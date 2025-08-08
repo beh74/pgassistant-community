@@ -1,0 +1,22 @@
+{
+    "sql":
+    [
+            {
+                "id": "search a firstname",
+                "description": "search a firstname",
+                "category": "Database",        
+                "sql": "select * from firstname where firstname like '$1%';",
+                "type": "param_query",
+                "reference": "https://www.postgresql.org/docs/current/sql-show.html"
+            },
+            {
+                "id": "optimized query",
+                "description": "optimized query",
+                "category": "Database",        
+                "sql": "select * from firstname_opt where firstname_lower_accent like '$1%';",
+                "type": "param_query",
+                "reference": "https://www.postgresql.org/docs/current/sql-show.html"
+            }
+            
+    ]
+}

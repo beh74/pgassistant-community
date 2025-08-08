@@ -1,0 +1,79 @@
+{
+    "sql":
+    [
+            {
+                "id": "vacuum_opt",
+                "description": "Vacuum analyze each table in the database",
+                "category": "Vacuum",
+                "sql": "SELECT n.nspname || '.' || c.relname AS table_name, s.n_live_tup AS live_tuples, s.n_dead_tup, s.n_tup_upd, pg_size_pretty(pg_total_relation_size(c.oid)) AS table_size, s.last_vacuum, s.last_autovacuum, s.last_analyze, s.last_autoanalyze, 'VACUUM ANALYZE ' || n.nspname || '.' || c.relname || ';' AS pga_suggestion FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_stat_all_tables s ON s.relid = c.oid WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, c.relname;",
+                "type": "select",
+                "reference": ""
+                
+            },
+            {
+                "id": "privileges",
+                "description": "test",
+                "category":"Database",
+                "sql": "SELECT grantee, privilege_type FROM information_schema.role_routine_grants WHERE routine_name = 'pg_stat_statements_reset';",
+                "type": "select",
+                "reference": ""
+            },
+              {
+                "id": "show_wal_level",
+                "description": "Show the current WAL level configuration",
+                "category": "DatabaseWal",
+                "sql": "SHOW wal_level;",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/runtime-config-wal.html"
+            },
+            {
+                "id": "check_wal_archive_mode",
+                "description": "Check if WAL archiving is enabled",
+                "category": "DatabaseWal",
+                "sql": "SHOW archive_mode;",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/runtime-config-wal.html"
+            },
+            {
+                "id": "get_last_wal_insert_lsn",
+                "description": "Get the last WAL insert location",
+                "category": "DatabaseWal",
+                "sql": "SELECT pg_current_wal_lsn();",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/functions-admin.html"
+            },
+            {
+                "id": "get_wal_file_name",
+                "description": "Get WAL file name from a given LSN",
+                "category": "DatabaseWal",
+                "sql": "SELECT pg_walfile_name('$1');",
+                "type": "param_query",
+                "reference": "https://www.postgresql.org/docs/current/functions-admin.html"
+            },
+            {
+                "id": "get_replication_slots",
+                "description": "List all replication slots and their status",
+                "category": "DatabaseWal",
+                "sql": "SELECT * FROM pg_replication_slots;",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/catalog-pg-replication-slots.html"
+            },
+            {
+                "id": "get_wal_receiver_status",
+                "description": "Check status of WAL receiver",
+                "category": "DatabaseWal",
+                "sql": "SELECT * FROM pg_stat_wal_receiver;",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html"
+            },
+            {
+                "id": "get_archived_wal",
+                "description": "Check archived WAL files",
+                "category": "DatabaseWal",
+                "sql": "SELECT * FROM pg_stat_archiver;",
+                "type": "select",
+                "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html"
+            }
+            
+    ]
+}

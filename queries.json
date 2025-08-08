@@ -1,0 +1,389 @@
+{
+"sql":
+[
+        {
+            "id": "db_version",
+            "description": "Database version",
+            "category": "Database",        
+            "sql": "SHOW server_version;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/sql-show.html"
+        },
+        {
+            "id": "table_list",
+            "description": "Analyze tables structure with LLM to check RFC(s) compliance",
+            "category": "table",
+            "sql" : "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' and table_schema not in ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;",
+            "type": "select",
+            "reference": ""
+        },
+        {   "id": "vacuum_suggestions_by_table",
+            "description": "Vacuum suggestions by tables",
+            "category": "Database",
+            "sql": "SELECT \n        schemaname || '.' || relname AS table_name,\n        n_live_tup AS live_tuples,\n        n_dead_tup,\n        n_tup_upd ,\n        pg_size_pretty(pg_total_relation_size(relid)) AS table_size,\n        last_vacuum,\n        last_autovacuum,\n        last_analyze,\n        last_autoanalyze,\n        CASE \n            WHEN n_dead_tup  + n_tup_upd> 1000 THEN 'VACUUM ANALYZE ' || schemaname || '.' || relname || ';'\n            WHEN n_live_tup=0 and last_analyze is null then 'ANALYZE ' || schemaname || '.' || relname || ';'\n            WHEN (last_vacuum IS NULL AND last_autovacuum IS null and last_analyze is null) THEN 'VACUUM ANALYZE ' || schemaname || '.' || relname || ';' \n            ELSE '-- NOTHING TO DO'\n        END AS pga_suggestion\n    FROM \n        pg_stat_user_tables\n\n    ORDER BY \n        n_dead_tup DESC, pg_total_relation_size(relid) DESC;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/sql-vacuum.html"
+        },
+        {
+            "id": "db_file_settings",
+            "description": "Database configuration file settings",
+            "category": "Database",        
+            "sql": "select name,setting from pg_file_settings;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/view-pg-file-settings.html"
+        },
+        {
+            "id": "databse_pg_tune",
+            "description": "PGTune parameters",
+            "category": "Database",
+            "sql": "select category, name, setting from pg_settings where name in ('max_connections','shared_buffers','effective_cache_size','maintenance_work_mem','checkpoint_completion_target','wal_buffers','default_statistics_target','random_page_cost','effective_io_concurrency','work_mem','huge_pages','min_wal_size','max_wal_size','max_worker_processes','max_parallel_workers_per_gather','max_parallel_workers','max_parallel_maintenance_workers') order by name",
+            "type": "select",
+            "reference": "https://pgtune.leopard.in.ua/"
+        },
+        {
+            "id": "db_size",
+            "description": "Database size",            
+            "category": "Database",        
+            "sql": "select pg_size_pretty(pg_database_size('$1'));",
+            "type": "param_query",
+            "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
+        },
+        {
+            "id": "db_cache",
+            "description": "Database hit cache ratio",            
+            "category": "Cache",        
+            "sql": "SELECT round (100*sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)),2)::float as ratio FROM pg_statio_user_tables;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-TABLES-VIEW"
+        },
+        {
+            "id": "hit_cache_by_table",
+            "description": "Cache usage by table",
+            "category": "Cache",
+            "sql": "SELECT schemaname, relname AS table_name, ROUND(100 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) AS table_cache_hit_ratio, ROUND(100 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) AS index_cache_hit_ratio, CASE WHEN ROUND(100 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) >= 99 THEN 'Excellent' WHEN ROUND(100 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) BETWEEN 95 AND 98 THEN 'Good' WHEN ROUND(100 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) BETWEEN 90 AND 94 THEN 'Average' ELSE 'Poor' END AS table_evaluation, CASE WHEN ROUND(100 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) >= 99 THEN 'Excellent' WHEN ROUND(100 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) BETWEEN 95 AND 98 THEN 'Good' WHEN ROUND(100 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) BETWEEN 90 AND 94 THEN 'Average' ELSE 'Poor' END AS index_evaluation FROM pg_statio_user_tables ORDER BY index_cache_hit_ratio asc, table_cache_hit_ratio asc;",
+            "type": "select"
+        },
+        {
+            "id": "table_size",
+            "description": "All tables size",                        
+            "category": "Table",        
+            "sql": "SELECT schemaname AS schema_name, relname AS table_name, n_live_tup AS row_count,  pg_size_pretty(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname))) AS size,  pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes FROM pg_stat_user_tables ORDER BY size_bytes DESC",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
+        },
+        {
+            "id": "table_size_top_5",
+            "description": "Top 5 tables size",                        
+            "category": "Table",        
+            "sql": "SELECT schemaname AS schema_name, relname AS table_name, n_live_tup AS row_count,  pg_size_pretty(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname))) AS size,  pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes FROM pg_stat_user_tables ORDER BY size_bytes DESC LIMIT 5;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
+        },        
+        {           
+            "id": "launch_analyze",
+            "description": "Launch analyze on a table",                        
+            "category": "Table",        
+            "sql": "SELECT schemaname AS schema_name, relname AS table_name, 'ANALYZE ' || quote_ident(schemaname) || '.' || quote_ident(relname) || ';' AS pga_suggestion FROM pg_stat_user_tables ORDER BY schema_name, relname;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
+        },    
+        {
+            "id": "table_io",
+            "category": "Table",
+            "description": "All tables IO",
+            "sql": "SELECT * from pg_statio_user_tables order by heap_blks_read desc;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-TABLES-VIEW"
+        },        
+        {
+            "id": "users",
+            "category": "Database",
+            "description": "Database users",                          
+            "sql": "SELECT pg_user.usename || case when pg_user.usesuper THEN ' (Super user)' else '' end as username FROM pg_catalog.pg_user;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/9.3/view-pg-user.html"
+        },
+        {
+            "id": "pg_stat_statements_enable",
+            "description": "Enable module pg_stat_statements",
+            "category": "Database",  
+            "sql": "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
+            "type": "exec",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },
+        {
+            "id": "pg_stat_reset",
+            "description": "Reset all statistics",            
+            "category": "cache",  
+            "sql": "SELECT pg_stat_reset();",
+            "type": "exec",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html"
+        },  
+        {
+            "id": "pg_stat_statements_reset",
+            "description": "Reset pg_stat_statements statistics",            
+            "category": "Cache",  
+            "sql": "SELECT pg_stat_statements_reset();",
+            "type": "exec",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },              
+        {
+            "id": "top_queries",
+            "description": "Top 50 queries",
+            "category": "Query",  
+            "sql": "SELECT \n  query,\n  calls,\n  rows,\n  ROUND(cast(total_exec_time as numeric),2) as total_exec_time,\n  ROUND(cast(mean_exec_time as numeric),5) as mean_exec_time,\n  ROUND(cast(min_exec_time as numeric),5) as min_exec_time,\n  ROUND(cast(max_exec_time as numeric),5) as max_exec_time,\n  ROUND(cast(stddev_exec_time as numeric),5) as stddev_exec_time,\n  round(shared_blks_hit/(shared_blks_hit+shared_blks_read)::NUMERIC*100,2) as hit_cache_ratio,\n   wal_records,\n  wal_fpi,\n  wal_bytes,\n  queryid,\n  (shared_blks_read + temp_blks_read + local_blks_read) AS total_blks_read\nFROM \n  pg_stat_statements\nWHERE \n  shared_blks_hit > 0 \n  AND query NOT LIKE '%pg_catalog%' \n  AND LOWER(query) NOT LIKE 'copy%' \n  AND LOWER(query) NOT LIKE 'set%' AND LOWER(query) not like '/* launched by pgassistant */%' \nORDER BY \n  total_exec_time DESC \nLIMIT 50",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },
+        {
+            "id": "rank_queries",
+            "description": "Rank queries",
+            "category": "Query",  
+            "sql": "WITH ranked_queries AS (SELECT query, queryid, calls, rows, mean_exec_time, total_exec_time, (shared_blks_hit / NULLIF((shared_blks_hit + shared_blks_read), 0)::NUMERIC) * 100 AS hit_cache_ratio, calls * mean_exec_time AS weighted_execution_time, (1 - (shared_blks_hit / NULLIF((shared_blks_hit + shared_blks_read), 0)::NUMERIC)) * 100 AS weighted_hit_cache_ratio FROM pg_stat_statements WHERE query NOT LIKE '%pg_catalog%' AND LOWER(query) NOT LIKE 'copy%' AND LOWER(query) NOT LIKE 'set%' AND calls > 1), normalized_scores AS (SELECT query, queryid, calls, rows, mean_exec_time, total_exec_time, hit_cache_ratio, weighted_execution_time, weighted_hit_cache_ratio, weighted_execution_time / NULLIF(MAX(weighted_execution_time) OVER (), 0) AS normalized_execution_time, weighted_hit_cache_ratio / NULLIF(MAX(weighted_hit_cache_ratio) OVER (), 0) AS normalized_hit_cache_ratio FROM ranked_queries) SELECT query, queryid, calls, rows, mean_exec_time, hit_cache_ratio, total_exec_time, ROUND(CAST(normalized_execution_time * 60 AS NUMERIC), 2) AS execution_time_percentage, ROUND(CAST(normalized_hit_cache_ratio * 40 AS NUMERIC), 2) AS cache_ratio_percentage, ROUND(CAST((normalized_execution_time * 60 + normalized_hit_cache_ratio * 40) AS NUMERIC), 2) AS optimization_score_percentage FROM normalized_scores WHERE (normalized_execution_time IS NOT NULL AND normalized_hit_cache_ratio IS NOT NULL) ORDER BY optimization_score_percentage DESC LIMIT 50;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },
+        {
+            "id": "index_seqscan",
+            "description": "Tables with sequential scans",
+            "category": "Indexe",
+            "sql": "SELECT schemaname, relname, seq_scan, seq_tup_read / seq_scan AS tup_per_scan,(select query from pg_stat_statements where lower(query) like '%'||relname||'%' and lower(query) not like '%explain analyze%' and lower(query) not like '%pg_catalog%' and lower(query) not like 'copy%' and lower(query) not like 'set%' order by total_exec_time desc limit 1 ), last_seq_scan, seq_tup_read, idx_tup_fetch, last_vacuum, last_autovacuum, last_analyze FROM pg_stat_user_tables WHERE seq_scan > 0 order by seq_scan desc limit 50;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/16/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW"
+        },
+        {
+            "id": "table_columns_stats",
+            "description": "Statistics of table columns",
+            "category": "Table",
+            "sql": "select schemaname, tablename, attname, null_frac, n_distinct,most_common_vals, correlation from pg_stats where schemaname not in ('pg_catalog','information_schema' ) order by schemaname, tablename,attname;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/view-pg-stats.html"
+        },
+        {
+            "id": "index_unused",            
+            "category": "Indexe",
+            "description": "Unused indexes",
+            "sql": "select a.schemaname, a.relname, a.indexrelname, b.indexdef from pg_stat_user_indexes a ,pg_indexes b where a.schemaname=b.schemaname and a.relname=b.tablename and a.indexrelname=b.indexname and a.idx_scan = 0 order by a.relname,a.indexrelname;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ALL-INDEXES-VIEW"
+        },
+        {
+            "id": "index_usage",
+            "category": "Indexe",
+            "description": "Indexes usage",
+            "sql": "SELECT relname, 100 * idx_scan / (seq_scan + idx_scan) percent_of_times_index_used, n_live_tup FROM pg_stat_user_tables where seq_scan + idx_scan>0 ORDER BY n_live_tup DESC;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW"
+        },
+        {
+            "id": "index_io",
+            "category": "Indexe",
+            "description": "Indexes IO",
+            "sql": "SELECT schemaname, relname,indexrelname,idx_blks_read,idx_blks_hit FROM pg_statio_user_indexes order by idx_blks_read desc;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-INDEXES-VIEW"
+        },
+        {
+            "id": "index_definition",
+            "category": "Indexe",
+            "description": "Indexes definitions",
+            "sql": "SELECT schemaname, tablename, indexname, indexdef FROM pg_indexes WHERE schemaname != 'pg_catalog' ORDER BY schemaname, tablename, indexname;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/view-pg-indexes.html"
+        },
+        {
+            "category": "Issue",
+            "id": "issue_idx_redundant",
+            "description": "Issue - Redundant indexes",
+            "sql": "WITH fk_indexes AS (\n    SELECT \n        n.nspname AS schema_name,\n        ci.relname AS index_name,\n        cr.relname AS table_name,\n        (confrelid::regclass)::text AS fk_table_ref,\n        array_to_string(indclass, ', ') AS opclasses\n    FROM pg_index i\n    JOIN pg_class ci ON ci.oid = i.indexrelid AND ci.relkind = 'i'\n    JOIN pg_class cr ON cr.oid = i.indrelid AND cr.relkind = 'r'\n    JOIN pg_namespace n ON n.oid = ci.relnamespace\n    JOIN pg_constraint cn ON cn.conrelid = cr.oid\n    LEFT JOIN pg_stat_user_indexes si ON si.indexrelid = i.indexrelid\n    WHERE contype = 'f' \n      AND i.indisunique IS FALSE\n      AND conkey IS NOT NULL\n      AND ci.relpages > 0\n      AND si.idx_scan < 10\n),\nindex_data AS (\n    SELECT \n        *,\n        (SELECT string_agg(lpad(i, 3, '0'), ' ') FROM unnest(string_to_array(indkey::text, ' ')) i) AS columns,\n        array_to_string(indclass, ', ') AS opclasses\n    FROM pg_index i\n    JOIN pg_class ci ON ci.oid = i.indexrelid AND ci.relkind = 'i'\n    WHERE indisvalid = TRUE \n      AND ci.relpages > 0\n),\nredundant_indexes AS (\n    SELECT \n        i2.indexrelid AS index_id,\n        tnsp.nspname AS schema_name,\n        trel.relname AS table_name,\n        pg_relation_size(trel.oid) AS table_size_bytes,\n        irel.relname AS index_name,\n        am1.amname AS access_method,\n        (i1.indexrelid::regclass)::text AS reason,\n        i1.indexrelid AS reason_index_id,\n        pg_get_indexdef(i1.indexrelid) AS main_index_def,\n        pg_size_pretty(pg_relation_size(i1.indexrelid)) AS main_index_size,\n        pg_get_indexdef(i2.indexrelid) AS index_def,\n        pg_relation_size(i2.indexrelid) AS index_size_bytes,\n        s.idx_scan AS index_usage,\n        quote_ident(tnsp.nspname) AS formated_schema_name,\n        COALESCE(NULLIF(quote_ident(tnsp.nspname), 'public') || '.', '') || quote_ident(irel.relname) AS formated_index_name,\n        quote_ident(trel.relname) AS formated_table_name,\n        COALESCE(NULLIF(quote_ident(tnsp.nspname), 'public') || '.', '') || quote_ident(trel.relname) AS formated_relation_name,\n        i2.opclasses\n    FROM index_data AS i1\n    JOIN index_data AS i2 ON (\n        i1.indrelid = i2.indrelid \n        AND i1.indexrelid <> i2.indexrelid\n    )\n    INNER JOIN pg_opclass op1 ON i1.indclass[0] = op1.oid\n    INNER JOIN pg_opclass op2 ON i2.indclass[0] = op2.oid\n    INNER JOIN pg_am am1 ON op1.opcmethod = am1.oid\n    INNER JOIN pg_am am2 ON op2.opcmethod = am2.oid\n    JOIN pg_stat_user_indexes AS s ON s.indexrelid = i2.indexrelid\n    JOIN pg_class AS trel ON trel.oid = i2.indrelid\n    JOIN pg_namespace AS tnsp ON trel.relnamespace = tnsp.oid\n    JOIN pg_class AS irel ON irel.oid = i2.indexrelid\n    WHERE NOT i2.indisprimary\n      AND NOT (i2.indisunique AND NOT i1.indisprimary)\n      AND am1.amname = am2.amname\n      AND i1.columns LIKE (i2.columns || '%')\n      AND i1.opclasses LIKE (i2.opclasses || '%')\n      AND pg_get_expr(i1.indexprs, i1.indrelid) IS NOT DISTINCT FROM pg_get_expr(i2.indexprs, i2.indrelid)\n      AND pg_get_expr(i1.indpred, i1.indrelid) IS NOT DISTINCT FROM pg_get_expr(i2.indpred, i2.indrelid)\n),\nredundant_indexes_fk AS (\n    SELECT \n        ri.*, \n        (SELECT COUNT(1) \n         FROM fk_indexes fi \n         WHERE fi.fk_table_ref = ri.table_name \n           AND fi.opclasses LIKE (ri.opclasses || '%')) > 0 AS supports_fk\n    FROM redundant_indexes ri\n),\nredundant_indexes_tmp_num AS (\n    SELECT \n        ROW_NUMBER() OVER () num, \n        rig.* \n    FROM redundant_indexes_fk rig \n    ORDER BY index_id\n),\nredundant_indexes_tmp_cut AS (\n    SELECT \n        ri1.*, \n        ri2.num AS r_num \n    FROM redundant_indexes_tmp_num ri1\n    LEFT JOIN redundant_indexes_tmp_num ri2 ON ri2.reason_index_id = ri1.index_id \n        AND ri1.reason_index_id = ri2.index_id\n    WHERE ri1.num < ri2.num OR ri2.num IS NULL\n),\nredundant_indexes_cut_grouped AS (\n    SELECT \n        DISTINCT(num), \n        * \n    FROM redundant_indexes_tmp_cut \n    ORDER BY index_size_bytes DESC\n),\nredundant_indexes_grouped AS (\n    SELECT \n        DISTINCT(num), \n        * \n    FROM redundant_indexes_tmp_cut \n    ORDER BY index_size_bytes DESC\n)\nSELECT \n    schema_name,\n    table_name,\n    table_size_bytes,\n    index_name,\n    access_method,\n    STRING_AGG(DISTINCT reason, ', ') AS redundant_to,\n    STRING_AGG(main_index_def, ', ') AS main_index_def,\n    STRING_AGG(main_index_size, ', ') AS main_index_size,\n    index_def,\n    index_size_bytes,\n    index_usage,\n    supports_fk,\n    -- Generate DROP INDEX SQL\n    CASE \n        WHEN index_usage < 10 AND NOT supports_fk THEN \n            'DROP INDEX ' || \n            COALESCE(NULLIF(quote_ident(schema_name), 'public') || '.', '') || \n            quote_ident(index_name) || '; ANALYZE ' || schema_name || '.' || table_name || ';' \n        ELSE '-- NO RECOMMANDATION'\n    END AS pga_suggestion\nFROM \n    redundant_indexes_cut_grouped\nGROUP BY \n    index_id, schema_name, table_name, table_size_bytes, index_name, access_method, index_def, index_size_bytes, index_usage, supports_fk\nORDER BY \n    index_size_bytes DESC;",
+            "type": "select",
+            "reference": "https://www.rockdata.net/tutorial/check-duplicate-indexes/"
+        },
+        {
+            "category": "Issue",
+            "id": "issue_idx_duplicate",
+            "description": "Issue - Duplicate indexes",
+            "sql": "SELECT indrelid::regclass AS tablename,array_agg(indexrelid::regclass) AS Indexes FROM pg_index GROUP BY indrelid ,indkey HAVING COUNT(*) > 1;",
+            "type": "select",
+            "reference": "https://www.rockdata.net/tutorial/check-duplicate-indexes/"
+        },
+        {
+            "category": "Issue",
+            "id": "issue_idx_fk_datatype",
+            "description": "Datatype on foreign keys are different",
+            "sql": "WITH foreign_key_columns AS (\n        SELECT\n            conname AS fk_name,\n            conrelid::regclass AS fk_table,\n            confrelid::regclass AS ref_table,\n            att2.attname AS fk_column,\n            att1.attname AS ref_column,\n            n.nspname AS schema_name,\n            pg_catalog.format_type(att2.atttypid, att2.atttypmod) AS fk_column_type,\n            pg_catalog.format_type(att1.atttypid, att1.atttypmod) AS ref_column_type\n        FROM\n            pg_constraint c\n        INNER JOIN pg_namespace n ON n.oid = c.connamespace\n        INNER JOIN pg_attribute att1\n            ON att1.attnum = ANY (c.confkey) AND att1.attrelid = c.confrelid\n        INNER JOIN pg_attribute att2\n            ON att2.attnum = ANY (c.conkey) AND att2.attrelid = c.conrelid\n        WHERE\n            c.contype = 'f'\n    ),\n    mismatched_types AS (\n        SELECT\n            fk_name,\n            schema_name,\n            fk_table,\n            ref_table,\n            fk_column,\n            ref_column,\n            fk_column_type,\n            ref_column_type,\n            'ALTER TABLE ' || schema_name || '.' || fk_table || \n            ' ALTER COLUMN ' || fk_column || ' TYPE ' || ref_column_type || \n            ' USING ' || fk_column || '::' || ref_column_type || ';' AS pga_suggestion\n        FROM\n            foreign_key_columns\n        WHERE\n            fk_column_type <> ref_column_type\n    )\n    SELECT\n        fk_name AS foreign_key_name,\n        schema_name,\n        fk_table AS foreign_key_table,\n        fk_column AS foreign_key_column,\n        ref_table AS referenced_table,\n        ref_column AS referenced_column,\n        fk_column_type AS foreign_key_column_type,\n        ref_column_type AS referenced_column_type,\n        pga_suggestion\n    FROM\n        mismatched_types\n    ORDER BY\n        schema_name, fk_table, fk_name;",
+            "type": "select",
+            "reference": ""
+        },
+        {
+            "category": "Issue",
+            "id": "issue_idx_fk_missing",
+            "description": "Issue - Indexes missing on foreign keys",
+            "sql": "WITH fkeys_without_indexes AS (SELECT c.conname AS fk_name, c.conrelid::regclass AS table_name, a.attname AS column_name, n.nspname AS schema_name, c.conkey, c.confrelid::regclass AS referenced_table FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace JOIN pg_class r ON r.oid = c.conrelid JOIN unnest(c.conkey) AS col_num ON true JOIN pg_attribute a ON a.attnum = col_num AND a.attrelid = r.oid LEFT JOIN pg_index i ON i.indrelid = r.oid AND col_num = ANY (i.indkey) WHERE c.contype = 'f' AND i.indexrelid IS NULL), referenced_stats AS (SELECT relid::regclass AS referenced_table, n_live_tup FROM pg_stat_user_tables), suggested_indexes AS (SELECT f.schema_name, f.table_name, f.column_name, f.referenced_table, s.n_live_tup, CASE WHEN s.n_live_tup IS NULL THEN 'REFERENCED TABLE IS NOT ANALYZED !' WHEN s.n_live_tup >= 1000 THEN 'INDEX STRONGLY RECOMMENDED' WHEN s.n_live_tup >= 500 THEN 'INDEX RECOMMENDED (moderate size)' ELSE 'INDEX MISSING BUT REFERENCED TABLE IS SMALL' END AS index_importance, 'CREATE INDEX CONCURRENTLY pga_idx_fk_' || f.table_name || '_' || f.column_name || ' ON ' || f.schema_name || '.' || f.table_name || '(' || f.column_name || ');' || ' ANALYZE ' || f.schema_name || '.' || f.table_name || ';' AS pga_suggestion_noexec FROM fkeys_without_indexes f LEFT JOIN referenced_stats s ON f.referenced_table = s.referenced_table) SELECT schema_name, table_name, column_name, referenced_table, n_live_tup as estimated_rows, index_importance, pga_suggestion_noexec FROM suggested_indexes ORDER BY schema_name, table_name, column_name;",
+            "type": "select",
+            "reference": "https://beh74.github.io/pgassistant-blog/doc/issue_index_fk/"
+        },
+        {
+            "description": "Tables without primary keys",
+            "category": "Issue",
+            "id": "issue_no_pk",
+            "sql": "SELECT tab.table_schema, tab.table_name FROM information_schema.tables tab LEFT JOIN information_schema.table_constraints tco ON tab.table_schema = tco.table_schema AND tab.table_name = tco.table_name AND tco.constraint_type = 'PRIMARY KEY' WHERE tab.table_type = 'BASE TABLE' AND tab.table_schema NOT IN ('information_schema', 'pg_catalog') AND tco.constraint_name IS NULL AND NOT EXISTS (SELECT 1 FROM pg_inherits JOIN pg_class child ON pg_inherits.inhrelid = child.oid JOIN pg_namespace ns ON child.relnamespace = ns.oid WHERE ns.nspname = tab.table_schema AND child.relname = tab.table_name) ORDER BY tab.table_schema, tab.table_name;",
+            "type": "select",
+            "reference": "https://dataedo.com/kb/query/postgresql/find-tables-without-primary-keys"   
+        },
+        {
+            "category": "Issue",
+            "id": "issue_column_diff_type",
+            "description": "Columns with different data types",
+            "sql": "SELECT table_name, column_name, data_type FROM information_schema.columns a where column_name in (select column_name FROM information_schema.columns b where a.column_name = b.column_name and a.data_type != b.data_type and a.table_name != b.table_name and b.table_schema='public') and a.table_schema='public' ORDER BY column_name, table_name;",
+            "type": "select"
+        },                
+        {
+            "category": "Database",
+            "id": "database_modules",
+            "description": "Database modules",
+            "sql": "SELECT * FROM pg_extension;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/catalog-pg-extension.html"
+        },
+        {
+            "category": "Database",
+            "id": "database_settings",
+            "description": "Database settings",
+            "sql": "SHOW ALL",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/sql-show.html"           
+        },
+        {
+            "category": "Database",
+            "id": "database_archive_settings",
+            "description": "Database archive settings",
+            "sql": "select category, name, setting from pg_settings where lower(name) like 'archive%' or lower(name) like '%wal%';;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/view-pg-settings.html"             
+        },
+        {
+            "category": "Database",
+            "id": "database_activity",
+            "description": "Database activity",
+            "sql": "SELECT datname, usename, query, application_name, client_addr, backend_start, state FROM pg_stat_activity where datname!='None' order by state,application_name,backend_start;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
+        },
+        {
+            "category": "Database",
+            "id": "database_activity_grouped",
+            "description": "Database activity grouped by user, application, client address and state",
+            "sql": "SELECT datname, usename, application_name, client_addr, state, count(*) as nb FROM pg_stat_activity where datname!='None' group by datname, usename, application_name, client_addr, state;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
+        },   
+        {
+            "category": "Database",
+            "id": "database_count_connexions",
+            "description": "Count active connexions",
+            "sql": "SELECT count(*) as nb FROM pg_stat_activity where datname!='None'",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
+        },
+        {
+            "category": "Database",
+            "id": "database_max_connexions",
+            "description": "Database max_connections setting",
+            "sql": "SELECT setting FROM pg_settings WHERE name = 'max_connections';",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/runtime-config-connection.html"
+        },
+        {
+            "category": "Database",
+            "id": "database_top_clients",
+            "description": "Database top 5 clients by connections",
+            "sql": "SELECT client_addr, COUNT(*) FILTER (WHERE state = 'active') AS active_connections, COUNT(*) FILTER (WHERE state = 'idle') AS idle_connections, COUNT(*) AS total_connections FROM pg_stat_activity WHERE client_addr IS NOT null GROUP BY client_addr ORDER BY total_connections desc LIMIT 5;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
+        },
+    
+        {
+            "category": "Database",
+            "id": "database_count_conlicts",
+            "description": "Database count conflicts",
+            "sql": "SELECT sum(confl_tablespace+confl_lock+confl_snapshot+confl_bufferpin+confl_deadlock) as nb from pg_stat_database_conflicts;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-DATABASE-CONFLICTS-VIEW"
+        },                
+        {
+            "category": "Database",
+            "id": "database_running_queries",
+            "description": "Running queries",
+            "sql": "SELECT datname, usename, query, application_name, client_addr, backend_start, state FROM pg_stat_activity where datname!='None' and state !='idle' order by state,application_name,backend_start;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
+        },
+        {
+            "category": "Database",
+            "id": "database_schemas",
+            "description": "Database schemas",
+            "sql": "SELECT *  FROM information_schema.schemata;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/information-schema.html"
+        },
+        {
+            "category": "Database",
+            "id": "database_conflicts",
+            "description": "Database conflicts",
+            "sql": "SELECT * from pg_stat_database_conflicts;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-DATABASE-CONFLICTS-VIEW"
+        },
+
+        {
+            "category": "Database",
+            "id": "database_wal_size",
+            "description": "Database wal size",
+            "sql": "SELECT ( a.wals::int * b.wal_seg_size::int / 1024 / 1024 ) AS WAL_Space_Used_MB FROM (SELECT count(*) wals FROM   pg_ls_dir('pg_wal') WHERE  pg_ls_dir ~ '^[0-9A-F]{24}') a,( SELECT  setting wal_seg_size FROM pg_settings WHERE   name = 'wal_segment_size') b;",
+            "type": "select",
+            "reference": "https://www.pythian.com/blog/technical-track/monitoring-transaction-logs-in-postgresql"
+        },
+        {
+            "category": "Database",
+            "id": "pg_stat_wal",
+            "description" : "Database pg_stat_wal (Postgresql>=14)",
+            "sql": "SELECT now() wal_capture_time, wal_records, wal_fpi, wal_bytes, wal_buffers_full, wal_write, wal_write_time, wal_sync_time,stats_reset FROM pg_stat_wal;",
+            "type": "select",
+            "reference": "https://www.pythian.com/blog/technical-track/monitoring-transaction-logs-in-postgresql"
+        },
+        {
+            "category": "Table",
+            "id": "table_description",
+            "description" : "Table definition",
+            "sql": "select column_name, data_type, character_maximum_length, column_default, is_nullable from INFORMATION_SCHEMA.COLUMNS where table_name = '$1';",
+            "type": "param_query",
+            "reference": "https://www.postgresql.org/docs/current/information-schema.html"
+        },         
+        {
+            "id": "top_queries_on_object",
+            "description": "Top 50 queries on object",
+            "category": "Query",  
+            "sql": "select queryid, query, calls, rows, total_exec_time,mean_exec_time,min_exec_time,max_exec_time,stddev_exec_time,shared_blks_hit,shared_blks_read,shared_blks_written,shared_blks_dirtied,local_blks_hit,local_blks_read,local_blks_dirtied,temp_blks_read,temp_blks_written,wal_records,wal_fpi,wal_bytes   from pg_stat_statements where query not like '%pg_catalog%' and lower(query) not like 'copy%' and lower(query) not like 'set%' and lower (query) like '%$1%' and lower(query) NOT LIKE '/* launched by pgassistant */%'order by total_exec_time desc limit 50",
+            "type": "param_query",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },
+        {
+            "id": "pgstat_get_sqlquery_by_id",
+            "description": "Get sql query by querid in pg_stat_statements",
+            "category": "Query",  
+            "sql": "select query from pg_stat_statements where queryid=$1",
+            "type": "param_query",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"            
+        },
+        {
+            "id": "database_profile",
+            "description": "DB Profile : amount of select, insert, update or delete",
+            "category": "Query",  
+            "sql": "WITH query_stats AS ( SELECT CASE WHEN lower(query) LIKE '%select %' THEN 'select' WHEN lower(query) LIKE '%insert %' THEN 'insert' WHEN lower(query) LIKE '%update %' THEN 'update' WHEN lower(query) LIKE '%delete %' THEN 'delete' END AS query_type, SUM(calls) AS total_calls, SUM(rows) AS total_rows, SUM(total_exec_time) AS total_exec_time, AVG(mean_exec_time) AS avg_mean_exec_time FROM pg_stat_statements WHERE lower(query) LIKE '%select %' OR lower(query) LIKE '%insert %' OR lower(query) LIKE '%update %' OR lower(query) LIKE '%delete %' GROUP BY query_type ), total_stats AS ( SELECT SUM(total_calls) AS grand_total_calls, SUM(total_exec_time) AS grand_total_exec_time FROM query_stats ) SELECT qs.query_type, qs.total_calls, qs.total_rows, round(qs.total_exec_time::numeric,2) as total_exec_time, round(qs.avg_mean_exec_time::numeric,3) as avg_mean_exec_time, round((qs.total_calls / ts.grand_total_calls) * 100,0) AS percentage_calls, round((qs.total_exec_time / ts.grand_total_exec_time)::numeric * 100,0) AS percentage_exec_time FROM query_stats qs, total_stats ts;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/pgstatstatements.html"            
+        }                     
+    ]
+}
+    
