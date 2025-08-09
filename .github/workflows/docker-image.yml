@@ -27,3 +27,4 @@ jobs:
             bertrand73/pgassistant:latest
           platforms: linux/amd64,linux/arm64
           no-cache: true
+
