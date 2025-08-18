@@ -6,7 +6,12 @@
   <br>
 </p>
 
----
+[![Documentation](https://img.shields.io/badge/Doumentation-pgAssistant-blue?logo=readthedocs)](https://beh74.github.io/pgassistant-blog/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit)
+[![Docker Pulls](https://img.shields.io/docker/pulls/bertrand73/pgassistant?label=Docker%20Pulls)](https://hub.docker.com/r/bertrand73/pgassistant)
+![Image Size](https://img.shields.io/docker/image-size/bertrand73/pgassistant/latest)
+![Latest version](https://img.shields.io/docker/v/bertrand73/pgassistant?sort=semver)
+
 
 ## Table of Contents
 1. [About](#about)
@@ -60,16 +65,20 @@ The original public snapshot is archived [here (Wayback Machine)](https://web.ar
 Choose your preferred setup method:
 
 ### Option A — Docker (recommended)
+
 Follow the guide [Get Started with Docker](https://beh74.github.io/pgassistant-blog/doc/startup_docker/)
 
----
 
 ### Option B — Python (local environment)
 Follow the guide [Get Started with Python](https://beh74.github.io/pgassistant-blog/doc/startup_python/)
 
 ---
 
+## Documentation
+
 Need help? Check the complete documentation and articles on the **[pgAssistant Blog](https://beh74.github.io/pgassistant-blog/)**.
+
+RSS feed : https://beh74.github.io/pgassistant-blog/index.xml
 
 ---
 
