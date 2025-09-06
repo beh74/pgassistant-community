@@ -1,5 +1,13 @@
 # Change Log
 
+## [1.9.8] - 2025-09-06
+
+### Features
+- Re-factoring LLM prompt for query optimization giving server parameters and table statistics ; optimize the prompt
+
+### Bug Fixes
+- Removing 'restrict' output from pg_dump
+
 ## [1.9.7] - 2025-08-08
 
 ### Features
