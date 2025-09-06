@@ -306,18 +306,18 @@ def analyze_query(querid):
                         params[param_index] = val  # Add to dictionnary
 
                 sql_query=sqlhelper.replace_query_parameters(sql_query,params)
-                sql_query_analyze = 'EXPLAIN ANALYZE  ' + sql_query
+                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS) {sql_query}"
 
                 if request.form.get('action')=='chatgpt':
                     rows = database.generic_select_with_sql(session,sql_query_analyze)
-                    chatgpt = llm.get_llm_query_for_query_analyze(sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+                    chatgpt = llm.get_llm_query_for_query_analyze(db_config=session, sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
 
                     chatgpt_response=llm.query_chatgpt(chatgpt)
                     return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
                 elif request.form.get('action')=='analyze':                   
                     parameters = {}
                     rows = database.generic_select_with_sql(session,sql_query_analyze)
-                    chatgpt = llm.get_llm_query_for_query_analyze(sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+                    chatgpt = llm.get_llm_query_for_query_analyze(db_config=session,sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
 
                     # Get more informations on query
                     existing_indexes = database.get_existing_indexes(session)

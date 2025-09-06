@@ -1,8 +1,14 @@
 import subprocess
 import re
 from pygments import highlight
-from pygments.lexers import SqlLexer
+from pygments.lexers import PostgresLexer
 from pygments.formatters import HtmlFormatter
+
+def remove_restrict_lines(html):
+    return "\n".join(
+        line for line in html.splitlines()
+        if not line.strip().startswith("\\restrict") and not line.strip().startswith("\\unrestrict")
+    )
 
 def sql_to_html(sql_query):
     """
@@ -15,9 +21,11 @@ def sql_to_html(sql_query):
         str: HTML code with syntax highlighting.
     """
     # Use the SQL lexer and an HTML formatter
-    formatter = HtmlFormatter(style="colorful", full=True, linenos=False)
-    highlighted_sql = highlight(sql_query, SqlLexer(), formatter)
-    return highlighted_sql
+    #formatter = HtmlFormatter(style="colorful", full=True, linenos=False)
+    sql_query = remove_pg_catalog_lines(sql_query)
+    formatter = HtmlFormatter(style="colorful", full=True, linenos=False, cssclass="sql-highlight")
+    highlighted_sql = highlight(sql_query, PostgresLexer(), formatter)
+    return remove_restrict_lines(highlighted_sql)
 
 def remove_pg_catalog_lines(sql_script):
     """
@@ -50,7 +58,7 @@ def generate_tables_ddl(host, port, database, user, password, tables):
 
         # Combine the command with piping and filtering
         command = f"""
-        PGPASSWORD="{password}" pg_dump -h {host} -p {port} -U {user} -d {database} --schema-only {table_args} |
+        PGPASSWORD="{password}" pg_dump -h {host} -p {port} -U {user} -d {database} --schema-only {table_args} --format plain |
         sed -e '/^--/d' \
             -e '/^SET/d' \
             -e '/^GRANT/d' \
@@ -70,8 +78,17 @@ def generate_tables_ddl(host, port, database, user, password, tables):
             check=True
         )
 
-        ddl_s = result.stdout.replace("\n\n", "\n")
-        return ddl_s
+        ddl_s = result.stdout
+
+        ddl_cleaned = "\n".join(
+            line for line in ddl_s.splitlines()
+            if not line.strip().startswith("\\restrict") and not line.strip().startswith("\\unrestrict")
+        )
+
+        while '\n\n' in ddl_cleaned:
+            ddl_cleaned = ddl_cleaned.replace('\n\n', '\n')
+
+        return ddl_cleaned
 
     except subprocess.CalledProcessError as e:
         print(f"Error generating DDL: {e}")

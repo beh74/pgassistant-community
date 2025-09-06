@@ -1,13 +1,18 @@
 import os
 import requests
+import markdown
+import pymdownx
+import re
+
 from urllib.parse import urlparse, urlunparse
 
 from openai import OpenAI
 from .ddl import generate_tables_ddl
 from .sqlhelper import get_tables
 from .config import get_config_value
-import markdown
-import re
+from .database import get_pg_tune_parameter
+from .database import fetch_table_stats
+
 
 def extract_root_uri(uri):
     """
@@ -52,9 +57,15 @@ def check_ollama_status(base_uri=None, timeout=2):
     except requests.RequestException:
         return "unreachable"
     
-def fix_code_blocks(text):
-    # Ajoute un saut de ligne avant chaque bloc ```lang s’il n’y en a pas déjà un
-    text = re.sub(r'([^\n])(```\w+)', r'\1\n\2', text)
+def fix_code_blocks(text: str) -> str:
+    # 1. Remove any language specifier after ``` (e.g. ```sql → ```)
+    text = re.sub(r'```[a-zA-Z0-9_+-]*', '```', text)
+
+    # 2. Ensure every opened block is closed
+    opens = len(re.findall(r'```', text))
+    if opens % 2 != 0:  # odd number of fences → add closing fence
+        text += "\n```"
+
     return text
 
 def query_chatgpt(question):
@@ -117,65 +128,194 @@ def query_chatgpt(question):
         )
         output = completion.choices[0].message.content
 
-    print(f"LLM response: {output}")
+    
     md_text = fix_code_blocks(output)
-
+    
     html = markdown.markdown(
-        md_text,
-        extensions=["fenced_code", "codehilite", "extra"],
-        extension_configs={
-            "codehilite": {"guess_lang": False, "css_class": "highlight"}
-        },
-        output_format="html5"
-    )
+            md_text,
+            extensions=[
+                "pymdownx.superfences",
+                "pymdownx.highlight",
+                "extra",
+            ],
+            extension_configs={
+                "pymdownx.highlight": {
+                    "use_pygments": True,
+                    "guess_lang": False,
+                    "linenums": False,
+                },
+                "pymdownx.superfences": {
+                  
+                },
+            },
+            output_format="html5",
+        )
     return html
 
-def get_llm_query_for_query_analyze (host, port, database, user, password, sql_query, rows):
+
+import re
+import json
+from typing import Any, Dict, Iterable, Optional, Union
+
+def _strip_explain(sql: str) -> str:
     """
-    Generates a detailed prompt for an LLM to analyze and optimize a PostgreSQL query.
+    Retire un préfixe EXPLAIN / EXPLAIN (options) [ANALYZE] s'il est présent.
+    Garde la requête d'origine pour l'analyse.
+    """
+    pattern = r"""
+        ^\s*EXPLAIN            # mot-clé
+        (?:\s*\( (?: [^()]+ | \([^()]*\) )* \) )?  # options éventuelles, équilibrées
+        (?:\s+ANALYZE)?        # ANALYZE optionnel (si pas dans la liste d'options)
+        \s+                    # au moins un espace avant la vraie requête
+    """
+    return re.sub(pattern, "", sql, flags=re.IGNORECASE | re.VERBOSE)
 
-    :param host: The database host.
-    :param port: The database port.
-    :param database: The database name.
-    :param user: The database user.
-    :param password: The database password.
-    :param sql_query: The SQL query with `EXPLAIN ANALYZE` prefix.
-    :param rows: The output of `EXPLAIN ANALYZE` as a list of dictionaries.
-    :return: A formatted string containing query details for LLM analysis.
-    """    
-    query = sql_query.replace ("EXPLAIN ANALYZE  ", "")
-    tables = get_tables(query)
-    
-    # Generate the DDL (schema) of the involved tables
+def _plan_block(rows: Union[str, Dict[str, Any], Iterable[Dict[str, Any]]]) -> str:
+    """
+    Normalise la section plan :
+    - si dict/list -> JSON pretty
+    - si list de dicts avec 'QUERY PLAN' (comme psql) -> concatène
+    - si str -> renvoie tel quel
+    """
+    if rows is None:
+        return "_No plan provided_"
+    if isinstance(rows, (dict, list)):
+        return "```json\n" + json.dumps(rows, indent=2) + "\n```"
+    if isinstance(rows, str):
+        rows = rows.strip()
+        fence = "```" if not rows.startswith("```") else ""
+        return f"{fence}\n{rows}\n{fence}"
+    # list de dicts (format psql)
+    try:
+        lines = []
+        for r in rows:  # type: ignore[assignment]
+            if isinstance(r, dict) and "QUERY PLAN" in r:
+                lines.append(str(r["QUERY PLAN"]))
+        return "```\n" + "\n".join(lines) + "\n```"
+    except Exception:
+        return "```\n" + str(rows) + "\n```"
+
+
+def get_llm_query_for_query_analyze(
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    sql_query: str,
+    rows: Union[str, Dict[str, Any], Iterable[Dict[str, Any]]],
+    *,
+
+    db_config: Optional[Dict[str, Any]] = None,
+) -> str:
+    """
+    Generates a robust prompt for PostgreSQL query optimization.
+    Automatically integrates server parameters via get_pg_tune_parameter()
+    """
+    # 1) SQL 
+    original_sql = _strip_explain(sql_query)
+    tables = get_tables(original_sql)
+
+    # 2) DDL
     ddl = generate_tables_ddl(host, port, database, user, password, tables)
+    ddl_block = f"```sql\n{ddl}\n```" if ddl else "_DDL unavailable_"
 
-    # Construct the LLM prompt with structured details
-    llm = (
-        "I have a PostgreSQL query that I would like to optimize. Below, I have provided the necessary details:\n\n"
-        f"1. **DDL of the table(s) involved**:\n```sql\n{ddl}\n```\n\n"
-        f"2. **The SQL query**:\n```sql\n{sql_query}\n```\n\n"
-        "3. **`EXPLAIN ANALYZE` output**:\n\n```"
-    )
-    llm += "\n".join(row['QUERY PLAN'] for row in rows)
-    llm += "\n```\n"
+    # 3) Server parameters
+    effective_version = None
+    effective_settings = None
     
-    # Add the optimization request
-    llm += (
-    "\nCould you analyze this query and suggest optimizations? If optimizations are possible, please provide the necessary SQL statements "
-    "(e.g., additional indexes or query rewrites) and explain the reasoning behind your recommendations."
+    try:
+        cfg = db_config 
+        running_values, major = get_pg_tune_parameter(cfg)
+        
+        if effective_settings is None:
+            effective_settings = running_values or {}
+        if effective_version is None:
+            effective_version = str(major)
+    except Exception as e:
+        print(f"get_pg_tune_parameter failed: {e}")
+        pass
+
+    # 4) Readable context
+    meta_lines = []
+    
+    if effective_version:
+        meta_lines.append(f"- PostgreSQL version: **{effective_version}**")
+    if effective_settings:
+        pretty = "\n".join(f"  - {k}: {v}" for k, v in effective_settings.items())
+        meta_lines.append("- Server settings (subset):\n" + pretty)
+    
+    table_stats=fetch_table_stats(db_config, tables) if db_config else None
+    if table_stats:
+        try:
+            stats_pretty = []
+            for t, s in table_stats.items():
+                parts = []
+                for k in ("estimated_rows", "n_live_tup", "n_dead_tup", "last_analyze"):
+                    if k in s and s[k] is not None:
+                        parts.append(f"{k}={s[k]}")
+                stats_pretty.append(f"  - {t}: " + ", ".join(parts) if parts else f"  - {t}")
+            meta_lines.append("- Table stats (subset):\n" + "\n".join(stats_pretty))
+        except Exception:
+            pass
+
+    plan_section = "\n".join(row['QUERY PLAN'] for row in rows)
+
+    # 5) Final prompt (identical to the “improved” version, with the context above)
+    llm = []
+    llm.append(
+        "You are a **senior PostgreSQL query optimizer**. "
+        "Read *all* sections before answering. Only use the information provided. "
+        "If a required piece of info is missing, say **Insufficient information** and list what is missing."
     )
-    # Add a cautionary note about redundant index recommendations
-    llm += (
-    "\n\n**Important Notice:** When suggesting optimizations, especially related to indexes, please carefully review the DDL provided above. "
-    "Some indexes may already exist, and redundant or unnecessary index recommendations should be avoided. Ensure any suggested indexes align "
-    "with the schema and constraints defined in the DDL. Never forget that primary keys are always indexed."
+    if meta_lines:
+        llm.append("\n**Context**:\n" + "\n".join(meta_lines))
+    llm.append("\n**1) DDL of involved tables**\n" + ddl_block)
+    llm.append("\n**2) SQL query (original, without EXPLAIN)**\n```sql\n" + original_sql.strip() + "\n```")
+    llm.append(
+        "\n**3) EXPLAIN ANALYZE output**\n"
+        "Be careful with indentation and node nesting.\n"
+        + plan_section
     )
-    # Encourage careful and well-supported recommendations
-    llm += (
-    "\nFeel free to reflect on possible optimizations and reasoning before finalizing your response. Ensure all suggestions are well-supported "
-    "and avoid any unnecessary or redundant recommendations."
+    llm.append(
+        """
+**Rules (very important):**
+- Do **not** recommend indexes that already exist in the DDL. Primary keys are already indexed.
+- If you recommend an index, include: table, columns (with order), predicate (if partial), opclass (if non-default), and whether `CONCURRENTLY` is advisable.
+- Never assume extensions (e.g., `pg_trgm`, `btree_gin`) are available unless visible in the DDL; if needed, say it's a *conditional* recommendation.
+- If no meaningful improvement is likely, say **No change required** and explain why.
+- Cite specific plan evidence for each recommendation (e.g., misestimation, Hash Join spill, Seq Scan on high-selectivity predicate, Sort method=external).
+- You may also propose **query rewrites** (equivalent semantics) to improve plan selection (e.g., pushdown of predicates, aligning ORDER BY with an index), and explain the expected plan change
+- Keep all SQL **PostgreSQL-valid** (match the version if provided).
+"""
     )
-    return llm
+    llm.append(
+    """
+**Respond in this exact Markdown structure:**
+
+1. **Summary of Findings**
+   - 3–6 bullet points. Mention bottlenecks with node names and evidence (rows, loops, time, buffers, spill/WAL if present).
+
+2. **Recommendations (ranked)**
+   For each item:
+   - *Action:* one line title
+   - *SQL (if applicable):* a single fenced block with ready-to-run statements
+   - *Impact:* High/Medium/Low
+   - *Confidence:* High/Medium/Low
+   - *Why:* short justification pointing to DDL/plan evidence
+
+   **If no immediate improvement is found, include at least one _Conditional (Scale-up / What-if)_ recommendation with explicit assumptions.**
+
+3. **Justification & Trade-offs**
+   - Why the planner chose the current strategy; what changes your proposal triggers (e.g., join order, index usage, memory).
+
+4. **If information is missing**
+   - Bullet list of the minimal extra data needed (e.g., `ANALYZE` freshness, `work_mem`, `n_distinct`, histograms from `pg_stats`).
+"""
+)
+    llm.append("\n**Reminder:** Avoid redundant or unnecessary index recommendations. Verify against the DDL above.")
+    return "\n".join(llm)
+
 
 def generate_primary_key_prompt(table_name: str, ddl: str) -> str:
     """

@@ -1,12 +1,13 @@
 services:
   pgassistant:
-    image: bertrand73/pgassistant:1.9.7
+    image: bertrand73/pgassistant:1.9.8
     restart: always
     environment:
       - OPENAI_API_KEY=nothing
       - OPENAI_API_MODEL=codestral:latest
       - LOCAL_LLM_URI=http://host.docker.internal:11434/v1/
       - SECRET_KEY=mySecretKeyforPGAssistant
+
     ports:
       - "8080:5005"
     volumes:

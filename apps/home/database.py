@@ -9,6 +9,8 @@ from psycopg2.extras import RealDictCursor
 from flask import g
 from . import sqlhelper
 
+from typing import Dict, Any, Iterable, Tuple, List, Optional
+
 PGA_QUERIES={}
 PGA_TABLES=[]
 
@@ -410,3 +412,71 @@ def get_existing_indexes(db_config):
         print(f"⚠️ Error while getting indexes definition : {e}")
 
     return existing_indexes
+
+
+def fetch_table_stats(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Returns a mini-summary for each table:
+    - estimated_rows (reltuples)
+    - n_live_tup, n_dead_tup, vacuum/analyze timestamps
+    - last_vacuum/last_autovacuum/last_analyze/last_autoanalyze
+    - (optional) sizes if extensions are allowed: pg_total_relation_size
+    """
+
+    if not tables:
+        return {}
+
+    rows = {}
+    conn = None 
+    try:
+        conn, message = connectdb(db_config)
+    except Exception as e:
+        return None
+    
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # 2.1 reltuples + taille
+        cur.execute(
+            """
+            SELECT n.nspname AS schemaname,
+                   c.relname  AS tablename,
+                   c.reltuples::bigint AS estimated_rows,
+                   pg_total_relation_size(c.oid) AS total_bytes
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('r','p') -- tables et partitions
+              AND (c.relname) = ANY(%s)
+            """,
+            (tables,),
+        )
+        for r in cur.fetchall():
+            key = f"{r['schemaname']}.{r['tablename']}"
+            rows[key] = {
+                "estimated_rows": int(r["estimated_rows"]),
+                "total_bytes": int(r["total_bytes"]),
+            }
+
+        # 2.2 pg_stat_all_tables
+        cur.execute(
+            """
+            SELECT schemaname, relname,
+                   n_live_tup, n_dead_tup,
+                   last_vacuum, last_autovacuum,
+                   last_analyze, last_autoanalyze
+            FROM pg_stat_all_tables
+            WHERE (relname) = ANY(%s)
+            """,
+            (tables,),
+        )
+        for r in cur.fetchall():
+            key = f"{r['schemaname']}.{r['relname']}"
+            rows.setdefault(key, {})
+            rows[key].update({
+                "n_live_tup": r["n_live_tup"],
+                "n_dead_tup": r["n_dead_tup"],
+                "last_vacuum": str(r["last_vacuum"]) if r["last_vacuum"] else None,
+                "last_autovacuum": str(r["last_autovacuum"]) if r["last_autovacuum"] else None,
+                "last_analyze": str(r["last_analyze"]) if r["last_analyze"] else None,
+                "last_autoanalyze": str(r["last_autoanalyze"]) if r["last_autoanalyze"] else None,
+            })
+
+    return rows
