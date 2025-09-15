@@ -59,12 +59,15 @@ def check_ollama_status(base_uri=None, timeout=2):
     
 def fix_code_blocks(text: str) -> str:
     # 1. Remove any language specifier after ``` (e.g. ```sql → ```)
-    text = re.sub(r'```[a-zA-Z0-9_+-]*', '```', text)
+    #text = re.sub(r'```[a-zA-Z0-9_+-]*', '```', text)
 
     # 2. Ensure every opened block is closed
     opens = len(re.findall(r'```', text))
     if opens % 2 != 0:  # odd number of fences → add closing fence
         text += "\n```"
+    
+    # 3. Systematically add a newline before each code fence
+    text = re.sub(r'```', r'\n```', text)
 
     return text
 

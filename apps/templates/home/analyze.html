@@ -32,14 +32,15 @@
         cursor: pointer;
         color: #888;
     }
+
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
 
     <div class="row">
-        <div class="col-12 col-xl-8">
-            <div class="card card-body border-0 shadow mb-4">
+        <div class="col-12 ">
+            <div class="card card-body border-0 shadow mb-4 w-100">
                 <h2 class="h5 mb-1">{{ description }}</h2>
                 <div>
                     <!-- <code>{{ query }}</code>-->
@@ -146,25 +147,29 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-sm table-bordered table-hover align-middle">
-                          <thead>
-                              <tr class="table-dark">
-                                <th>Row</th>
-                                <th>Comments</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                            {% for row in rows %}
+                    <table class="table table-sm table-bordered table-hover align-middle">
+                        <thead>
+                        <tr class="table-dark">
+                            <th>Query Plan &amp; Comments</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in rows %}
                             <tr>
-                                <td>{{ row['QUERY PLAN'] }}</td>
-                                <td>{{ analyze_explain_row(row) }}</td>
+                            <td class="plan-cell">{{ row['QUERY PLAN'] }}</td>
                             </tr>
-                            {% endfor %}
-                          </tbody>
-                      </table>
-                 </div>
+                            {% set comment = analyze_explain_row(row) %}
+                            {% if comment %}
+                            <tr class="table-light">
+                                <td><em>{{ comment }}</em></td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
                 </div>
-            </div>
+                </div>
                 
                 <div class="card shadow mb-4">
                     <div class="card-header py-3">

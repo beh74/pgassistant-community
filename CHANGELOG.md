@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.9.8.1] - 2025-09-15
+- Minor changes on the UI 
+
+
 ## [1.9.8] - 2025-09-06
 
 ### Features

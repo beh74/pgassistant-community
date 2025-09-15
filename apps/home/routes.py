@@ -411,7 +411,7 @@ def llm_get_models():
         return jsonify({"models": model_names})
 
     except Exception as e:
-        return jsonify({"error": f"Could not fetch models: {str(e)}"}), 500
+        return jsonify({"error": "Could not fetch models"}), 500
 
 
 
@@ -469,7 +469,6 @@ def route_template(template: str):
             llm_api_key = request.form.get("llm_api_key")
             llm_model = request.form.get("llm_model")
 
-            print (f"llm_uri={llm_uri}, llm_api_key={llm_api_key}, llm_model={llm_model}")
             config.update_llm_config(llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model)
 
             

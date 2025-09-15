@@ -4,10 +4,9 @@ services:
     restart: always
     environment:
       - OPENAI_API_KEY=nothing
-      - OPENAI_API_MODEL=codestral:latest
+      - OPENAI_API_MODEL=gpt-oss:20b 
       - LOCAL_LLM_URI=http://host.docker.internal:11434/v1/
       - SECRET_KEY=mySecretKeyforPGAssistant
-
     ports:
       - "8080:5005"
     volumes:
