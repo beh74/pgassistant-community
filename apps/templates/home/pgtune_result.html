@@ -31,6 +31,7 @@
                 <a class="nav-item nav-link active" id="nav-home-tab" data-bs-toggle="tab" href="#nav-home" role="tab" aria-controls="nav-home" aria-selected="true">Parameters</a>
                 <a class="nav-item nav-link" id="nav-profile-tab" data-bs-toggle="tab" href="#nav-apply" role="tab" aria-controls="nav-apply" aria-selected="false">Apply parameters</a>
                 <a class="nav-item nav-link" id="nav-contact-tab" data-bs-toggle="tab" href="#nav-docker" role="tab" aria-controls="nav-docker" aria-selected="false">Docker</a>
+                <a class="nav-item nav-link" id="nav-kube-tab" data-bs-toggle="tab" href="#nav-kube" role="tab" aria-controls="nav-kube" aria-selected="false">Kubernetes</a>
             </div>
         </nav>
         <div class="tab-content" id="nav-tabContent">
@@ -81,6 +82,10 @@
             <div class="tab-pane fade" id="nav-docker" role="tabpanel" aria-labelledby="nav-docker-tab">
                 <label for="textarea">docker-compose.yml</label>
                 <textarea class="form-control" name="docker_cmd" id="docker_cmd" rows="20">{{ docker_cmd }}</textarea>
+            </div>
+            <div class="tab-pane fade" id="nav-kube" role="tabpanel" aria-labelledby="nav-kube-tab">
+                <label for="textarea">Kubernetes StatefulSet snippet</label>
+                <textarea class="form-control" name="kubernetes_cmd" id="kubernetes_cmd" rows="20">{{ kubernetes_cmd }}</textarea>
             </div>
         </div>
         <!-- End of tab -->

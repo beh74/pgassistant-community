@@ -220,6 +220,8 @@ def get_db_info(db_config,con=None):
             try:
                 cache, _= db_query(con,'db_cache')
                 info["cache"]=cache[0]['ratio']
+                if not info["cache"]:
+                    info["cache"]=0 
             except:
                 info["cache"]=0
 

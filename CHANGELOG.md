@@ -1,8 +1,18 @@
 # Change Log
 
+
+## [1.9.8.2] - 2025-10-13
+
+### Bug Fixes
+- pgTune : workmem parameter fix according to pgTune formula; refactoring bash script pgtune.sh
+- Main dashboard : got an error if database cache ratio is null
+
+### Features
+- pgTune : on docker-compose.yml generation : adding volume, shm_size and healthcheck 
+- pgTune : adding Kubernetes deployment -> prototype
+
 ## [1.9.8.1] - 2025-09-15
 - Minor changes on the UI 
-
 
 ## [1.9.8] - 2025-09-06
 

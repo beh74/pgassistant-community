@@ -225,13 +225,15 @@ def handle_pgtune_post():
     tuned_values = a_pgtune.get_pg_tune()
     sqlalter = a_pgtune.get_alter_system(running_values)
     docker_cmd = a_pgtune.get_docker_cmd(session, major_version)
+    kubernetes_cmd = a_pgtune.get_kube_cmd(session, major_version)
 
     return render_template("home/pgtune_result.html", segment="pgtune_result.html", 
                            major_version=int(major_version),
                            running_values=running_values, 
                            tuned_values=tuned_values,
                            sqlalter=sqlalter,
-                           docker_cmd=docker_cmd
+                           docker_cmd=docker_cmd,
+                           kubernetes_cmd=kubernetes_cmd
                            )
 
 
