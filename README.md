@@ -12,16 +12,6 @@
 ![Image Size](https://img.shields.io/docker/image-size/bertrand73/pgassistant/latest)
 ![Latest version](https://img.shields.io/docker/v/bertrand73/pgassistant?sort=semver)
 
-
-## Table of Contents
-1. [About](#about)
-2. [Features](#features)
-3. [Quick Start](#quick-start)
-4. [Screenshots](#screenshots)
-5. [Mindset](#mindset)
-6. [Documentation](#documentation)
-7. [Special Thanks](#special-thanks)
-
 ---
 
 ## About
@@ -32,6 +22,17 @@ It provides actionable insights into database behavior, detects schema issues, a
 Originally published under the [MIT License](LICENSE), this project is now **community-maintained**.  
 The original public snapshot is archived [here (Wayback Machine)](https://web.archive.org/web/20250000000000*/https://github.com/nexsol-technologies/pgassistant).
 
+---
+
+## Screenshots
+
+| | | |
+|---|---|---|
+| <a href="media/dashboard.png?raw=1"><img src="media/dashboard.png" alt="Dashboard" width="300"></a> | <a href="media/myqueries.png?raw=1"><img src="media/myqueries.png" alt="Mes requêtes" width="300"></a> | <a href="media/top_queries.png?raw=1"><img src="media/top_queries.png" alt="Top queries" width="300"></a> |
+| <a href="media/analyze_parameters.png?raw=1"><img src="media/analyze_parameters.png" alt="Analyze parameters" width="300"></a> | <a href="media/cache_usage.png?raw=1"><img src="media/cache_usage.png" alt="Cache usage" width="300"></a> | <a href="media/index_coverage.png?raw=1"><img src="media/index_coverage.png" alt="Index coverage" width="300"></a> |
+| <a href="media/issue_fk_missing.png?raw=1"><img src="media/issue_fk_missing.png" alt="Foreign key missing" width="300"></a> | <a href="media/issue_redundant_idx.png?raw=1"><img src="media/issue_redundant_idx.png" alt="Index redondant" width="300"></a> | <a href="media/pgtune.png?raw=1"><img src="media/pgtune.png" alt="PgTune" width="300"></a> |
+| <a href="media/pgtune_docker.png?raw=1"><img src="media/pgtune_docker.png" alt="PgTune Docker" width="300"></a> | <a href="media/pgrune_results.png?raw=1"><img src="media/pgrune_results.png" alt="PgRunE results" width="300"></a> | <a href="media/ddl.png?raw=1"><img src="media/ddl.png" alt="DDL Viewer" width="300"></a> |
+| <a href="media/llm_prompt.png?raw=1"><img src="media/llm_prompt.png" alt="LLM Prompt" width="300"></a> | <a href="media/llm_settings.png?raw=1"><img src="media/llm_settings.png" alt="LLM Settings" width="300"></a> | <a href="media/gpt-oss-2.png?raw=1"><img src="media/gpt-oss-2.png" alt="GPT OSS 2" width="300"></a> |
 ---
 
 ## Features
@@ -49,10 +50,15 @@ The original public snapshot is archived [here (Wayback Machine)](https://web.ar
 - **Common Value Detection** – Use `pg_stats` to discover the most frequent query parameter values.  
 
 ### AI-Powered Database Assistance
-- **OpenAI Integration** – Let GPT explain query plans and suggest optimizations.  
+- **Compatibility** — pgAssistant is compatible with any LLM that supports the OpenAI API.
 - **Local LLM Support** – Use Ollama or other locally hosted models seamlessly.  
-- **RFC Compliance Checks** – Verify if table definitions comply with relevant RFCs.  
-- **Primary Key Discovery** – Ask the LLM to suggest an optimal primary key when missing. 
+- **Use AI to perform RFC Compliance Checks** – Verify if table definitions comply with relevant RFCs.  
+- **Use AI to optimize a query** – AI can help you define new indexes or rewrite a query. 
+
+Check this [post](https://beh74.github.io/pgassistant-blog/post/gpt-oss/) to try out the new open-source **gpt-oss** model integration with pgAssistant and Ollama.
+
+If running an LLM locally isn’t an option for you, this [post](https://beh74.github.io/pgassistant-blog/post/pgassistant-on-swissdata/) might be worth checking out.
+
 
 ### Deployment
 - **pgAssistant is Docker based** – Easy to deploy
@@ -82,27 +88,6 @@ RSS feed : https://beh74.github.io/pgassistant-blog/index.xml
 
 ---
 
-### LLM integration
-
-Check this [post](https://beh74.github.io/pgassistant-blog/post/gpt-oss/) to try out the new open-source **gpt-oss** model integration with pgAssistant and Ollama.
-
-If running an LLM locally isn’t an option for you, this [post](https://beh74.github.io/pgassistant-blog/post/pgassistant-on-swissdata/) might be worth checking out.
-
-
-
-## Screenshots
-
-### Dashboard
-<img src="media/dashboard.png" alt="Dashboard" height="640px"/>
-
----
-
-
-### RFC(s) compliance**
-<img src="media/gpt-oss-2.png" alt="Dashboard" height="640px"/>
-
----
-
 ## Mindset
 
 Most database optimization tools are deterministic:  
@@ -115,12 +100,6 @@ they tell you what is slow, but not **why** it’s slow or how to **fix** it bey
 
 **Note:** LLMs can make mistakes—sometimes big ones. Always validate suggestions, test extensively, and use pgAssistant in **non-production environments**.  
 The goal is to make developers more autonomous, educated, and less dependent on DBA time.
-
----
-
-## Documentation
-
-Visit the [pgAssistant Blog](https://beh74.github.io/pgassistant-blog/) for documentation, guides, and updates.
 
 ---
 
