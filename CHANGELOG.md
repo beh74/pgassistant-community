@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.9.9] - 2025-10-19
+
+### Features
+- Use AI to verify table compliance with your SQL guidelines (like naming conventions) - Just provide a valid URL to your guidelines. This new functionnality is added on the Table definition helper menu.
+- Add a new environment variable to store a valid URL to your guidelines : LLM_SQL_GUIDELINES 
 
 ## [1.9.8.2] - 2025-10-13
 

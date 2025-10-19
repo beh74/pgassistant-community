@@ -11,7 +11,7 @@
         },
         {
             "id": "table_list",
-            "description": "Analyze tables structure with LLM to check RFC(s) compliance",
+            "description": "Analyze tables structure with LLM to check RFC(s) compliance or SQL naming guidelines",
             "category": "table",
             "sql" : "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' and table_schema not in ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;",
             "type": "select",

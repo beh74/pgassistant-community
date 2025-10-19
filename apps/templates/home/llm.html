@@ -49,6 +49,16 @@
                     </div>
                 </div>
 
+                <div class="row">
+                    <div class="col-sm-6 mb-3">
+                        <label for="api_key">SQL Guidelines</label>
+                        <div class="input-group">
+                            <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
+                        </div>
+                        <small class="form-text text-muted">Provide here a valid URL for SQL guidelines. By default, the system will use its internal guidelines.</small>
+                    </div>
+                </div>
+
                 <div class="mt-3">
                     <button class="btn btn-primary" type="submit">Save
                         <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"

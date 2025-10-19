@@ -375,7 +375,7 @@ You are an expert in **database design**, **SQL optimization**, and **data stand
    - **Date & Time** (ISO 8601)  
    - **Languages & Localization** (ISO 639 for language codes, ISO 4217 for currencies)  
    - **Database Best Practices** (Normalization, indexing, constraints)  
-2. **Validate column types, sizes, constraints, and indexes**, ensuring compliance with:  
+2. **Validate column types, sizes, constraints, and indexes**, ensuring compliance (if relevant)with:  
    - **RFC 5322** for **email addresses**  
    - **RFC 6350** for **names and addresses (vCard format)**  
    - **RFC 3696** for **name and domain validation**  
@@ -397,13 +397,45 @@ You are an expert in **database design**, **SQL optimization**, and **data stand
    - **Use `CREATE INDEX` to improve search performance**  
 5. **Provide justifications** for each recommended change based on relevant standards.  
 
----
-
 ## **Here is the DDL to analyze**  
 ```sql
 {ddl}
 ```
 """
+    return llm_prompt
+
+
+def analyze_with_sql_quide(ddl: str, guidelines: str) -> str:
+    llm_prompt = f"""
+Please review the following DDL using this SQL Naming Conventions Guide: {guidelines}
+
+Produce a single Markdown table with EXACTLY five columns:
+
+1. **Current column name**
+2. **Recommended column name** (per the guide)
+3. **Reference** (paste the FULL URL to the exact section)
+4. **SQL to rename** (PostgreSQL `ALTER TABLE ... RENAME COLUMN ...`)
+5. **SQL to describe** (`COMMENT ON COLUMN ... IS ...`)
+
+# Decision rules (STRICT — do not violate):
+- **ZERO-CHANGE RULE:** If the recommended name is **identical** to the current name **after normalization** (trim spaces, remove surrounding quotes, and lowercase comparison), then:
+  - Put **"—"** in column 4 (no ALTER).
+  - Put **"—"** in column 5 unless you truly add/modify a description.
+  - Add no other SQL for that column.
+- **RENAME ONLY IF NEEDED:** Emit an `ALTER` **only** when the normalized recommended name **differs** from the normalized current name.
+- **TABLE NAME ACCURACY:** Use the exact table name(s) found in the DDL; do not invent names.
+- **QUOTES:** Preserve quotes in SQL when identifiers are quoted in the DDL.
+- **POSTGRES VALIDITY:** All SQL must be valid PostgreSQL.
+- **REFERENCES:** The Reference column must be a **direct link** (full URL) to the specific guideline you applied (not just the homepage).
+- **NO EXTRA TEXT:** Output only the table. No prose before or after.
+
+Now analyze the following DDL:
+
+```sql
+{ddl}
+```
+"""
+
     return llm_prompt
 
 

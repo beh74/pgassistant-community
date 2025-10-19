@@ -32,8 +32,8 @@ The original public snapshot is archived [here (Wayback Machine)](https://web.ar
 | <a href="media/analyze_parameters.png?raw=1"><img src="media/analyze_parameters.png" alt="Analyze parameters" width="300"></a> | <a href="media/cache_usage.png?raw=1"><img src="media/cache_usage.png" alt="Cache usage" width="300"></a> | <a href="media/index_coverage.png?raw=1"><img src="media/index_coverage.png" alt="Index coverage" width="300"></a> |
 | <a href="media/issue_fk_missing.png?raw=1"><img src="media/issue_fk_missing.png" alt="Foreign key missing" width="300"></a> | <a href="media/issue_redundant_idx.png?raw=1"><img src="media/issue_redundant_idx.png" alt="Index redondant" width="300"></a> | <a href="media/pgtune.png?raw=1"><img src="media/pgtune.png" alt="PgTune" width="300"></a> |
 | <a href="media/pgtune_docker.png?raw=1"><img src="media/pgtune_docker.png" alt="PgTune Docker" width="300"></a> | <a href="media/pgrune_results.png?raw=1"><img src="media/pgrune_results.png" alt="PgRunE results" width="300"></a> | <a href="media/ddl.png?raw=1"><img src="media/ddl.png" alt="DDL Viewer" width="300"></a> |
-| <a href="media/llm_prompt.png?raw=1"><img src="media/llm_prompt.png" alt="LLM Prompt" width="300"></a> | <a href="media/llm_settings.png?raw=1"><img src="media/llm_settings.png" alt="LLM Settings" width="300"></a> | <a href="media/gpt-oss-2.png?raw=1"><img src="media/gpt-oss-2.png" alt="GPT OSS 2" width="300"></a> |
----
+| <a href="media/llm_prompt.png?raw=1"><img src="media/llm_prompt.png" alt="LLM Prompt" width="300"></a> | <a href="media/llm_guidelines.png?raw=1"><img src="media/llm_guidelines.png" alt="LLM Guidelines" width="300"></a> | <a href="media/llm_settings.png?raw=1"><img src="media/llm_settings.png" alt="LLM Settings" width="300"></a> |
+| <a href="media/gpt-oss-2.png?raw=1"><img src="media/gpt-oss-2.png" alt="GPT OSS 2" width="300"></a> |  |  |
 
 ## Features
 
@@ -52,7 +52,8 @@ The original public snapshot is archived [here (Wayback Machine)](https://web.ar
 ### AI-Powered Database Assistance
 - **Compatibility** — pgAssistant is compatible with any LLM that supports the OpenAI API.
 - **Local LLM Support** – Use Ollama or other locally hosted models seamlessly.  
-- **Use AI to perform RFC Compliance Checks** – Verify if table definitions comply with relevant RFCs.  
+- **Use AI to perform RFC compliance Checks** – Verify if table definitions comply with relevant RFCs.
+- **Use AI to verify table compliance with your SQL guidelines** - Just provide a valid URL to your guidelines.   
 - **Use AI to optimize a query** – AI can help you define new indexes or rewrite a query. 
 
 Check this [post](https://beh74.github.io/pgassistant-blog/post/gpt-oss/) to try out the new open-source **gpt-oss** model integration with pgAssistant and Ollama.

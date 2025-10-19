@@ -1,11 +1,12 @@
 services:
   pgassistant:
-    image: bertrand73/pgassistant:1.9.8
+    image: bertrand73/pgassistant:1.9.9
     restart: always
     environment:
       - OPENAI_API_KEY=nothing
       - OPENAI_API_MODEL=gpt-oss:20b 
       - LOCAL_LLM_URI=http://host.docker.internal:11434/v1/
+      - LLM_SQL_GUIDELINES=https://raw.githubusercontent.com/beh74/pgassistant-blog/refs/heads/main/content/post/sql-guide.md
       - SECRET_KEY=mySecretKeyforPGAssistant
     ports:
       - "8080:5005"

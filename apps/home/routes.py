@@ -464,17 +464,18 @@ def route_template(template: str):
                 segment=segment,
                 llm_uri=config.get_config_value("LOCAL_LLM_URI"),
                 llm_api_key=config.get_config_value("OPENAI_API_KEY"),
-                llm_model=config.get_config_value("OPENAI_API_MODEL")
+                llm_model=config.get_config_value("OPENAI_API_MODEL"),
+                llm_sql_guidelines=config.get_config_value("LLM_SQL_GUIDELINES")
 )
         elif segment == "llm.html" and request.method == 'POST':
             llm_uri = request.form.get("llm_uri")
             llm_api_key = request.form.get("llm_api_key")
             llm_model = request.form.get("llm_model")
+            llm_sql_guidelines = request.form.get("llm_sql_guidelines", "")
 
-            config.update_llm_config(llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model)
+            config.update_llm_config(llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model, llm_sql_guidelines=llm_sql_guidelines)
 
-            
-            return render_template(f"home/{template}", segment=segment, llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model)
+            return render_template(f"home/{template}", segment=segment, llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model,llm_sql_guidelines=llm_sql_guidelines)
         return render_template(f"home/{template}", segment=segment, dbinfo={})
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
@@ -502,6 +503,18 @@ def llm_table(schema: str, tablename:str):
     llm_prompt = llm.analyze_table_format(ddl=ddl_str)
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze table definition for {schema}.{tablename}")
+    else:
+        chatgpt_response=llm.query_chatgpt(llm_prompt)
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+
+@blueprint.route('/table_llm_guidelines/<schema>/<tablename>', methods=['GET','POST'])
+def llm_table_guidelines(schema: str, tablename:str):
+    tables = []
+    tables.append (f"{schema}.{tablename}")
+    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+    llm_prompt = llm.analyze_with_sql_quide(ddl=ddl_str, guidelines=config.get_config_value("LLM_SQL_GUIDELINES"))
+    if request.method == 'GET':
+        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
     else:
         chatgpt_response=llm.query_chatgpt(llm_prompt)
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
