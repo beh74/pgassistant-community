@@ -24,6 +24,33 @@ The original public snapshot is archived [here (Wayback Machine)](https://web.ar
 
 ---
 
+## Demo Access
+
+You can try the live demo here: [https://ov-004f8b.infomaniak.ch/](https://ov-004f8b.infomaniak.ch/)
+
+To connect to the demo database, use the following credentials:
+
+- **Host name:** `demo-db`  
+- **Port:** `5432`  
+- **Database name:** `northwind`  
+- **User:** `postgres`  
+- **Password:** `demo`
+
+### ⚠️ Very Important Notice
+
+- This demo **does not use any Large Language Model (LLM)**.  
+  Do **not** provide any API keys or credentials in the *LLM Settings* form.
+
+- **If you enter your own LLM provider API key in the demo**, please be aware that:  
+  - The key **may be visible to other demo users**.  
+  - The key **could be used by others without your consent**.  
+  - **The demo administrator accepts no responsibility** for any misuse, exposure, or unauthorized access resulting from providing such keys.
+
+- The demo database is **reset and reinitialized from scratch every day**.  
+  All stored data will be permanently deleted during this process.
+
+---
+
 ## Screenshots
 
 | | | |
