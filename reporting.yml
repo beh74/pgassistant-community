@@ -1,0 +1,77 @@
+  - chapter_name: Database version
+    query_id: db_version
+    description: PostgreSQL database version
+    enabled: true
+    template: db_version.md
+
+  - chapter_name: Database size
+    query_id: db_size_current
+    description: Database size information
+    enabled: true
+    template: db_size.md
+
+  - chapter_name: Database hit cache ratio
+    query_id: db_cache
+    description: Cache hit ratio statistics
+    enabled: true
+    template: db_cache.md
+
+  - chapter_name: Database parameters
+    query_id: reporting_pgtune
+    description: Lists database parameters used with pg_tune
+    enabled: true
+    template: generic_select.md
+
+  - chapter_name: Cache usage statistics
+    query_id: top_cache_usage
+    description: Lists database parameters used with pg_tune
+    enabled: true
+    template: generic_select.md
+
+  - chapter_name: pg_stat_database
+    query_id: reporting_pg_stat_database
+    description: Lists pg_stat_database informations
+    enabled: true
+    template: generic_select_with_sql.md 
+
+  - chapter_name: Vacuum statistics
+    query_id: reporting_vacuum_stats
+    description: Lists vacuum informations
+    enabled: true
+    template: generic_select_with_sql.md  
+
+  - chapter_name: Top queries by total time
+    query_id: reporting_top_queries_by_time
+    description: Top queries by total time
+    enabled: true
+    template: generic_select_with_sql.md
+
+  - chapter_name: Top queries by mean time
+    query_id: reporting_top_queries_by_mean_time
+    description: Top queries by mean execution time
+    enabled: true
+    template: generic_select_with_sql.md    
+
+  - chapter_name: Database issues - Missing indexes on foreign keys
+    query_id: issue_idx_fk_missing
+    description: Lists foreign keys without indexes
+    enabled: true
+    template: generic_select.md
+
+  - chapter_name: Database issues - Indexes duplicated
+    query_id: issue_idx_redundant
+    description: Lists duplicated indexes
+    enabled: true
+    template: generic_select.md
+
+  - chapter_name: Database issues - Tables without primary key
+    query_id: issue_no_pk
+    description: Lists tables without primary keys
+    enabled: true
+    template: generic_select.md
+
+  - chapter_name: Database issues - Datatype on foreign keys are different
+    query_id: issue_idx_fk_datatype
+    description: Datatype on foreign keys are different
+    enabled: true
+    template: generic_select.md

@@ -5,7 +5,7 @@ Main routes
 import traceback
 import os
 from apps.home import blueprint
-from flask import render_template, request, session,redirect, jsonify
+from flask import render_template, request, session,redirect, jsonify, Response
 from jinja2 import TemplateNotFound
 from . import database
 from . import llm
@@ -16,6 +16,7 @@ from . import ddl
 from . import sqlcolumns
 from . import analyze_aquery
 from . import config
+from . import reporting
 import re
 import requests
 
@@ -415,7 +416,35 @@ def llm_get_models():
     except Exception as e:
         return jsonify({"error": "Could not fetch models"}), 500
 
+@blueprint.route("/api/v1/report", methods=["POST"])
+def api_database_report():
+    try:
+        # read JSON POST
+        data = request.get_json(force=True)
 
+        # check db_config
+        if not data or "db_config" not in data:
+            return jsonify({"error": "Missing 'db_config' in request body"}), 400
+
+        db_config = data["db_config"]
+
+        # Check keys in db_config
+        required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
+        missing = [k for k in required_keys if k not in db_config]
+        if missing:
+            return jsonify({"error": f"Missing keys in db_config: {', '.join(missing)}"}), 400
+
+        # Generate report
+        database_reports = reporting.get_database_report(
+            db_config,
+            report_yaml_definition_file="./reporting.yml",
+            template_folder="db_report_templates"
+        )
+
+        return Response(database_reports, mimetype="text/markdown; charset=utf-8")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @blueprint.route('/<template>', methods=['GET', 'POST'])
 def route_template(template: str):

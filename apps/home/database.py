@@ -302,6 +302,15 @@ def db_query(cnx, query_id, db_name=None):
             else:
                 db_exec(cnx,sql)
 
+def get_query_by_id(query_id):
+    get_queries()
+
+    for query in PGA_QUERIES['sql']:
+        if query_id == query['id']:
+            return query['sql']
+    return None
+
+
 def get_my_queries():
     if os.path.isfile("myqueries.json"):
         rows=[]

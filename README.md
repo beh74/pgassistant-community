@@ -6,7 +6,7 @@
   <br>
 </p>
 
-[![Documentation](https://img.shields.io/badge/Doumentation-pgAssistant-blue?logo=readthedocs)](https://beh74.github.io/pgassistant-blog/)
+[![Documentation](https://img.shields.io/badge/Documentation-pgAssistant-blue?logo=readthedocs)](https://beh74.github.io/pgassistant-blog/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit)
 [![Docker Pulls](https://img.shields.io/docker/pulls/bertrand73/pgassistant?label=Docker%20Pulls)](https://hub.docker.com/r/bertrand73/pgassistant)
 ![Image Size](https://img.shields.io/docker/image-size/bertrand73/pgassistant/latest)

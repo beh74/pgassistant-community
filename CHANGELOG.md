@@ -1,5 +1,27 @@
 # Change Log
 
+## [2.0] - 2025-11-09
+
+### Features
+- Add an API route to generate a database report. For example :
+```
+curl -X POST http://localhost:8080/api/v1/report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "db_config": {
+      "db_host": "host.docker.internal",
+      "db_port": 5420,
+      "db_name": "northwind",
+      "db_user": "postgres",
+      "db_password": "demo"
+    }
+  }'
+```
+
+The database report is currently returned in Markdown format, but this API will be enhanced with additional formats soon.
+For security reasons, we highly recommend deploying pgAssistant behind a reverse proxy like HAProxy or Nginx, and enabling HTTPS for all communications.
+
+
 ## [1.9.9] - 2025-10-19
 
 ### Features
