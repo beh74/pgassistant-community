@@ -36,6 +36,22 @@ To connect to the demo database, use the following credentials:
 - **User:** `postgres`  
 - **Password:** `demo`
 
+If you want to try the new database report API coming with v2.0 :
+```
+curl -X POST https://ov-004f8b.infomaniak.ch/api/v1/report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "db_config": {
+      "db_host": "demo-db",
+      "db_port": 5432,
+      "db_name": "northwind",
+      "db_user": "postgres",
+      "db_password": "demo"
+    }
+  }'
+```
+
+
 ### ⚠️ Very Important Notice
 
 - This demo **does not use any Large Language Model (LLM)**.  
