@@ -23,7 +23,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            bertrand73/pgassistant:2.0
+            bertrand73/pgassistant:2.0.2
             bertrand73/pgassistant:latest
           platforms: linux/amd64,linux/arm64
           no-cache: true

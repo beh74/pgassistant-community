@@ -1,6 +1,6 @@
 services:
   pgassistant:
-    image: bertrand73/pgassistant:2.0
+    image: bertrand73/pgassistant:latest
     restart: always
     environment:
       - OPENAI_API_KEY=nothing

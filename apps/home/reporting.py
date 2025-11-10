@@ -45,7 +45,7 @@ def get_database_report(db_config, report_yaml_definition_file="./reporting.yml"
             chapter_render = render_template(f"{template_folder}/main.md", db_config=db_config, now=datetime.datetime.now())
             database_reports = chapter_render
 
-        elif enabled:
+        if enabled:
             try:
                 rows, _ = database.db_query(dbcon, query_id)
                 sql = database.get_query_by_id(query_id)

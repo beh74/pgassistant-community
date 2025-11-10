@@ -242,7 +242,7 @@
             "description": "Tables without primary keys",
             "category": "Issue",
             "id": "issue_no_pk",
-            "sql": "SELECT tab.table_schema, tab.table_name FROM information_schema.tables tab LEFT JOIN information_schema.table_constraints tco ON tab.table_schema = tco.table_schema AND tab.table_name = tco.table_name AND tco.constraint_type = 'PRIMARY KEY' WHERE tab.table_type = 'BASE TABLE' AND tab.table_schema NOT IN ('information_schema', 'pg_catalog') AND tco.constraint_name IS NULL AND NOT EXISTS (SELECT 1 FROM pg_inherits JOIN pg_class child ON pg_inherits.inhrelid = child.oid JOIN pg_namespace ns ON child.relnamespace = ns.oid WHERE ns.nspname = tab.table_schema AND child.relname = tab.table_name) ORDER BY tab.table_schema, tab.table_name;",
+            "sql": "SELECT n.nspname AS table_schema, c.relname AS table_name FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace LEFT JOIN pg_constraint AS co ON co.conrelid = c.oid AND co.contype = 'p' LEFT JOIN pg_inherits AS ih ON ih.inhrelid = c.oid WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' AND co.oid IS NULL AND ih.inhrelid IS NULL ORDER BY table_schema, table_name;",
             "type": "select",
             "reference": "https://dataedo.com/kb/query/postgresql/find-tables-without-primary-keys"   
         },

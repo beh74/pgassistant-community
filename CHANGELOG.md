@@ -1,5 +1,10 @@
 # Change Log
 
+## [2.0.2] - 2025-11-10
+
+### Bug Fixes
+- Inconsistent behaviour tables with missing primary keys #1 (thanks to rillekille : Rickard Hökros)
+- Database version is not rendered in the database report API.
 
 ## [2.0.1] - 2025-11-10
 
