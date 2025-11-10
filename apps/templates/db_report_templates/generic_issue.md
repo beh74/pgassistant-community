@@ -14,6 +14,15 @@
 {%- endfor -%} |
 {%- endfor %}
 
+### pgAssistant recommandations
+
+```sql
+{%- for r in rows %}
+  {%- for key, val in r.items() if key.startswith('pga_suggestion') and val %}
+{{ val }}
+{% endfor -%}
+{%- endfor %}
+```
 
 {% else %}
 Empty data

@@ -1,5 +1,11 @@
 # Change Log
 
+
+## [2.0.1] - 2025-11-10
+
+### Features
+- Add usefull informations on the database report (uptime, database profile). 
+
 ## [2.0] - 2025-11-09
 
 ### Features

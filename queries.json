@@ -402,7 +402,7 @@
         {
             "id": "reporting_pg_stat_database",
             "description": "pg_stat_database",
-            "category": "Table",        
+            "category": "Reporting",        
             "sql": "SELECT datname, blks_read, blks_hit, round(100.0 * blks_hit / NULLIF(blks_hit+blks_read,0),2) AS cache_hit, temp_bytes, deadlocks FROM pg_stat_database WHERE datname = current_database();",
             "type": "select",
             "reference": ""
@@ -410,7 +410,7 @@
         {
             "id": "reporting_unused_indexes",
             "description": "Unused indexes",
-            "category": "Table",        
+            "category": "Reporting",
             "sql": "SELECT s.schemaname, s.relname, s.indexrelname, s.idx_scan, pg_relation_size(s.indexrelid) AS size_bytes FROM pg_stat_user_indexes s JOIN pg_index i ON i.indexrelid = s.indexrelid WHERE s.idx_scan = 0 ORDER BY size_bytes DESC;",
             "type": "select",
             "reference": ""
@@ -418,7 +418,7 @@
         {
             "id": "reporting_top_queries_by_time",
             "description": "Top 10 queries by total execution time (excluding pgAssistant queries, with cache hit ratio)",
-            "category": "Table",
+            "category": "Reporting",
             "sql": "SELECT query, calls, total_exec_time, mean_exec_time, rows, shared_blks_hit, shared_blks_read, ROUND(100 * shared_blks_hit / NULLIF(shared_blks_hit + shared_blks_read, 0), 2) AS hit_cache_ratio FROM pg_stat_statements WHERE query NOT LIKE '/* launched by pgAssistant */%' ORDER BY total_exec_time DESC LIMIT 10;",
             "type": "select",
             "reference": ""
@@ -426,7 +426,7 @@
         {
             "id": "reporting_top_queries_by_mean_time",
             "description": "Top 10 queries by mean execution time (excluding pgAssistant queries, with cache hit ratio)",
-            "category": "Table",
+            "category": "Reporting",
             "sql": "SELECT query, calls, total_exec_time, mean_exec_time, rows, shared_blks_hit, shared_blks_read, ROUND(100 * shared_blks_hit / NULLIF(shared_blks_hit + shared_blks_read, 0), 2) AS hit_cache_ratio FROM pg_stat_statements WHERE query NOT LIKE '/* launched by pgAssistant */%' ORDER BY mean_exec_time DESC LIMIT 10;",
             "type": "select",
             "reference": ""
@@ -434,7 +434,7 @@
         {
             "id": "reporting_vacuum_stats",
             "description": "Vacuum stats",
-            "category": "Table",
+            "category": "Reporting",
             "sql": "SELECT schemaname, relname, n_dead_tup, vacuum_count, autovacuum_count,last_vacuum, last_autovacuum, last_analyze, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_dead_tup DESC;",
             "type": "select",
             "reference": ""
@@ -442,11 +442,27 @@
         {
             "id": "reporting_pgtune",
             "description": "Database main parameters from pgTune estimation",
-            "category": "Table",
+            "category": "Reporting",
             "sql": "SELECT category, name, unit, setting, CASE WHEN unit IN ('8kB','kB','MB','GB') THEN pg_size_pretty(setting::bigint * CASE unit WHEN '8kB' THEN 8192 WHEN 'kB' THEN 1024 WHEN 'MB' THEN 1048576 WHEN 'GB' THEN 1073741824 END) ELSE setting END AS human_readable FROM pg_settings WHERE name IN ('max_connections','shared_buffers','effective_cache_size','maintenance_work_mem','checkpoint_completion_target','wal_buffers','default_statistics_target','random_page_cost','effective_io_concurrency','work_mem','huge_pages','min_wal_size','max_wal_size','max_worker_processes','max_parallel_workers_per_gather','max_parallel_workers','max_parallel_maintenance_workers','autovacuum') ORDER BY name;",
             "type": "select",
             "reference": ""
-        }   
+        },
+        {
+            "id": "reporting_pguptime",
+            "description": "Database uptime",
+            "category": "Reporting",
+            "sql": "SELECT pg_postmaster_start_time(), round(EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) / 86400, 2) AS uptime_days;",
+            "type": "select",
+            "reference": ""
+        },
+        {
+            "id": "reporting_db_profile",
+            "description": "Database profile: amount of select, insert, update or delete",
+            "category": "Reporting",
+            "sql": "WITH head AS (SELECT queryid, calls, rows, total_exec_time, mean_exec_time, lower(substring(query FROM '(?is)^\\s*(?:/\\*.*?\\*/\\s*)*(?:--[^\\n]*\\n\\s*)*(\\w+)')) AS first_token FROM pg_stat_statements), classified AS (SELECT queryid, calls, rows, total_exec_time::numeric AS total_exec_time, mean_exec_time::numeric AS avg_mean_exec_time, CASE WHEN first_token IN ('select','insert','update','delete') THEN first_token WHEN first_token = 'with' THEN 'select' WHEN first_token IN ('merge') THEN 'merge' WHEN first_token IN ('call') THEN 'call' WHEN first_token IN ('create','alter','drop','truncate','comment','grant','revoke','rename') THEN 'ddl' WHEN first_token IN ('copy','analyze','vacuum','explain','show','set','reset','discard','checkpoint','prepare','execute','deallocate','listen','unlisten','notify','begin','start','commit','rollback','savepoint','release') THEN 'utility' ELSE 'other' END AS query_type FROM head), agg AS (SELECT query_type, SUM(calls) AS total_calls, SUM(rows) AS total_rows, SUM(total_exec_time) AS total_exec_time, AVG(avg_mean_exec_time) AS avg_mean_exec_time FROM classified GROUP BY query_type), tot AS (SELECT SUM(total_calls)::numeric AS grand_total_calls, SUM(total_exec_time)::numeric AS grand_total_exec_time FROM agg) SELECT a.query_type, a.total_calls, a.total_rows, ROUND(a.total_exec_time, 2) AS total_exec_time, ROUND(a.avg_mean_exec_time, 3) AS avg_mean_exec_time, COALESCE(ROUND(100.0 * a.total_calls::numeric / NULLIF(t.grand_total_calls, 0), 0), 0)::int AS percentage_calls, COALESCE(ROUND(100.0 * a.total_exec_time / NULLIF(t.grand_total_exec_time, 0), 0), 0)::int AS percentage_exec_time FROM agg a CROSS JOIN tot t ORDER BY percentage_exec_time DESC NULLS LAST, percentage_calls DESC NULLS LAST;",
+            "type": "select",
+            "reference": ""
+        }           
     
     ]
 }
