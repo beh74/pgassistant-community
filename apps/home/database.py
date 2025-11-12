@@ -261,8 +261,18 @@ def get_db_info(db_config,con=None):
         info["error"]=message
     return info
 
+def get_query_by_id(query_id):
+    get_queries()
+
+    for query in PGA_QUERIES['sql']:
+        if query_id == query['id']:
+            return query
+    return None
+
 def get_pgstat_query_by_id(db_config, query_id):
+    print(query_id)
     query = get_query_by_id('pgstat_get_sqlquery_by_id')
+    print(query)
     sql=query['sql'].replace ('$1', query_id)
     con, _ = connectdb(db_config)
     sql_text=''
@@ -271,13 +281,7 @@ def get_pgstat_query_by_id(db_config, query_id):
         sql_text=sql_rows[0]['query']
     return sql_text
 
-def get_query_by_id(query_id):
-    get_queries()
 
-    for query in PGA_QUERIES['sql']:
-        if query_id == query['id']:
-            return query
-    return None
 
 def search(key):
     get_queries()
@@ -302,7 +306,7 @@ def db_query(cnx, query_id, db_name=None):
             else:
                 db_exec(cnx,sql)
 
-def get_query_by_id(query_id):
+def get_query_by_id_reporing(query_id):
     get_queries()
 
     for query in PGA_QUERIES['sql']:

@@ -1,5 +1,10 @@
 # Change Log
 
+## [2.0.3] - 2025-12-10
+
+### Bug Fixes
+- Fixing issue : Can't analyze queries #2
+
 ## [2.0.2] - 2025-11-10
 
 ### Bug Fixes

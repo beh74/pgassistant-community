@@ -5,7 +5,6 @@ import datetime
 from flask import render_template
 from . import database
 
-
 def get_database_report(db_config, report_yaml_definition_file="./reporting.yml", template_folder="db_report_templates"):
 
     # Step 1: Connect to the database
@@ -48,7 +47,7 @@ def get_database_report(db_config, report_yaml_definition_file="./reporting.yml"
         if enabled:
             try:
                 rows, _ = database.db_query(dbcon, query_id)
-                sql = database.get_query_by_id(query_id)
+                sql = database.get_query_by_id_reporing(query_id)
                 if len(rows) > 0:
                     chapter_render = render_template(f"{template_folder}/{template}", rows=rows, chapter_name=chapter_name, sql=sql)
                     database_reports = database_reports+chapter_render
@@ -56,6 +55,4 @@ def get_database_report(db_config, report_yaml_definition_file="./reporting.yml"
             except Exception as e:
                 print(f"get_database_report - Error executing query for entry {idx} (query_id: {query_id}): {e}")
 
-
     return database_reports
-
