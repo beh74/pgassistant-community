@@ -270,9 +270,7 @@ def get_query_by_id(query_id):
     return None
 
 def get_pgstat_query_by_id(db_config, query_id):
-    print(query_id)
     query = get_query_by_id('pgstat_get_sqlquery_by_id')
-    print(query)
     sql=query['sql'].replace ('$1', query_id)
     con, _ = connectdb(db_config)
     sql_text=''
