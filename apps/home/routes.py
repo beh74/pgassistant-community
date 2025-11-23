@@ -19,6 +19,7 @@ from . import config
 from . import reporting
 import re
 import requests
+import json
 
 config.init_or_load_env()
 
@@ -425,7 +426,6 @@ def api_database_report():
         # check db_config
         if not data or "db_config" not in data:
             return jsonify({"error": "Missing 'db_config' in request body"}), 400
-
         db_config = data["db_config"]
 
         # Check keys in db_config
@@ -440,11 +440,97 @@ def api_database_report():
             report_yaml_definition_file="./reporting.yml",
             template_folder="db_report_templates"
         )
-
         return Response(database_reports, mimetype="text/markdown; charset=utf-8")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
+def api_reset_stats():
+    try:
+        # read JSON POST
+        data = request.get_json(force=True)
+
+        # check db_config
+        if not data or "db_config" not in data:
+            return jsonify({"error": "Missing 'db_config' in request body"}), 400
+        db_config = data["db_config"]
+
+        # Check keys in db_config
+        required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
+        missing = [k for k in required_keys if k not in db_config]
+        if missing:
+            return jsonify({"error": f"Missing keys in db_config: {', '.join(missing)}"}), 400
+
+        # Reset pg_stat_statements statistics
+        database.exec_cmd(db_config, "pg_stat_statements_reset")
+
+        return Response("pg_stat_statements statistics are reset", mimetype="text/markdown; charset=utf-8")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@blueprint.route("/api/v1/apply_recommandations", methods=["POST"])
+def api_apply_recommendations():
+    try:
+        # read JSON POST
+        data = request.get_json(force=True)
+
+        # 1) Validate db_config
+        if not data or "db_config" not in data:
+            return jsonify({"error": "Missing 'db_config' in request body"}), 400
+
+        db_config = data["db_config"]
+
+        required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
+        missing = [k for k in required_keys if k not in db_config]
+        if missing:
+            return jsonify({"error": f"Missing keys in db_config: {', '.join(missing)}"}), 400
+
+        # 2) Validate dryrun (optional but must be boolean if provided)
+        dryrun = data.get("dryrun", True)
+        if not isinstance(dryrun, bool):
+            return jsonify({"error": "'dryrun' must be a boolean"}), 400
+
+        # 3) Validate run_recommandations
+        allowed_reco = {
+            "create_missing_fk_indexes",
+            "drop_redundants_indexes",
+            "alter_table_on_fk",
+            "drop_unused_indexes",
+            "all",
+        }
+        run_recommandations = data.get("run_recommandations", None)
+
+        if run_recommandations is None:
+            return jsonify({"error": "Missing 'run_recommandations'"}), 400
+
+        if not isinstance(run_recommandations, list):
+            return jsonify({"error": "'run_recommandations' must be a list"}), 400
+
+        unknown = [x for x in run_recommandations if x not in allowed_reco]
+        if unknown:
+            return jsonify({"error": f"Unknown recommendation(s): {', '.join(unknown)}"}), 400
+
+        # if "all" is present → expand to all
+        if "all" in run_recommandations:
+            run_recommandations = list(allowed_reco - {"all"})
+
+        # 4) Now do the actual work (or simulate if dryrun)
+        # For the moment we simulate
+        result = {
+            "dryrun": dryrun,
+            "run_recommandations": run_recommandations,
+            "message": "Recommendations processing is not implemented yet.",
+        }
+
+        return Response(
+            json.dumps(result, indent=2),
+            mimetype="application/json; charset=utf-8"
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @blueprint.route('/<template>', methods=['GET', 'POST'])
 def route_template(template: str):

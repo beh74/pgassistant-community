@@ -14,18 +14,18 @@
                 <div class="card-body">
                     <div class="row d-block d-xl-flex align-items-center">
                         <div class="col-12 col-xl-5 text-xl-center mb-3 mb-xl-0 d-flex align-items-center justify-content-xl-center">
-                            <div class="icon-shape icon-shape-primary rounded me-4 me-sm-0">
-                                <svg class="icon" data-slot="icon" fill="none" stroke="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125">
-                                    </path>
+                            <div class="icon-shape icon-shape-info rounded me-4 me-sm-0">
+                                
+                                <svg data-slot="icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path clip-rule="evenodd" fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z"></path>
                                 </svg>
                             </div>
                         </div>
                         <div class="col-12 col-xl-7 px-xl-0">
                             <div class="d-none d-sm-block">
                                 <a target="blanck" href="https://www.postgresql.org/docs/release/">
-                                <h2 class="h6 text-info mb-0">Database version</h2>
-                                <h3 class="fw-extrabold mb-2">{{ dbinfo['version'] }}</h3>
+                                <h2 class="h6 text-info mb-0">Database version & uptime</h2>
+                                <h3 class="fw-extrabold mb-2">{{ dbinfo['version'] }} </h3> Uptime : <b>{{ dbinfo['uptime'] }}</b>
                                 </a>
                             </div>
                         </div>
@@ -39,13 +39,17 @@
                     <div class="row d-block d-xl-flex align-items-center">
                         <div class="col-12 col-xl-5 text-xl-center mb-3 mb-xl-0 d-flex align-items-center justify-content-xl-center">
                             <div class="icon-shape icon-shape-secondary rounded me-4 me-sm-0">
-                                <svg class="icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"></path></svg>
+                                
+                                <svg data-slot="icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M4.75 8a.75.75 0 0 0-.75.75v2.5c0 .414.336.75.75.75H9.5a.75.75 0 0 0 .75-.75v-2.5A.75.75 0 0 0 9.5 8H4.75Z"></path>
+                                    <path clip-rule="evenodd" fill-rule="evenodd" d="M3.25 5A2.25 2.25 0 0 0 1 7.25v5.5A2.25 2.25 0 0 0 3.25 15h12.5A2.25 2.25 0 0 0 18 12.75v-1.085a1.5 1.5 0 0 0 1-1.415v-.5a1.5 1.5 0 0 0-1-1.415V7.25A2.25 2.25 0 0 0 15.75 5H3.25ZM2.5 7.25a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-.75.75H3.25a.75.75 0 0 1-.75-.75v-5.5Z"></path>
+                                </svg>
                             </div>
                         </div>
                         <div class="col-12 col-xl-7 px-xl-0">
                             <div class="d-none d-sm-block">
                                 <h2 class="h6 text-info mb-0">Database size</h2>
-                                <h3 class="fw-extrabold mb-2">{{ dbinfo['size'] }}</h3>
+                                <h3 class="fw-extrabold mb-2">{{ dbinfo['size'] }}.</h3> Shared buffers (25% of RAM) : <a href="/pgtune.html"><b>{{ dbinfo['shared_buffers'] }}</b></a>
                             </div>
                         </div>
                     </div>
@@ -65,9 +69,7 @@
                             <div class="d-none d-sm-block">
                                 <h2 class="h6 text-info mb-0">Hit Cache Ratio</h2>
                                 <a href="/cache_table.html" class="d-flex align-items-center fw-bold">
-                                    <svg class="icon icon-xs text-gray-500 me-2" viewBox="0 0 20 20" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"></path>
-                                    </svg>
+
                                 
                         
                                     <!-- Condition pour afficher une icône en fonction de la valeur du cache hit ratio -->
@@ -98,7 +100,9 @@
                                             </svg> <!-- ❌ Poor -->
                                         {% endif %}
                                     </div>
+
                                 </a>
+                                Should be &gt; 95%. 
                             </div>
                         </div>
                     </div>
@@ -113,7 +117,7 @@
                     <div class="card border-0 shadow">
                         <div class="card-header border-bottom d-flex align-items-center justify-content-between">
                             <h2 class="fs-5 fw-bold mb-0">Profile - Calls</h2>
-                              <a href="/generic/database_profile" class="btn btn-sm btn-primary">See all</a>
+                              <a href="/generic/reporting_db_profile" class="btn btn-sm btn-primary">See all</a>
                           </div>
                         <div class="card-body">
                             <!-- Profile - Calls -->
@@ -212,7 +216,7 @@
                     <div class="card border-0 shadow">
                         <div class="card-header border-bottom d-flex align-items-center justify-content-between">
                             <h2 class="fs-5 fw-bold mb-0">Profile - Time consume</h2>
-                              <a href="/generic/database_profile" class="btn btn-sm btn-primary">See all</a>
+                              <a href="/generic/reporting_db_profile" class="btn btn-sm btn-primary">See all</a>
                           </div>
                         <div class="card-body">
                             <!-- Project 1 -->

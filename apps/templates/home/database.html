@@ -23,6 +23,19 @@
                 </div>
                 <form method="POST" id="form_connect">
                     <div class="row">
+                        <div class="col-md-9 mb-3">
+                            <div>
+                                <label for="db_uri">Connection URI (optional)</label>
+                                <input class="form-control"
+                                    id="db_uri"
+                                    name="db_uri"
+                                    type="text"
+                                    placeholder="postgresql://user:password@host:port/dbname">
+                            </div>
+                        </div>
+                    </div>                    
+
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <div>
                                 <label for="db_host">Host name</label>
@@ -98,20 +111,70 @@
         </div>
 
     </div>
-    <script type="text/javascript">
+<script type="text/javascript">
 
-        
-        function myButtonCircle(el) {          
-              const form = document.getElementById("form_connect")
-              if(form.checkValidity()) {
-                document.getElementById("connect").disabled=true;
-                document.getElementById("connect").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting  ...';
-                form.submit();
-              } else {
-                    form.reportValidity()
-              }                 
+    function fillFieldsFromUri() {
+        const uriInput = document.getElementById("db_uri");
+        if (!uriInput) return;
+
+        const uri = uriInput.value.trim();
+        if (!uri) {
+            // Rien à faire, l'utilisateur n'utilise pas l'URI
+            return;
         }
-    </script>
+
+        // Accepte postgres:// ou postgresql://
+        let normalized = uri;
+        if (uri.startsWith("postgresql://") || uri.startsWith("postgres://")) {
+            normalized = uri.replace(/^postgres(ql)?:\/\//, "http://");
+        } else {
+            alert("Invalid URI: it should start with postgresql:// or postgres://");
+            throw new Error("Invalid URI");
+        }
+
+        let url;
+        try {
+            url = new URL(normalized);
+        } catch (e) {
+            alert("Invalid connection URI: " + e.message);
+            throw e;
+        }
+
+        const host = url.hostname || "";
+        const port = url.port || "5432";
+        const dbname = (url.pathname || "").replace(/^\//, "");
+        const user = decodeURIComponent(url.username || "");
+        const password = decodeURIComponent(url.password || "");
+
+        // Remplir les champs du formulaire
+        document.getElementById("db_host").value = host;
+        document.getElementById("db_port").value = port;
+        document.getElementById("db_name").value = dbname;
+        document.getElementById("db_user").value = user;
+        document.getElementById("db_password").value = password;
+    }
+
+    function myButtonCircle(el) {
+        const form = document.getElementById("form_connect");
+
+        try {
+            // Si l'utilisateur a renseigné une URI, on remplit d'abord les champs
+            fillFieldsFromUri();
+        } catch (e) {
+            // Erreur déjà affichée à l'utilisateur, on annule la soumission
+            return;
+        }
+
+        if (form.checkValidity()) {
+            document.getElementById("connect").disabled = true;
+            document.getElementById("connect").innerHTML =
+                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting  ...';
+            form.submit();
+        } else {
+            form.reportValidity();
+        }
+    }
+</script>
 {% endblock content %}
 
 <!-- Specific Page JS goes HERE  -->

@@ -225,10 +225,22 @@ def get_db_info(db_config,con=None):
             except:
                 info["cache"]=0
 
+            try:
+                uptime, _= db_query(con,'reporting_pguptime')
+                info["uptime"]=uptime[0]['uptime_pretty']
+            except:
+                info["uptime"]="?"
+
+            try: 
+                shared_buffers, _= db_query(con,'shared_buffers_setting')    
+                info["shared_buffers"]=shared_buffers[0]['current_setting']
+            except:
+                info["shared_buffers"]="?"
+
             table_size, _= db_query(con,'table_size_top_5')
             info["table_size"]=table_size
 
-            info['profile'], _= db_query(con,'database_profile')
+            info['profile'], _= db_query(con,'reporting_db_profile')
 
             connexions, _= db_query(con,'database_count_connexions')
             info['connexions']=connexions[0]['nb']
@@ -335,6 +347,7 @@ def get_queries():
     #if not PGA_QUERIES.get('sql'):
         with open("queries.json", encoding="utf-8") as f_in:
             PGA_QUERIES=json.load(f_in)
+            print("Loaded", len(PGA_QUERIES.get('sql')), "pgAssistant queries.")
 
             # get tables names from each pgassistant queries
             PGA_TABLES=[]

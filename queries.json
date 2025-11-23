@@ -177,8 +177,8 @@
         {
             "id": "index_unused",            
             "category": "Indexe",
-            "description": "Unused indexes",
-            "sql": "select a.schemaname, a.relname, a.indexrelname, b.indexdef from pg_stat_user_indexes a ,pg_indexes b where a.schemaname=b.schemaname and a.relname=b.tablename and a.indexrelname=b.indexname and a.idx_scan = 0 order by a.relname,a.indexrelname;",
+            "description": "Unused indexes (excluding those supporting primary keys, unique constraints)",
+            "sql": "SELECT a.schemaname, a.relname, a.indexrelname, b.indexdef, '/* ' || CASE WHEN fk.conname IS NOT NULL THEN 'index used for a foreign key: ' || fk.conname ELSE 'not used for a foreign key' END || ' */ ' || 'DROP INDEX CONCURRENTLY IF EXISTS ' || quote_ident(a.schemaname) || '.' || quote_ident(a.indexrelname) || '; ANALYZE ' || quote_ident(a.schemaname) || '.' || quote_ident(a.relname) || ';' AS pga_suggestion FROM pg_stat_user_indexes a JOIN pg_indexes b ON a.schemaname=b.schemaname AND a.relname=b.tablename AND a.indexrelname=b.indexname JOIN pg_index i ON i.indexrelid=a.indexrelid LEFT JOIN LATERAL (SELECT conname FROM pg_constraint c WHERE c.contype='f' AND c.conrelid=a.relid AND i.indkey::smallint[]=c.conkey) fk ON TRUE LEFT JOIN pg_constraint c ON c.conindid=i.indexrelid AND c.contype IN ('p','u') WHERE a.idx_scan=0 AND c.oid IS NULL AND NOT i.indisunique ORDER BY a.relname, a.indexrelname;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ALL-INDEXES-VIEW"
         },
@@ -409,9 +409,9 @@
         },
         {
             "id": "reporting_unused_indexes",
-            "description": "Unused indexes",
+            "description": "Unused indexes (excluding those supporting primary keys, unique constraints)",
             "category": "Reporting",
-            "sql": "SELECT s.schemaname, s.relname, s.indexrelname, s.idx_scan, pg_relation_size(s.indexrelid) AS size_bytes FROM pg_stat_user_indexes s JOIN pg_index i ON i.indexrelid = s.indexrelid WHERE s.idx_scan = 0 ORDER BY size_bytes DESC;",
+            "sql": "SELECT a.schemaname, a.relname, a.indexrelname, b.indexdef, '/* ' || CASE WHEN fk.conname IS NOT NULL THEN 'index used for a foreign key: ' || fk.conname ELSE 'not used for a foreign key' END || ' */ ' || 'DROP INDEX CONCURRENTLY IF EXISTS ' || quote_ident(a.schemaname) || '.' || quote_ident(a.indexrelname) || '; ANALYZE ' || quote_ident(a.schemaname) || '.' || quote_ident(a.relname) || ';' AS pga_suggestion FROM pg_stat_user_indexes a JOIN pg_indexes b ON a.schemaname=b.schemaname AND a.relname=b.tablename AND a.indexrelname=b.indexname JOIN pg_index i ON i.indexrelid=a.indexrelid LEFT JOIN LATERAL (SELECT conname FROM pg_constraint c WHERE c.contype='f' AND c.conrelid=a.relid AND i.indkey::smallint[]=c.conkey) fk ON TRUE LEFT JOIN pg_constraint c ON c.conindid=i.indexrelid AND c.contype IN ('p','u') WHERE a.idx_scan=0 AND c.oid IS NULL AND NOT i.indisunique ORDER BY a.relname, a.indexrelname;",
             "type": "select",
             "reference": ""
         },
@@ -451,7 +451,7 @@
             "id": "reporting_pguptime",
             "description": "Database uptime",
             "category": "Reporting",
-            "sql": "SELECT pg_postmaster_start_time(), round(EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) / 86400, 2) AS uptime_days;",
+            "sql": "WITH diff AS (SELECT now() - pg_postmaster_start_time() AS i) SELECT pg_postmaster_start_time(), now() - pg_postmaster_start_time() AS uptime_interval, round(EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) / 86400, 2) AS uptime_days, trim(both ', ' from concat_ws(', ', CASE WHEN extract(month FROM i)::int > 0 THEN extract(month FROM i)::int || ' months' END, CASE WHEN extract(day FROM i)::int > 0 THEN extract(day FROM i)::int || ' days' END, CASE WHEN extract(hour FROM i)::int > 0 THEN extract(hour FROM i)::int || ' hours' END, CASE WHEN extract(minute FROM i)::int > 0 THEN extract(minute FROM i)::int || ' minutes' END)) AS uptime_pretty FROM diff;",
             "type": "select",
             "reference": ""
         },
@@ -462,7 +462,31 @@
             "sql": "WITH head AS (SELECT queryid, calls, rows, total_exec_time, mean_exec_time, lower(substring(query FROM '(?is)^\\s*(?:/\\*.*?\\*/\\s*)*(?:--[^\\n]*\\n\\s*)*(\\w+)')) AS first_token FROM pg_stat_statements), classified AS (SELECT queryid, calls, rows, total_exec_time::numeric AS total_exec_time, mean_exec_time::numeric AS avg_mean_exec_time, CASE WHEN first_token IN ('select','insert','update','delete') THEN first_token WHEN first_token = 'with' THEN 'select' WHEN first_token IN ('merge') THEN 'merge' WHEN first_token IN ('call') THEN 'call' WHEN first_token IN ('create','alter','drop','truncate','comment','grant','revoke','rename') THEN 'ddl' WHEN first_token IN ('copy','analyze','vacuum','explain','show','set','reset','discard','checkpoint','prepare','execute','deallocate','listen','unlisten','notify','begin','start','commit','rollback','savepoint','release') THEN 'utility' ELSE 'other' END AS query_type FROM head), agg AS (SELECT query_type, SUM(calls) AS total_calls, SUM(rows) AS total_rows, SUM(total_exec_time) AS total_exec_time, AVG(avg_mean_exec_time) AS avg_mean_exec_time FROM classified GROUP BY query_type), tot AS (SELECT SUM(total_calls)::numeric AS grand_total_calls, SUM(total_exec_time)::numeric AS grand_total_exec_time FROM agg) SELECT a.query_type, a.total_calls, a.total_rows, ROUND(a.total_exec_time, 2) AS total_exec_time, ROUND(a.avg_mean_exec_time, 3) AS avg_mean_exec_time, COALESCE(ROUND(100.0 * a.total_calls::numeric / NULLIF(t.grand_total_calls, 0), 0), 0)::int AS percentage_calls, COALESCE(ROUND(100.0 * a.total_exec_time / NULLIF(t.grand_total_exec_time, 0), 0), 0)::int AS percentage_exec_time FROM agg a CROSS JOIN tot t ORDER BY percentage_exec_time DESC NULLS LAST, percentage_calls DESC NULLS LAST;",
             "type": "select",
             "reference": ""
-        }           
+        },
+        {
+            "id": "reporting_bgwritter17",
+            "description": "Background writer stats (PostgreSQL>=17)",
+            "category": "Reporting",
+            "sql": "SELECT cp.num_timed AS checkpoints_timed, cp.num_requested AS checkpoints_req, (cp.num_timed + cp.num_requested) AS checkpoints_total, CASE WHEN (cp.num_timed + cp.num_requested) > 0 THEN round((cp.num_requested::numeric * 100.0::numeric) / (cp.num_timed + cp.num_requested), 1) ELSE NULL END AS checkpoints_req_ratio_pct, cp.write_time AS checkpoint_write_time, cp.sync_time AS checkpoint_sync_time, CASE WHEN (cp.num_timed + cp.num_requested) > 0 THEN round(((cp.write_time + cp.sync_time)::numeric / (cp.num_timed + cp.num_requested)), 1) ELSE NULL END AS avg_checkpoint_time_ms, cp.buffers_written AS buffers_checkpoint, bg.buffers_clean, bg.maxwritten_clean, bg.buffers_alloc, cp.stats_reset AS stats_reset_checkpointer, bg.stats_reset AS stats_reset_bgwriter, (CASE WHEN (cp.num_timed + cp.num_requested) > 0 AND (cp.write_time + cp.sync_time) / (cp.num_timed + cp.num_requested) > 5000 THEN '🔴 ' WHEN cp.num_requested > cp.num_timed OR bg.maxwritten_clean > 0 THEN '🟠 ' ELSE '🟢 ' END || CASE WHEN cp.num_requested > cp.num_timed THEN 'High number of WAL-driven checkpoints (num_requested > num_timed): consider increasing max_wal_size.' ELSE 'Checkpoints are mostly time-driven: max_wal_size seems adequate.' END || CASE WHEN (cp.num_timed + cp.num_requested) > 0 AND (cp.write_time + cp.sync_time) / (cp.num_timed + cp.num_requested) > 5000 THEN ' Average checkpoint time is high (> 5000 ms): check I/O performance and checkpoint_completion_target and storage performance.' ELSE '' END || CASE WHEN bg.maxwritten_clean > 0 THEN ' Background writer frequently reaches its write limit (maxwritten_clean > 0): consider tuning bgwriter_lru_maxpages and bgwriter_lru_multiplier.' ELSE '' END) AS pga_suggestion_bgwriter FROM pg_stat_bgwriter AS bg CROSS JOIN pg_stat_checkpointer AS cp;",
+            "type": "select",
+            "reference": ""
+        },
+        {
+            "id": "reporting_bgwritter16",
+            "description": "Background writer stats (PostgreSQL<17)",
+            "category": "Reporting",
+            "sql": "SELECT checkpoints_timed, checkpoints_req, (checkpoints_timed + checkpoints_req) AS checkpoints_total, CASE WHEN (checkpoints_timed + checkpoints_req) > 0 THEN round((checkpoints_req::numeric * 100.0::numeric) / (checkpoints_timed + checkpoints_req), 1) ELSE NULL END AS checkpoints_req_ratio_pct, checkpoint_write_time, checkpoint_sync_time, CASE WHEN (checkpoints_timed + checkpoints_req) > 0 THEN round(((checkpoint_write_time + checkpoint_sync_time)::numeric / (checkpoints_timed + checkpoints_req)), 1) ELSE NULL END AS avg_checkpoint_time_ms, buffers_checkpoint, buffers_clean, buffers_backend, buffers_backend_fsync, maxwritten_clean, buffers_alloc, stats_reset, (CASE WHEN buffers_backend_fsync > 0 OR ((checkpoints_timed + checkpoints_req) > 0 AND (checkpoint_write_time + checkpoint_sync_time) / (checkpoints_timed + checkpoints_req) > 5000) THEN '🔴 ' WHEN checkpoints_req > checkpoints_timed OR maxwritten_clean > 0 THEN '🟠 ' ELSE '🟢 ' END || (CASE WHEN checkpoints_req > checkpoints_timed THEN 'High number of WAL-driven checkpoints (checkpoints_req > checkpoints_timed): consider increasing max_wal_size.' ELSE 'Checkpoints are mostly time-driven: max_wal_size seems adequate.' END || CASE WHEN (checkpoints_timed + checkpoints_req) > 0 AND (checkpoint_write_time + checkpoint_sync_time) / (checkpoints_timed + checkpoints_req) > 5000 THEN ' Average checkpoint time is high (> 5000 ms): check I/O performance and checkpoint_completion_target.' ELSE '' END || CASE WHEN buffers_backend_fsync > 0 THEN ' Backends had to perform fsync (buffers_backend_fsync > 0): checkpointer may be overloaded or I/O is too slow.' ELSE '' END || CASE WHEN maxwritten_clean > 0 THEN ' Background writer frequently reaches its write limit (maxwritten_clean > 0): consider tuning bgwriter_lru_maxpages and bgwriter_lru_multiplier.' ELSE '' END)) AS pga_suggestion_bgwriter FROM pg_stat_bgwriter;",
+            "type": "select",
+            "reference": ""
+        },
+        {
+            "id": "shared_buffers_setting",
+            "description": "Get shared buffers usage",
+            "category": "Database",
+            "sql": "SELECT current_setting('shared_buffers');",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS"
+        }                       
     
     ]
 }

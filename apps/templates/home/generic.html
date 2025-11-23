@@ -87,6 +87,44 @@
       </div>
   </div>
 
+{# --- SECTION CODE : if any "pga_suggestion*" --- #}
+{% if rows and rows|length > 0 %}
+  {% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
+
+  {# 1) Détecter les colonnes qui commencent par pga_suggestion* #}
+  {% for key in rows[0].keys() %}
+    {% if key.startswith('pga_suggestion') %}
+      {% set _ = ns.suggestion_keys.append(key) %}
+    {% endif %}
+  {% endfor %}
+
+  {# 2) Collecter toutes les valeurs de ces colonnes #}
+  {% for row in rows %}
+    {% for key in ns.suggestion_keys %}
+      {% if key in row and row[key] %}
+        {% set _ = ns.suggestions.append(row[key]) %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+
+  {# 3) Afficher la section uniquement s’il y a au moins une suggestion #}
+  {% if ns.suggestions %}
+  <div class="card border-0 shadow mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="card-title mb-0">Code suggestions</h5>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copySuggestionsToClipboard()">
+          Copy
+        </button>
+      </div>
+      <pre id="pgaSuggestions"
+           style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+{{ ns.suggestions | join('\n') }}
+      </pre>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
   <p id="current-sql">No SQL executing</p>
   <div id="results"></div>
 
@@ -94,6 +132,41 @@
 <script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js" ></script>
 
 <script>
+    function copySuggestionsToClipboard() {
+    const el = document.getElementById('pgaSuggestions');
+    if (!el) return;
+    const text = el.innerText || el.textContent || "";
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+        .then(() => {
+            console.log('Suggestions copied to clipboard');
+        })
+        .catch(err => {
+            console.error('Clipboard copy failed', err);
+            fallbackCopyText(text);
+        });
+    } else {
+        fallbackCopyText(text);
+    }
+    }
+
+    function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        console.log('Suggestions copied to clipboard (fallback)');
+    } catch (err) {
+        console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textarea);
+    }
+
     function refreshPage() {
             location.reload(); // Reloads the page
         }

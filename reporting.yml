@@ -46,6 +46,18 @@
     enabled: true
     template: generic_select_with_sql.md 
 
+  - chapter_name: pg_stat_checkpointer + pg_stat_bgwriter statistics (PostgreSQL>=17)
+    query_id: reporting_bgwritter17
+    description: pg_stat_checkpointer + pg_stat_bgwriter statistics (PostgreSQL>=17)
+    enabled: true
+    template: db_wal.md
+
+  - chapter_name: pg_stat_bgwriter statistics (PostgreSQL<=16)
+    query_id: reporting_bgwritter16
+    description: pg_stat_bgwriter statistics (PostgreSQL<=16)
+    enabled: true
+    template: db_wal.md    
+
   - chapter_name: Vacuum statistics
     query_id: reporting_vacuum_stats
     description: Lists vacuum informations
@@ -63,6 +75,12 @@
     description: Top queries by mean execution time
     enabled: true
     template: generic_select_with_sql.md    
+
+  - chapter_name: Unused indexes (excluding those supporting primary keys, unique constraints)
+    query_id: reporting_unused_indexes
+    description: Unused indexes (excluding those supporting primary keys, unique constraints)
+    enabled: true
+    template: generic_issue.md
 
   - chapter_name: Database issues - Missing indexes on foreign keys
     query_id: issue_idx_fk_missing
