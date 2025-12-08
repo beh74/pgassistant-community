@@ -47,33 +47,26 @@ def get_formated_sql(sql_query):
     except:
         return sql_query
     
+
 def replace_query_parameters(query, params):
     """
-    Remplace les paramètres ($1, $2, etc.) dans une chaîne SQL par leurs valeurs.
+    Replace parameters ($1, $2, etc.) in an SQL string with their provided values.
 
-    Args:
-        query (str): La chaîne SQL contenant les paramètres sous la forme $1, $2, etc.
-        params (dict): Un dictionnaire contenant les paramètres (ex: {1: 'xx', 2: 'yy'}).
-
-    Returns:
-        str: La chaîne SQL avec les paramètres remplacés par leurs valeurs.
+    The values in `params` are assumed to be already SQL-formatted
+    (including quotes, NULL, etc.). This function does not modify or escape them.
     """
     def replace_match(match):
-        # Extraire le numéro du paramètre
         param_index = int(match.group(1))
-        # Obtenir la valeur du paramètre
-        value = params.get(param_index)
-        if value is None:
-            value = ''
-        return str(value)
 
-    # Remplacer tous les paramètres $1, $2, ... dans la requête
-    if "$" in query:
-        modified_query = re.sub(r"\$(\d+)", replace_match, query)
-    else:
-        modified_query=query
+        # If the parameter is not provided, keep the original $n placeholder
+        if param_index not in params:
+            return match.group(0)
 
-    return modified_query
+        value = params[param_index]
+        return '' if value is None else str(value)
+
+    # Replace all occurrences of $<number>
+    return re.sub(r"\$(\d+)", replace_match, query)
 
 def parse_most_common_vals(value):
     """Parse PostgreSQL's most_common_vals field into a Python list."""

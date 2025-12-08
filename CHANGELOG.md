@@ -1,5 +1,25 @@
 # Change Log
 
+## [2.2.0] - 2025-08-12
+
+### Features
+
+- **Improved parameter detection in the Analyze form**
+  The parameter extraction engine has been significantly enhanced to provide more accurate column and datatype mapping for SQL queries using positional parameters (`$1`, `$2`, …).
+  Improvements include:  
+     - better parsing of SQL expressions via SQLGlot  
+     - support for parameters inside expressions (`$1 - discount`, arithmetic operations, functions, etc.)  
+     - support for casted parameters (e.g. `$1::date`, `$2::numeric`)  
+     - handling of `IN (...)`, `NOT IN (...)`, and `BETWEEN ... AND ...` clauses  
+     - fallback strategies to ensure robust behavior even on complex or unusual queries  
+  These enhancements allow pgAssistant to properly pre-fill the Analyze form with the correct column types.
+
+### Bug fixes
+
+- **Report API** now returns an error when pgAssistant cannot connect to the database ;
+- **Analyze form** now have a better detection of string parameters (like uid, jdon, etc)
+
+
 ## [2.1.0] - 2025-22-10
 
 ### Features

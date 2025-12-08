@@ -60,7 +60,7 @@
             "id": "db_cache",
             "description": "Database hit cache ratio",            
             "category": "Cache",        
-            "sql": "SELECT round (100*sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)),2)::float as ratio FROM pg_statio_user_tables;",
+            "sql": "SELECT round(100.0 * blks_hit / NULLIF(blks_hit+blks_read,0),2) AS ratio FROM pg_stat_database WHERE datname = current_database();",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-TABLES-VIEW"
         },
@@ -486,8 +486,23 @@
             "sql": "SELECT current_setting('shared_buffers');",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS"
-        }                       
-    
+        },
+        {
+            "category": "Action",
+            "id": "action_idx_fk_missing",
+            "description": "Issue & action - Usefull Indexes missing on foreign keys",
+            "sql": "WITH fkeys_without_indexes AS (SELECT c.conname AS fk_name, c.conrelid::regclass AS tablename, a.attname AS column_name, n.nspname AS schemaname, c.conkey, c.confrelid::regclass AS referenced_table FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace JOIN pg_class r ON r.oid = c.conrelid JOIN unnest(c.conkey) AS col_num ON true JOIN pg_attribute a ON a.attnum = col_num AND a.attrelid = r.oid LEFT JOIN pg_index i ON i.indrelid = r.oid AND col_num = ANY (i.indkey) WHERE c.contype = 'f' AND i.indexrelid IS NULL), referenced_stats AS (SELECT relid::regclass AS referenced_table, n_live_tup FROM pg_stat_user_tables), suggested_indexes AS (SELECT f.schemaname, f.tablename, f.column_name, f.referenced_table, s.n_live_tup, CASE WHEN s.n_live_tup = 0 THEN 'REFERENCED TABLE IS NOT ANALYZED !' WHEN s.n_live_tup >= 1000 THEN '❌ INDEX STRONGLY RECOMMENDED' WHEN s.n_live_tup >= 500 THEN '⚠️ INDEX RECOMMENDED (moderate size)' ELSE '✅ INDEX MISSING BUT REFERENCED TABLE IS SMALL' END AS index_importance, 'CREATE INDEX CONCURRENTLY pga_idx_fk_' || f.tablename || '_' || f.column_name || ' ON ' || f.schemaname || '.' || f.tablename || '(' || f.column_name || ');' AS pga_action FROM fkeys_without_indexes f LEFT JOIN referenced_stats s ON f.referenced_table = s.referenced_table) SELECT schemaname, tablename, column_name, referenced_table, n_live_tup AS estimated_rows, index_importance, pga_action FROM suggested_indexes WHERE index_importance IN ('❌ INDEX STRONGLY RECOMMENDED','⚠️ INDEX RECOMMENDED (moderate size)') ORDER BY schemaname, tablename, column_name;",
+            "type": "select",
+            "reference": "https://beh74.github.io/pgassistant-blog/doc/issue_index_fk/"
+        },
+        {
+            "category": "Action",
+            "id": "action_idx_duplicate",
+            "description": "Issue & action - Remove duplicate indexes (with strict definition match)",
+            "sql": "WITH index_data AS (SELECT i.indexrelid, n.nspname AS schemaname, t.relname AS table_name, c.relname AS index_name, t.oid AS table_oid, pg_relation_size(i.indexrelid) AS index_size_bytes, COALESCE(s.idx_scan, 0) AS index_usage, pg_get_indexdef(i.indexrelid) AS index_def, i.indisprimary, i.indisunique, EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conindid = i.indexrelid) AS is_constraint_index, format('%s|%s|%s|%s|%s|%s|%s', i.indrelid, i.indkey, i.indclass, i.indoption, pg_get_expr(i.indexprs, i.indrelid), pg_get_expr(i.indpred, i.indrelid), am.amname) AS index_signature FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid AND c.relkind = 'i' JOIN pg_class t ON t.oid = i.indrelid AND t.relkind = 'r' JOIN pg_namespace n ON n.oid = t.relnamespace JOIN pg_am am ON am.oid = c.relam LEFT JOIN pg_stat_user_indexes s ON s.indexrelid = i.indexrelid WHERE i.indisvalid), duplicate_defs AS (SELECT index_signature, COALESCE(MIN(indexrelid) FILTER (WHERE is_constraint_index OR indisunique), MIN(indexrelid)) AS keeper_index_id, COUNT(*) AS cnt FROM index_data GROUP BY index_signature HAVING COUNT(*) > 1) SELECT d.schemaname, d.table_name, d.index_name, d.index_def, d.index_size_bytes, d.index_usage, 'DROP INDEX ' || quote_ident(d.schemaname) || '.' || quote_ident(d.index_name) || ';' AS pga_action FROM index_data d JOIN duplicate_defs dd ON d.index_signature = dd.index_signature AND d.indexrelid <> dd.keeper_index_id AND d.is_constraint_index = FALSE AND d.indisunique = FALSE ORDER BY d.index_size_bytes DESC;",
+            "type": "select",
+            "reference": "https://www.rockdata.net/tutorial/check-duplicate-indexes/"
+        }               
     ]
 }
     

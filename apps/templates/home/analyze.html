@@ -369,6 +369,26 @@
         const type = field.getAttribute('data-type');
         const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
 
+        // List of PostgreSQL types that should be quoted in SQL literals
+        const stringTypes = [
+            'char', 'varchar', 'text',
+            'date', 'timestamp', 'timestamptz', 'time', 'timetz', 'interval',
+            'uuid',
+            'json', 'jsonb',
+            'inet', 'cidr', 'macaddr', 'macaddr8',
+            'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle',
+            'bit', 'bit varying',
+            'xml',
+            'money'
+        ];
+
+        // Helper to decide if the value should be quoted
+        function shouldBeQuoted(sqlType) {
+            if (!sqlType) return false;
+            const t = sqlType.toLowerCase();
+            return stringTypes.some(st => t.includes(st));
+        }
+
         if (table && column && type) {
             fetch('/api/v1/fetch_column_data', {
                 method: 'POST',
@@ -389,12 +409,15 @@
                         let suggestionItem = document.createElement("div");
                         suggestionItem.classList.add("suggestion-item");
                         suggestionItem.textContent = value;
+
                         suggestionItem.addEventListener('click', function () {
-                            field.value = type.includes('char') || type.includes('text') || type.includes('date')
+                            field.value = shouldBeQuoted(type)
                                 ? `'${value}'`
                                 : value;
+
                             suggestionsBox.style.display = 'none';
                         });
+
                         suggestionsBox.appendChild(suggestionItem);
                     });
                     suggestionsBox.style.display = 'block';
