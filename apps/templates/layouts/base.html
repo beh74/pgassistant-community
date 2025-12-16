@@ -31,6 +31,8 @@ Base page
 <!-- Specific Page JS goes HERE  -->    
 {% block stylesheets %}{% endblock stylesheets %}
 
+<link type="text/css" href="{{ config.ASSETS_ROOT }}/css/pga.css" rel="stylesheet">
+
 </head>
 <body>
 
@@ -44,9 +46,9 @@ Base page
 
       {% include 'includes/settings-box.html' %}
 
-      {% include 'includes/footer.html' %}
-
     </main>
+
+      {% include 'includes/footer.html' %}
 
   {% include 'includes/scripts.html' %}
     

@@ -1,4 +1,4 @@
-<nav class="navbar navbar-top navbar-expand navbar-dashboard navbar-dark ps-0 pe-2 pb-0">
+<nav class="navbar navbar-top navbar-expand navbar-dashboard navbar-dark">
               <div class="container-fluid px-0">
                 <div class="d-flex justify-content-between w-100" id="navbarSupportedContent">
                   <div class="d-flex align-items-center">
@@ -10,7 +10,7 @@
                               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
                             </svg>
                           </span>
-                          <input class="form-control" id="searchkey" name="searchkey" type="text" placeholder="Search 4 a query">                          
+                          <input class="form-control" id="searchkey" name="searchkey" type="text" placeholder="Search query">                          
                       </div>
                       <div class="input-group input-group-merge search-bar">
                       
@@ -20,16 +20,24 @@
                   </div>
                   <!-- Navbar links -->
                   <ul class="navbar-nav align-items-center">
-                    
+                    <li class="nav-item">
+                    {% if session['db_host'] %}
+                    <div class="media-body ms-2 text-dark align-items-center d-none d-lg-block">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4.318 2.687C5.234 2.271 6.536 2 8 2s2.766.27 3.682.687C12.644 3.125 13 3.627 13 4c0 .374-.356.875-1.318 1.313C10.766 5.729 9.464 6 8 6s-2.766-.27-3.682-.687C3.356 4.875 3 4.373 3 4c0-.374.356-.875 1.318-1.313M13 5.698V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7V5.698c.271.202.58.378.904.525C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777A5 5 0 0 0 13 5.698M14 4c0-1.007-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1s-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4v9c0 1.007.875 1.755 1.904 2.223C4.978 15.71 6.427 16 8 16s3.022-.289 4.096-.777C13.125 14.755 14 14.007 14 13zm-1 4.698V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10V8.698c.271.202.58.378.904.525C4.978 9.71 6.427 10 8 10s3.022-.289 4.096-.777A5 5 0 0 0 13 8.698m0 3V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13v-1.302c.271.202.58.378.904.525C4.978 12.71 6.427 13 8 13s3.022-.289 4.096-.777c.324-.147.633-.323.904-.525"/>
+                        </svg>
+                      <span class="mb-0 font-small fw-bold text-gray-900">
+                        {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
+                      </span>
+                    </div>
+                    {% endif %}
+                    </li>
                     <li class="nav-item dropdown ms-lg-3">
                       <a class="nav-link dropdown-toggle pt-1 px-0" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <div class="media d-flex align-items-center">
-                          <img  alt="Image placeholder" src="{{ config.ASSETS_ROOT }}/img/technologies/postgresql.png">
-                          <div class="media-body ms-2 text-dark align-items-center d-none d-lg-block">
-                            <span class="mb-0 font-small fw-bold text-gray-900">
-                              {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
-                            </span>
-                          </div>
+                          <span>
+                            <svg class="icon icon-s me-2" fill="black" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
+                          </span>
                         </div>
                       </a>
                       <div class="dropdown-menu dashboard-dropdown dropdown-menu-end mt-2 py-1">
