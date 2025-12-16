@@ -17,6 +17,7 @@ from . import sqlcolumns
 from . import analyze_aquery
 from . import config
 from . import reporting
+from . import action
 import re
 import requests
 import json
@@ -297,6 +298,7 @@ def analyze_query(querid):
             # extract parameters list
             pattern = r'\$[0-9]+' 
             parameters = re.findall(pattern, sql_query)
+            parameters = sorted(set(parameters), key=lambda p: int(p[1:]))
 
             if request.method == 'POST':
 
@@ -440,6 +442,8 @@ def api_database_report():
             report_yaml_definition_file="./reporting.yml",
             template_folder="db_report_templates"
         )
+        if not database_reports:
+            return jsonify({"error": "No report generated"}), 500
         return Response(database_reports, mimetype="text/markdown; charset=utf-8")
 
     except Exception as e:
@@ -482,6 +486,12 @@ def api_apply_recommendations():
 
         db_config = data["db_config"]
 
+        # --- Validate unique_name ---
+        if "unique_name" not in data or not data["unique_name"]:
+            return jsonify({"error": "Missing or empty 'unique_name'"}), 400
+        unique_name = data["unique_name"]
+
+        # --------------------------
         required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
         missing = [k for k in required_keys if k not in db_config]
         if missing:
@@ -495,8 +505,8 @@ def api_apply_recommendations():
         # 3) Validate run_recommandations
         allowed_reco = {
             "create_missing_fk_indexes",
-            "drop_redundants_indexes",
-            "alter_table_on_fk",
+            "drop_duplicate_indexes",
+            "alter_table_columns_on_fk",
             "drop_unused_indexes",
             "all",
         }
@@ -516,18 +526,31 @@ def api_apply_recommendations():
         if "all" in run_recommandations:
             run_recommandations = list(allowed_reco - {"all"})
 
-        # 4) Now do the actual work (or simulate if dryrun)
-        # For the moment we simulate
+        # 4) Run actions
+        executed_sql, errors = action.run_actions(db_config, unique_name=unique_name, dry_mode=dryrun)
         result = {
             "dryrun": dryrun,
             "run_recommandations": run_recommandations,
-            "message": "Recommendations processing is not implemented yet.",
+            "message": "Recommendations executed." if not errors else "Errors occurred while executing recommendations.",
+            "executed_sql": executed_sql,
+            "errors": errors
         }
 
+        # If errors exist → return same payload but as an error
+        if errors:
+            return Response(
+                json.dumps(result, indent=2),
+                mimetype="application/json; charset=utf-8",
+                status=400   # or 500 depending on what you prefer
+            )
+
+        # Otherwise → success
         return Response(
             json.dumps(result, indent=2),
-            mimetype="application/json; charset=utf-8"
+            mimetype="application/json; charset=utf-8",
+            status=200
         )
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

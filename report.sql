@@ -1,7 +1,7 @@
 
 -- 1) target databases
 create table if not exists target_database (
-  id            bigserial primary key,
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   unique_name   varchar(255) not null,       
   host          varchar(255) not null,       
   dbname        varchar(63)  not null,       
@@ -14,7 +14,7 @@ create table if not exists target_database (
 
 -- 2) reports
 create table if not exists report_run (
-  id                  bigserial primary key,
+  id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   target_database_id  bigint not null references target_database(id) on delete restrict,
   started_at          timestamptz not null default now(),
   finished_at         timestamptz,
@@ -24,7 +24,7 @@ create table if not exists report_run (
 
 -- 3) chapters
 create table if not exists chapter_run (
-  id               bigserial primary key,
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   report_run_id    bigint not null references report_run(id) on delete cascade,
   chapter_name     varchar(256) not null,
   query_id         varchar(128) not null,
@@ -32,4 +32,16 @@ create table if not exists chapter_run (
   row_count        integer not null default 0,
   success          boolean not null default false,     
   result_json      jsonb not null
+);
+
+--4) actions
+create table if not exists action_run (
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  target_database_id  bigint not null references target_database(id) on delete restrict,
+  started_at       timestamptz not null default now(),
+  finished_at      timestamptz,
+  success          boolean not null default false,
+  executed_sql     text not null,
+  issue_type       varchar(128) not null,
+  dry_mode         boolean not null default true
 );
