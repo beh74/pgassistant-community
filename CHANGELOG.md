@@ -1,5 +1,11 @@
 # Change Log
 
+## [2.2.1] - 2025-17-12
+
+## Features
+
+- Visual upgrade of the database connexion page. Change of colors, icons, alignment in the connexion form.
+
 ## [2.2.0] - 2025-08-12
 
 ### Features
