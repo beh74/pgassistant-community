@@ -1,0 +1,56 @@
+#sidebarMenu #app-title:hover {
+    background-color: inherit;
+}
+
+#sidebarMenu {
+    max-width: 300px;
+}
+
+@media (min-width: 992px) {
+    .content, footer {
+        margin-left: 300px;
+    }
+}
+
+footer {
+    flex-shrink: 0;
+}
+
+body, html {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.content {
+    flex: 1 0 auto;
+}
+
+button#connect {
+    float: right;
+}
+
+.alert {
+    font-size: 11pt;
+}
+
+.alert-link {
+    text-decoration: underline;
+}
+
+.btn-primary {
+    background-color: #336791 !important;
+    border-color: #336791 !important;
+}
+
+.bg-dark {
+    background-color: #344B5E !important;
+}
+
+.sidebar .nav-item.active > .nav-link, .sidebar .nav-item .nav-link:hover {
+    background-color: #466680 !important;
+}
+
+.sidebar .nav-link .sidebar-icon {
+    color: inherit;
+}
