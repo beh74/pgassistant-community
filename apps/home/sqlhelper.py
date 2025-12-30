@@ -73,41 +73,41 @@ def parse_most_common_vals(value):
     
     print(value)
     if not value or value == "{}":
-        return []  # Retourne une liste vide si NULL ou vide
+        return []  # returns an empty list if NULL or empty
 
-    # Vérifier si la valeur est bien une chaîne
+        # Check if the value is indeed a string
     if isinstance(value, tuple):  
-        value = value[0]  # Extraire la première valeur du tuple
+        value = value[0]  # Extract the first valute
 
     if value is None:
         return []
 
-    # Supprimer les accolades `{}` autour de la chaîne
+    # Remove the surrounding braces `{}` from the string
     value = value.strip("{}")
 
-    # Expression régulière pour capturer :
-    # - Les valeurs entre guillemets (ex: "John Doe", "2024-12-23 08:31:35.616712")
-    # - Les valeurs non guillemetées (ex: F, M, 2020-07-21, 1238)
+    # regular expression to capture:
+    # - Values in quotes (e.g., "John Doe", "2024-12-23 08:31:35.616712")
+    # - Unquoted values (e.g., F, M, 2020-07
     pattern = r'"([^"]+)"|([^,]+)'
 
     matches = re.findall(pattern, value)
     
     parsed_values = []
     for match in matches:
-        raw_value = match[0] if match[0] else match[1]  # Priorité à la valeur entre guillemets
+        raw_value = match[0] if match[0] else match[1]  # priority to quoted value
 
-        # Tentative de conversion en date (format PostgreSQL)
+        # try to parse as timestamp or date
         try:
             parsed_value = str(datetime.strptime(raw_value, "%Y-%m-%d %H:%M:%S.%f"))  # Format timestamp
         except ValueError:
             try:
-                parsed_value = str(datetime.strptime(raw_value, "%Y-%m-%d"))  # Format date simple
+                parsed_value = str(datetime.strptime(raw_value, "%Y-%m-%d"))  # Format date 
             except ValueError:
-                # Tentative de conversion en entier
+                # try to parse as integer
                 try:
                     parsed_value = int(raw_value)
                 except ValueError:
-                    parsed_value = raw_value  # Garder sous forme de chaîne si tout échoue
+                    parsed_value = raw_value  # keep as string if all else fails
         
         parsed_values.append(parsed_value)
 
@@ -240,32 +240,32 @@ def map_query_parameters(query, connection):
     Returns:
         A dictionary { parameter: (table_name, column_name, data_type) }.
     """
-    # Extraire les paramètres SQL et leurs colonnes associées
+    # Extract the SQL parameters and their associated columns
     param_columns = analyze_param.extract_parameter_columns(query)
 
     if not param_columns:
         print("No SQL parameters found.")
         return {}
 
-    # Convertir les données pour la requête PostgreSQL
+    # Convert data for PostgreSQL query
     table_column_pairs = [(table_column.split('.')[0], table_column.split('.')[1]) for table_column in param_columns.values()]
 
-    # Récupérer les types de données des colonnes
+    # Retrieve column data types
     column_types = get_column_data_types(connection, table_column_pairs)
 
 
-    # Associer chaque paramètre SQL à son (table, colonne, data_type)
+    # Associate each SQL parameter with its (table, column, data_type)
     param_mapping = {}
     for param, column in param_columns.items():
         table_name, column_name = column.split('.')
         column_key = (table_name, column_name)
 
-        # Vérifier si la clé est présente avec un schéma (ex: public.authors)
+        # Check if the key is present with a schema (e.g., public.authors)
         matching_key = next((key for key in column_types.keys() if key[1] == column_name and key[0].endswith(table_name)), None)
 
         if matching_key:
             column_type = column_types[matching_key]
-            resolved_table_name = matching_key[0]  # Utiliser le nom de la table avec schéma
+            resolved_table_name = matching_key[0]  # Use the table name with schema
         else:
             column_type = "UNKNOWN"
             resolved_table_name = table_name

@@ -29,12 +29,14 @@ def handle_database_post(segment: str):
     session.permanent = True
     for key, val in request.form.items():
         session[key] = val
-    session.modified = True
 
     dbinfo = database.get_db_info(session)
 
     if "error" in dbinfo:
         return render_template(f"home/{segment}", segment=segment, dbinfo=dbinfo)  
+
+    session['version']=database.get_pg_major_version(dbinfo['version'])
+    session.modified = True
 
     return render_template("home/dashboard.html", segment="dashboard.html", dbinfo=dbinfo)
 
@@ -50,29 +52,30 @@ def handle_dashboard_get(segment: str):
 
 def handle_topqueries_get(template: str, segment: str, tablename: str = None):
     if session.get("db_name"):
-        # Récupération du paramètre optionnel 'tablename' depuis l'URL si non fourni en argument
+        
+        # get optional tablename parameter from URL
         if tablename is None:
-            tablename = request.args.get('tablename')  # None si non fourni
+            tablename = request.args.get('tablename')  
 
-        # Récupérer toutes les requêtes SQL de la base
+        # get top queries
         rows = database.get_top_queries(session)
 
-        # Ajout des informations supplémentaires sur les queries
+        # add additional information on queries
         for row in rows:            
             row['tables'] = sqlhelper.get_tables(row['query'])
             row['operation_type'] = sqlhelper.get_sql_type(row['query'])
 
-        # Récupérer les tables internes de PostgreSQL
+        # Get PostgreSQL internal tables
         pga_tables = database.get_pga_tables()
 
-        # Filtrage des queries pour ignorer les tables système
+        # Filter queries to ignore system tables
         rows_filtered = [row for row in rows if not any(table in pga_tables for table in row['tables'])]
 
-        # 🌟 Filtrer encore plus si 'tablename' est renseigné
+        # Filter even more if 'tablename' is provided
         if tablename:
             rows_filtered = [row for row in rows_filtered if tablename in row['tables']]
 
-        # Rendu du template avec les données filtrées
+        # Render the template with the filtered data
         return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename)
 
     else:
@@ -168,17 +171,18 @@ def handle_cache_table_get(template: str, segment: str):
     if session.get("db_name"):
             query_rows,description=database.generic_select(session,"hit_cache_by_table")
             for row in query_rows:
-                # Vérifier et convertir 'table_cache_hit_ratio'
+                # check and convert 'table_cache_hit_ratio'
                 try:
                     row['table_cache_hit_ratio'] = float(row['table_cache_hit_ratio'])
                 except (ValueError, TypeError):
                     row['table_cache_hit_ratio'] = 0  # Valeur invalide remplacée par None
 
-                # Vérifier et convertir 'index_cache_hit_ratio'
+
+                # check and convert 'index_cache_hit_ratio'
                 try:
                     row['index_cache_hit_ratio'] = float(row['index_cache_hit_ratio'])
                 except (ValueError, TypeError):
-                    row['index_cache_hit_ratio'] = 0  # Valeur invalide remplacée par None            
+                    row['index_cache_hit_ratio'] = 0  # Invalid value replaced by 0          
             return render_template("home/cache_table.html", rows=query_rows, segment=segment, description=description )
     else:
         return redirect("/database.html")

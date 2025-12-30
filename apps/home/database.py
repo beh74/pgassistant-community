@@ -14,6 +14,13 @@ from typing import Dict, Any, Iterable, Tuple, List, Optional
 PGA_QUERIES={}
 PGA_TABLES=[]
 
+
+def get_pg_major_version(server_version: str) -> int:
+    match = re.match(r'^(\d+)', server_version.strip())
+    if not match:
+        raise ValueError(f"Invalid PostgreSQL version string: {server_version}")
+    return int(match.group(1))
+
 def dict_merge(dct, merge_dct):
     """ Recursive dict merge. Inspired by :meth:``dict.update()``, instead of
     updating only top-level keys, dict_merge recurses down into dicts nested
@@ -143,7 +150,11 @@ def get_top_queries(db_config):
     con, message = connectdb(db_config)
     if con:
        try:
-           rows,description=db_query(con,'top_queries')
+            print("DB VERSION =", db_config.get('version'))
+            if db_config.get('version')==18:
+               rows,description=db_query(con,'top_queries_18')
+            else:
+               rows,description=db_query(con,'top_queries')
        except:
            rows=[] 
        con.close()  

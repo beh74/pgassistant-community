@@ -14,7 +14,7 @@ It produces a postgresql.conf file based on supplied parameters.
 
   -h                  display this help and exit
   -v PG_VERSION       (optional) PostgreSQL version
-                      accepted values: 9.5, 9.6, 10, 11, 12, 13, 14, 15, 16, 17
+                      accepted values: 9.5, 9.6, 10, 11, 12, 13, 14, 15, 16, 17, 18
                       default value: 15
   -t DB_TYPE          (optional) For what type of application is PostgreSQL used
                       accepted values: web, oltp, dw, desktop, mixed
@@ -85,7 +85,7 @@ set_db_default_values() {
       max_worker_processes=8
       max_parallel_workers_per_gather=0
       ;;
-    "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17")
+    "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17"| "18")
       max_worker_processes=8
       max_parallel_workers_per_gather=2
       max_parallel_workers=8
@@ -350,7 +350,8 @@ while getopts "hv:t:m:u:c:s:" opt; do
          [ "$v" != "14" ] && \
          [ "$v" != "15" ] && \
          [ "$v" != "16" ] && \
-         [ "$v" != "17" ]; then
+         [ "$v" != "17" ] && \
+         [ "$v" != "18" ] ; then
         _input_error "$v is not a valid PostgreSQL version number"
       fi
       db_version=$v

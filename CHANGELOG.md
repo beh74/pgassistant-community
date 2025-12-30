@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.2.2] - 2025-30-12
+
+## Features
+
+- Adding Postgresql 18 support.
+
+### Bug fixes
+
+- **pgTune** docker-compose.yml file : with swarm mode, shmsize is in bytes ;
+
 ## [2.2.1] - 2025-17-12
 
 ## Features
