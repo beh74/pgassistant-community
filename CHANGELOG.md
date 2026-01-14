@@ -1,5 +1,11 @@
 # Change Log
 
+## [2.2.3] - 2026-14-01
+
+## Features
+
+- Aesthetical improvement of the Dashboard
+
 ## [2.2.2] - 2025-30-12
 
 ## Features
