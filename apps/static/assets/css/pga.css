@@ -48,9 +48,27 @@ button#connect {
 }
 
 .sidebar .nav-item.active > .nav-link, .sidebar .nav-item .nav-link:hover {
-    background-color: #466680 !important;
+    background-color: #466680;
 }
 
 .sidebar .nav-link .sidebar-icon {
     color: inherit;
+}
+
+.icon-24 {
+    height: 24px;
+    width: 24px;
+}
+
+.icon-20 {
+    height: 20px;
+    width: 20px;
+}
+
+.icon-dark-blue {
+    color: #336791;
+}
+
+.bg-info {
+    background-color: #637D91 !important;
 }
