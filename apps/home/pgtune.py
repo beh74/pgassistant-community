@@ -48,6 +48,30 @@ class pgTune:
 
         return self.db_tune
 
+    def _size_to_bytes(self, value):
+        """
+        Convert a PostgreSQL-style memory value (e.g. '128mb', '1gb')
+        into bytes for Docker tmpfs usage.
+        """
+        if isinstance(value, int):
+            return value
+
+        value = value.strip().lower()
+
+        units = {
+            "kb": 1024,
+            "mb": 1024 ** 2,
+            "gb": 1024 ** 3,
+            "tb": 1024 ** 4,
+        }
+
+        for unit, multiplier in units.items():
+            if value.endswith(unit):
+                return int(float(value[:-len(unit)]) * multiplier)
+
+        # Fallback: assume raw bytes
+        return int(value)
+    
     def get_docker_cmd(self, db_config, db_version):
         """
         Generate a docker-compose YAML configuration for a PostgreSQL container
@@ -71,6 +95,10 @@ class pgTune:
         service_name = f"{db_config['db_name']}-db"
         volume_name = f"{db_config['db_name']}_data"
 
+        # Calculate shared_buffers in bytes for shm_size in Swarm mode
+        shared_buffers = self.db_tune.get("shared_buffers", "128mb")
+        shared_buffers_bytes = self._size_to_bytes(shared_buffers)
+
         # Header (compose version is optional but recommended for clarity)
         docker_cmd = "services:\n"
 
@@ -85,7 +113,7 @@ class pgTune:
             f"    #  - type: tmpfs\n"
             f"    #    target: /dev/shm\n"
             f"    #    tmpfs:\n"
-            f"    #      size: {self.db_tune.get('shared_buffers', '128mb')}\n"
+            f"    #      size: {shared_buffers_bytes}\n"
             f"    volumes:\n"
             f"      - {volume_name}:/var/lib/postgresql/data\n"
             f"    ports:\n"

@@ -114,25 +114,25 @@ def analyze_table_conditions(sql_query):
 
 def check_index_coverage(indexes_dict, used_columns_dict):
     """
-    Renvoie un dictionnaire indiquant, pour chaque table et chaque colonne utilisée,
-    si la colonne est couverte par au moins un index existant.
+    Returns a dictionary indicating, for each table and each column used,
+    whether the column is covered by at least one existing index.
 
-    :param indexes_dict: Dictionnaire des indexes existants, par exemple :
+    :param indexes_dict: Dictionary of existing indexes, for example:
         {
             'payment': {('payment_date', 'payment_id')},
             'actor': {('actor_id',), ('last_name',)},
             ...
         }
 
-    :param used_columns_dict: Dictionnaire des tables et colonnes
-                             présentes dans la requête, par exemple :
+    :param used_columns_dict: Dictionary of tables and columns
+                            referenced in the query, for example:
         {
             'books': ['book_id', 'author_id'],
             'loans': ['book_id', 'borrower_id', 'loan_date'],
             ...
         }
 
-    :return: Un dictionnaire de la forme :
+    :return: A dictionary of the form:
         {
             'books': {
                 'book_id': True/False,
@@ -149,11 +149,11 @@ def check_index_coverage(indexes_dict, used_columns_dict):
 
     for table, columns in used_columns_dict.items():
         coverage_info[table] = {}
-        # Récupère l'ensemble des indexes pour la table ; renvoie set() si la table n'est pas trouvée
+        # Retrieve the set of indexes for the table; returns set() if the table is not found
         table_indexes = indexes_dict.get(table, set())
 
         for col in columns:
-            # Vérifie si au moins un index contient cette colonne
+            # Check if at least one index contains this column
             is_covered = any(col in index_tuple for index_tuple in table_indexes)
             coverage_info[table][col] = is_covered
 
