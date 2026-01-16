@@ -30,11 +30,7 @@ You can try the live demo here: [https://ov-004f8b.infomaniak.ch/](https://ov-00
 
 To connect to the demo database, use the following credentials:
 
-- **Host name:** `demo-db`  
-- **Port:** `5432`  
-- **Database name:** `northwind`  
-- **User:** `postgres`  
-- **Password:** `demo`
+- **Connection URI** `postgresql://postgres:demo@demo-db:5432/northwind`
 
 If you want to try the new database report API coming with v2.0 :
 ```
