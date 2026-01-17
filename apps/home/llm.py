@@ -254,11 +254,30 @@ def get_llm_query_for_query_analyze(
             stats_pretty = []
             for t, s in table_stats.items():
                 parts = []
-                for k in ("estimated_rows", "n_live_tup", "n_dead_tup", "last_analyze"):
+                for k in ("estimated_rows", "n_live_tup", "n_dead_tup", "last_analyze", "last_vacuum", "last_autovacuum", "last_analyze", "last_autoanalyze"):
                     if k in s and s[k] is not None:
                         parts.append(f"{k}={s[k]}")
                 stats_pretty.append(f"  - {t}: " + ", ".join(parts) if parts else f"  - {t}")
             meta_lines.append("- Table stats (subset):\n" + "\n".join(stats_pretty))
+        except Exception:
+            pass
+
+    table_pg_stats = fetch_table_stats(db_config, tables) if db_config else None
+    if table_pg_stats:
+        try:
+            pg_stats_pretty = []
+            for t, stats in table_pg_stats.items():
+                pg_stats_pretty.append(f"  - {t}:")
+                for col, col_stats in stats.items():
+                    parts = []
+                    for k in ("n_distinct", "most_common_vals", "histogram_bounds"):
+                        if k in col_stats and col_stats[k] is not None:
+                            val = col_stats[k]
+                            if isinstance(val, list):
+                                val = "[" + ", ".join(str(v) for v in val) + "]"
+                            parts.append(f"{k}={val}")
+                    pg_stats_pretty.append(f"    - {col}: " + ", ".join(parts) if parts else f"    - {col}")
+            meta_lines.append("- pg_stats (subset):\n" + "\n".join(pg_stats_pretty))
         except Exception:
             pass
 

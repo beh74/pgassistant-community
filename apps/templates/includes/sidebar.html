@@ -1,296 +1,405 @@
-        <nav class="navbar navbar-dark navbar-theme-primary px-4 col-12 d-lg-none">
-            <a class="navbar-brand me-lg-5" href="/">
-                <img class="navbar-brand-dark" src="{{ config.ASSETS_ROOT }}/img/brand/light.svg" alt="Volt logo" /> <img class="navbar-brand-light" src="{{ config.ASSETS_ROOT }}/img/brand/dark.svg" alt="Volt logo" />
-            </a>
-            <div class="d-flex align-items-center">
-                <button class="navbar-toggler d-lg-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
-                  <span class="navbar-toggler-icon"></span>
-                </button>
-            </div>
-        </nav>
+{# ------------------- Mobile top navbar (only < lg) ------------------- #}
+<nav class="navbar navbar-dark navbar-theme-primary px-4 col-12 d-lg-none">
+  <a class="navbar-brand me-lg-5" href="/">
+    <img class="navbar-brand-dark" src="{{ config.ASSETS_ROOT }}/img/brand/light.svg" alt="Volt logo" />
+    <img class="navbar-brand-light" src="{{ config.ASSETS_ROOT }}/img/brand/dark.svg" alt="Volt logo" />
+  </a>
 
-        <nav id="sidebarMenu" class="sidebar d-lg-block bg-dark text-white collapse col-lg-3" data-simplebar>
-          <div class="sidebar-inner px-4 pt-3">
-            <div class="user-card d-flex d-md-none align-items-center justify-content-between justify-content-md-center pb-4">
-              <div class="d-flex align-items-center">
-                <div class="avatar-lg me-4">
-                  <img src="{{ config.ASSETS_ROOT }}/img/technologies/postgresql.png" class="card-img-top rounded-circle border-white"
-                    alt="pgAssistant">
-                </div>
-                <div class="d-block">
-                  <h2 class="h5 mb-3">Pg Assistant</h2>
-                  <a href="/database.html" class="btn btn-secondary btn-sm d-inline-flex align-items-center">
-                    <svg class="icon icon-xxs me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>            
-                    Settings
-                  </a>
-                </div>
-              </div>
-              <div class="collapse-close d-md-none">
-                <a href="#sidebarMenu" data-bs-toggle="collapse"
-                    data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="true"
-                    aria-label="Toggle navigation">
-                    <svg class="icon icon-xs" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                  </a>
-              </div>
-            </div>
-            <ul class="nav flex-column pt-3 pt-md-0">
-              <li class="nav-item">
-                <a href="/database.html" class="nav-link d-flex align-items-center" id="app-title">
-                  <span class="sidebar-icon">
-                    <img src="{{ config.ASSETS_ROOT }}/img/technologies/postgresql_elephant.png" height="20" width="20" alt="PGSQL Logo">
-                  </span>
-                  <span class="mt-1 ms-1 sidebar-text">PG Assistant</span>
-                </a>
-              </li>
-              {% if session['db_host'] %}
-              <li class="nav-item {% if 'dashboard' in segment %} active {% endif %}">
-                <a href="/dashboard.html" class="nav-link">
-                  <span class="sidebar-icon">
-                    <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path></svg>
-                  </span> 
-                  <span class="sidebar-text">Dashboard</span>
-                </a>
-              </li>
-              <li class="nav-item {% if 'table_rfc' in segment %} active {% endif %}">
-                <a href="/table_rfc.html" class="nav-link">
-                  <span class="sidebar-icon">
-                  <svg class="icon icon-xs me-2" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122"></path>
-                  </svg>                                    
-                  </span>
-                  <span class="sidebar-text">Table definition helper</span>
-                </a>
-              </li>              
-              <li class="nav-item {% if 'topqueries' in segment %} active {% endif %}">
-                <a href="/topqueries.html" class="nav-link">
-                  <span class="sidebar-icon">
-                    <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"></path><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"></path></svg>
-                  </span>
-                  <span class="sidebar-text">Top queries</span>
-                </a>
-              </li>
-              <li class="nav-item {% if 'rankqueries' in segment %} active {% endif %}">
-                <a href="/rankqueries.html" class="nav-link">
-                  <span class="sidebar-icon">
-                    <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path fill-rule="evenodd" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"></path></svg>
-                  </span>
-                  <span class="sidebar-text">Rank queries</span>
-                </a>
-              </li>
-              <li class="nav-item {% if 'stats' in segment %} active {% endif %}">
-                <a href="/stats.html" class="nav-link">
-                  <span class="sidebar-icon">
-                    <svg class="icon icon-xs" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path fill-rule="evenodd" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" clip-rule="evenodd"></path></svg>
-                  </span>
-                  <span class="sidebar-text">Statistics</span>
-                </a>
-              </li>              
-              {% endif %}
-              <li class="nav-item {% if 'database.html' in segment %} active {% endif %}">
-                <a href="/database.html" class="nav-link">
-                  <span class="sidebar-icon">
-                    <svg class="icon icon-xs" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-database-fill-gear" viewBox="0 0 16 16">
-                      <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1"/>
-                      <path d="M2 7v-.839c.457.432 1.004.751 1.49.972C4.722 7.693 6.318 8 8 8s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V7c0 .424-.155.802-.411 1.133a4.51 4.51 0 0 0-4.815 1.843A12 12 0 0 1 8 10c-1.573 0-3.022-.289-4.096-.777C2.875 8.755 2 8.007 2 7m6.257 3.998L8 11c-1.682 0-3.278-.307-4.51-.867-.486-.22-1.033-.54-1.49-.972V10c0 1.007.875 1.755 1.904 2.223C4.978 12.711 6.427 13 8 13h.027a4.55 4.55 0 0 1 .23-2.002m-.002 3L8 14c-1.682 0-3.278-.307-4.51-.867-.486-.22-1.033-.54-1.49-.972V13c0 1.007.875 1.755 1.904 2.223C4.978 15.711 6.427 16 8 16c.536 0 1.058-.034 1.555-.097a4.5 4.5 0 0 1-1.3-1.905m3.631-4.538c.18-.613 1.048-.613 1.229 0l.043.148a.64.64 0 0 0 .921.382l.136-.074c.561-.306 1.175.308.87.869l-.075.136a.64.64 0 0 0 .382.92l.149.045c.612.18.612 1.048 0 1.229l-.15.043a.64.64 0 0 0-.38.921l.074.136c.305.561-.309 1.175-.87.87l-.136-.075a.64.64 0 0 0-.92.382l-.045.149c-.18.612-1.048.612-1.229 0l-.043-.15a.64.64 0 0 0-.921-.38l-.136.074c-.561.305-1.175-.309-.87-.87l.075-.136a.64.64 0 0 0-.382-.92l-.148-.045c-.613-.18-.613-1.048 0-1.229l.148-.043a.64.64 0 0 0 .382-.921l-.074-.136c-.306-.561.308-1.175.869-.87l.136.075a.64.64 0 0 0 .92-.382zM14 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0"/>
-                    </svg>
-                  </span>
-                  <span class="sidebar-text">Connexion Settings</span>
-                </a>
-              </li>
-              {% if session['db_host'] %}
-              <li class="nav-item {% if 'database_' in segment %} active {% endif %}">
-                <span
-                  class="nav-link  collapsed  d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse" data-bs-target="#submenu-db">
-                  <span>
-                    <span class="sidebar-icon">
-                      <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path></svg>
-                    </span> 
-                    <span class="sidebar-text">Database</span>
-                  </span>
-                  <span class="link-arrow">
-                    <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                  </span>
-                </span>
-                <div class="multi-level collapse {% if 'database_' in segment %} show {% endif %}"
-                  role="list" id="submenu-db" aria-expanded="false">
-                  <ul class="flex-column nav">              
-                    <li class="nav-item {% if 'database_modules' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_modules">
-                        <span class="sidebar-text">Modules</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'database_settings' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_settings">
-                        <span class="sidebar-text">All Settings</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'database_archive_settings' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_archive_settings ">
-                        <span class="sidebar-text">Archive Settings</span>
-                      </a>
-                    </li>    
-                                
-                    <li class="nav-item {% if 'database_activity' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_activity">
-                        <span class="sidebar-text">Activity</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'database_schemas' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_schemas">
-                        <span class="sidebar-text">Schemas</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'database_conflicts' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/database_conflicts">
-                        <span class="sidebar-text">Conflicts</span>
-                      </a>
-                    </li>                    
-                  </ul>
-                </div>
-              </li>
+  <div class="d-flex align-items-center">
+    <button class="navbar-toggler d-lg-none collapsed"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#sidebarMenu"
+            aria-controls="sidebarMenu"
+            aria-expanded="false"
+            aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  </div>
+</nav>
 
-              <li class="nav-item {% if 'table_' in segment %} active {% endif %}">
-                <span
-                  class="nav-link  collapsed  d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse" data-bs-target="#submenu-tables">
-                  <span>
-                    <span class="sidebar-icon">
-                      <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z" clip-rule="evenodd"></path></svg>
-                    </span> 
-                    <span class="sidebar-text">Tables</span>
-                  </span>
-                  <span class="link-arrow">
-                    <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                  </span>
-                </span>
-                <div class="multi-level collapse {% if 'table_' in segment %} show {% endif %}"
-                  role="list" id="submenu-tables" aria-expanded="false">
-                  <ul class="flex-column nav">              
-                    <li class="nav-item {% if 'table_io' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/table_io">
-                        <span class="sidebar-text">Tables statistics</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'table_size' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/table_size">
-                        <span class="sidebar-text">Tables size</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'table_columns_stats' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/table_columns_stats">
-                        <span class="sidebar-text">Tables columns stats</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
+{% set segment = segment|default('') %}
+
+{# ------------------- Sidebar ------------------- #}
+<nav id="sidebarMenu" class="sidebar d-lg-block bg-dark text-white collapse col-lg-3" data-simplebar>
+  <div class="sidebar-inner px-4 pt-3">
+
+    {# Mobile user card #}
+    <div class="user-card d-flex d-md-none align-items-center justify-content-between justify-content-md-center pb-4">
+      <div class="d-flex align-items-center">
+        <div class="avatar-lg me-4">
+          <img src="{{ config.ASSETS_ROOT }}/img/technologies/postgresql.png"
+               class="card-img-top rounded-circle border-white"
+               alt="pgAssistant">
+        </div>
+        <div class="d-block">
+          <h2 class="h5 mb-3">Pg Assistant</h2>
+          <a href="/database.html" class="btn btn-secondary btn-sm d-inline-flex align-items-center">
+            <svg class="icon icon-xxs me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            Settings
+          </a>
+        </div>
+      </div>
+
+      <div class="collapse-close d-md-none">
+        <button class="btn btn-link p-0 text-white"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#sidebarMenu"
+                aria-controls="sidebarMenu"
+                aria-expanded="true"
+                aria-label="Close navigation">
+          <svg class="icon icon-xs" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clip-rule="evenodd"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <ul class="nav flex-column pt-3 pt-md-0">
+
+      {# Brand entry #}
+      <li class="nav-item">
+        <a href="/database.html" class="nav-link d-flex align-items-center" id="app-title">
+          <span class="sidebar-icon">
+            <img src="{{ config.ASSETS_ROOT }}/img/technologies/postgresql_elephant.png"
+                 height="20" width="20" alt="PGSQL Logo">
+          </span>
+          <span class="mt-1 ms-1 sidebar-text">PG Assistant</span>
+        </a>
+      </li>
+
+      {# ------------------- Top links (only if connected) ------------------- #}
+      {% if session['db_host'] %}
+      <li class="nav-item {% if 'dashboard' in segment %} active {% endif %}">
+        <a href="/dashboard.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path>
+              <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Dashboard</span>
+        </a>
+      </li>
+
+      <li class="nav-item {% if 'table_rfc' in segment %} active {% endif %}">
+        <a href="/table_rfc.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor"
+                viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Table definition helper</span>
+        </a>
+      </li>
+
+      <li class="nav-item {% if 'topqueries' in segment %} active {% endif %}">
+        <a href="/topqueries.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"></path>
+              <path fill-rule="evenodd"
+                    d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+                    clip-rule="evenodd"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Top queries</span>
+        </a>
+      </li>
+
+      <li class="nav-item {% if 'rankqueries' in segment %} active {% endif %}">
+        <a href="/rankqueries.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd"
+                    d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"
+                    clip-rule="evenodd"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Rank queries</span>
+        </a>
+      </li>
+
+      <li class="nav-item {% if segment.startswith('stats') %} active {% endif %}">
+        <a href="/stats.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd"
+                    d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"
+                    clip-rule="evenodd"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Statistics</span>
+        </a>
+      </li>
+      {% endif %}
+
+      {# Connexion settings always visible #}
+      <li class="nav-item {% if 'database.html' in segment %} active {% endif %}">
+        <a href="/database.html" class="nav-link">
+          <span class="sidebar-icon me-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1"/>
+              <path d="M2 7v-.839c.457.432 1.004.751 1.49.972C4.722 7.693 6.318 8 8 8s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V7c0 .424-.155.802-.411 1.133a4.51 4.51 0 0 0-4.815 1.843A12 12 0 0 1 8 10c-1.573 0-3.022-.289-4.096-.777C2.875 8.755 2 8.007 2 7m6.257 3.998L8 11c-1.682 0-3.278-.307-4.51-.867-.486-.22-1.033-.54-1.49-.972V10c0 1.007.875 1.755 1.904 2.223C4.978 12.711 6.427 13 8 13h.027a4.55 4.55 0 0 1 .23-2.002m-.002 3L8 14c-1.682 0-3.278-.307-4.51-.867-.486-.22-1.033-.54-1.49-.972V13c0 1.007.875 1.755 1.904 2.223C4.978 15.711 6.427 16 8 16c.536 0 1.058-.034 1.555-.097a4.5 4.5 0 0 1-1.3-1.905m3.631-4.538c.18-.613 1.048-.613 1.229 0l.043.148a.64.64 0 0 0 .921.382l.136-.074c.561-.306 1.175.308.87.869l-.075.136a.64.64 0 0 0 .382.92l.149.045c.612.18.612 1.048 0 1.229l-.15.043a.64.64 0 0 0-.38.921l.074.136c.305.561-.309 1.175-.87.87l-.136-.075a.64.64 0 0 0-.92.382l-.045.149c-.18.612-1.048.612-1.229 0l-.043-.15a.64.64 0 0 0-.921-.38l-.136.074c-.561.305-1.175-.309-.87-.87l.075-.136a.64.64 0 0 0-.382-.92l-.148-.045c-.613-.18-.613-1.048 0-1.229l.148-.043a.64.64 0 0 0 .382-.921l-.074-.136c-.306-.561.308-1.175.869-.87l.136.075a.64.64 0 0 0 .92-.382zM14 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0"/>
+            </svg>
+          </span>
+          <span class="sidebar-text">Connexion Settings</span>
+        </a>
+      </li>
+      {# ------------------- Accordion sections (only if connected) ------------------- #}
+      {% if session['db_host'] %}
+
+      <div id="sidebarAccordion">
+
+        {# Database submenu #}
+        <li class="nav-item {% if 'database_' in segment %} active {% endif %}">
+          <button class="nav-link d-flex justify-content-between align-items-center w-100 {% if 'database_' in segment %}{% else %}collapsed{% endif %}"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#sb-database"
+                  aria-controls="sb-database"
+                  aria-expanded="{% if 'database_' in segment %}true{% else %}false{% endif %}">
+            <span class="d-flex align-items-center">
+              <span class="sidebar-icon">
+                <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path>
+                  <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path>
+                </svg>
+              </span>
+              <span class="sidebar-text">Database</span>
+            </span>
+            <span class="link-arrow">
+              <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clip-rule="evenodd"></path>
+              </svg>
+            </span>
+          </button>
+
+          <div id="sb-database"
+               class="multi-level collapse {% if 'database_' in segment %}show{% endif %}"
+               data-bs-parent="#sidebarAccordion">
+            <ul class="flex-column nav">
+              <li class="nav-item {% if 'database_modules' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_modules"><span class="sidebar-text">Modules</span></a>
               </li>
-              <li class="nav-item {% if 'index_' in segment %} active {% endif %}">
-                <span
-                  class="nav-link  collapsed  d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse" data-bs-target="#submenu-pages">
-                  <span>
-                    <span class="sidebar-icon">
-                      <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2z" clip-rule="evenodd"></path><path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V7z"></path></svg>
-                    </span> 
-                    <span class="sidebar-text">Indexes</span>
-                  </span>
-                  <span class="link-arrow">
-                    <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                  </span>
-                </span>
-                <div class="multi-level collapse {% if 'index_' in segment %} show {% endif %} " role="list"
-                  id="submenu-pages" aria-expanded="false">
-                  <ul class="flex-column nav">
-                    <li class="nav-item {% if 'index_definition' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/index_definition">
-                        <span class="sidebar-text">All indexes</span>
-                      </a>
-                    </li>                    
-                    <li class="nav-item {% if 'index_seqscan' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/index_seqscan">
-                        <span class="sidebar-text">Sequential scans</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'index_unused' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/index_unused">
-                        <span class="sidebar-text">Unused indexes</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'index_usage' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/index_usage">
-                        <span class="sidebar-text">Indexes usage</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'index_io' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/index_io">
-                        <span class="sidebar-text">Indexes IO</span>
-                      </a>
-                    </li>                                        
-                  </ul>
-                </div>
+              <li class="nav-item {% if 'database_settings' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_settings"><span class="sidebar-text">All Settings</span></a>
               </li>
-              <li class="nav-item {% if 'issue_' in segment %} active {% endif %}">
-                <span
-                  class="nav-link  collapsed  d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse" data-bs-target="#submenu-issue">
-                  <span>
-                    <span class="sidebar-icon">
-                      <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"></path><path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
-                    </span> 
-                    <span class="sidebar-text">Issues</span>
-                  </span>
-                  <span class="link-arrow">
-                    <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                  </span>
-                </span>
-                <div class="multi-level collapse {% if 'issue_' in segment %} show {% endif %}" role="list"
-                  id="submenu-issue" aria-expanded="false">
-                  <ul class="flex-column nav">
-                    <li class="nav-item {% if 'issue_no_pk' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/primary_key.html">
-                        <span class="sidebar-text">Tables without PK</span>
-                      </a>
-                    </li> 
-                    <li class="nav-item {% if 'issue_idx_redundant' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/issue_idx_redundant">
-                        <span class="sidebar-text">Redundant Indexes</span>
-                      </a>
-                    </li>    
-                    <li class="nav-item {% if 'issue_idx_fk_datatype' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/issue_idx_fk_datatype">
-                        <span class="sidebar-text">Wrong data types on FK</span>
-                      </a>
-                    </li>
-                    <li class="nav-item {% if 'issue_idx_fk_missing' in segment %} active {% endif %}">
-                      <a class="nav-link" href="/generic/issue_idx_fk_missing">
-                        <span class="sidebar-text">Missing indexes on FK</span>
-                      </a>
-                    </li>                    
-                  </ul>
-                </div>
+              <li class="nav-item {% if 'database_archive_settings' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_archive_settings"><span class="sidebar-text">Archive Settings</span></a>
               </li>
-              <div role="separator" class="dropdown-divider mt-4 mb-3 border-gray-700"></div>
-              <li class="nav-item">
-                <a href="{{ url_for('authentication_blueprint.logout') }}" class="nav-link">
-                    <span class="sidebar-icon">
-                        <svg class="icon icon-xs text-danger me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg> 
-                    </span>
-                    <span class="sidebar-text">Logout</span>
-                </a>
-              </li> 
-              {% endif %}           
-              <li class="nav-item">
-                <a target="_blank" 
-                   href="https://beh74.github.io/pgassistant-blog/"
-                   class="btn btn-secondary d-flex align-items-center justify-content-center btn-upgrade-pro"> 
-                  <span>Documentation</span>
-                </a>
+              <li class="nav-item {% if 'database_activity' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_activity"><span class="sidebar-text">Activity</span></a>
+              </li>
+              <li class="nav-item {% if 'database_schemas' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_schemas"><span class="sidebar-text">Schemas</span></a>
+              </li>
+              <li class="nav-item {% if 'database_conflicts' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/database_conflicts"><span class="sidebar-text">Conflicts</span></a>
               </li>
             </ul>
           </div>
-        </nav>
+        </li>
+
+        {# Tables submenu #}
+        {% set is_tables_submenu = (segment and segment[:6] == 'table_' and segment[:9] != 'table_rfc') %}
+        <li class="nav-item {% if is_tables_submenu %} active {% endif %}">
+          <button class="nav-link d-flex justify-content-between align-items-center w-100 {% if is_tables_submenu %}{% else %}collapsed{% endif %}"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#sb-tables"
+                  aria-controls="sb-tables"
+                  aria-expanded="{% if is_tables_submenu %}true{% else %}false{% endif %}">
+            <span class="d-flex align-items-center">
+              <span class="sidebar-icon">
+                <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd"
+                        d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z"
+                        clip-rule="evenodd"></path>
+                </svg>
+              </span>
+              <span class="sidebar-text">Tables</span>
+            </span>
+            <span class="link-arrow">
+              <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clip-rule="evenodd"></path>
+              </svg>
+            </span>
+          </button>
+
+          <div id="sb-tables"
+               class="multi-level collapse {% if is_tables_submenu %}show{% endif %}"
+               data-bs-parent="#sidebarAccordion">
+            <ul class="flex-column nav">
+              <li class="nav-item {% if 'table_io' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/table_io"><span class="sidebar-text">Tables statistics</span></a>
+              </li>
+              <li class="nav-item {% if 'table_size' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/table_size"><span class="sidebar-text">Tables size</span></a>
+              </li>
+              <li class="nav-item {% if 'table_columns_stats' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/table_columns_stats"><span class="sidebar-text">Tables columns stats</span></a>
+              </li>
+            </ul>
+          </div>
+        </li>
+
+        {# Indexes submenu #}
+        <li class="nav-item {% if 'index_' in segment %} active {% endif %}">
+          <button class="nav-link d-flex justify-content-between align-items-center w-100 {% if 'index_' in segment %}{% else %}collapsed{% endif %}"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#sb-indexes"
+                  aria-controls="sb-indexes"
+                  aria-expanded="{% if 'index_' in segment %}true{% else %}false{% endif %}">
+            <span class="d-flex align-items-center">
+              <span class="sidebar-icon">
+                <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd"
+                        d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2z"
+                        clip-rule="evenodd"></path>
+                  <path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V7z"></path>
+                </svg>
+              </span>
+              <span class="sidebar-text">Indexes</span>
+            </span>
+            <span class="link-arrow">
+              <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clip-rule="evenodd"></path>
+              </svg>
+            </span>
+          </button>
+
+          <div id="sb-indexes"
+               class="multi-level collapse {% if 'index_' in segment %}show{% endif %}"
+               data-bs-parent="#sidebarAccordion">
+            <ul class="flex-column nav">
+              <li class="nav-item {% if 'index_definition' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/index_definition"><span class="sidebar-text">All indexes</span></a>
+              </li>
+              <li class="nav-item {% if 'index_seqscan' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/index_seqscan"><span class="sidebar-text">Sequential scans</span></a>
+              </li>
+              <li class="nav-item {% if 'index_unused' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/index_unused"><span class="sidebar-text">Unused indexes</span></a>
+              </li>
+              <li class="nav-item {% if 'index_usage' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/index_usage"><span class="sidebar-text">Indexes usage</span></a>
+              </li>
+              <li class="nav-item {% if 'index_io' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/index_io"><span class="sidebar-text">Indexes IO</span></a>
+              </li>
+            </ul>
+          </div>
+        </li>
+
+        {# Issues submenu #}
+        <li class="nav-item {% if 'issue_' in segment or 'primary_key' in segment %} active {% endif %}">
+          <button
+            class="nav-link d-flex justify-content-between align-items-center w-100
+                  {% if 'issue_' in segment or 'primary_key' in segment %}{% else %}collapsed{% endif %}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#sb-issues"
+            aria-controls="sb-issues"
+            aria-expanded="{% if 'issue_' in segment or 'primary_key' in segment %}true{% else %}false{% endif %}">
+
+            <span class="d-flex align-items-center">
+              <span class="sidebar-icon">
+                <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"
+                    xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"></path>
+                  <path fill-rule="evenodd"
+                        d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"
+                        clip-rule="evenodd"></path>
+                </svg>
+              </span>
+              <span class="sidebar-text">Issues</span>
+            </span>
+
+            <span class="link-arrow">
+              <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clip-rule="evenodd"></path>
+              </svg>
+            </span>
+          </button>
+
+          <div id="sb-issues"
+              class="multi-level collapse {% if 'issue_' in segment or 'primary_key' in segment %}show{% endif %}"
+              data-bs-parent="#sidebarAccordion">
+
+            <ul class="flex-column nav">
+
+              <li class="nav-item {% if 'issue_no_pk' in segment or 'primary_key' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/primary_key.html">
+                  <span class="sidebar-text">Tables without PK</span>
+                </a>
+              </li>
+
+              <li class="nav-item {% if 'issue_idx_redundant' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/issue_idx_redundant">
+                  <span class="sidebar-text">Redundant Indexes</span>
+                </a>
+              </li>
+
+              <li class="nav-item {% if 'issue_idx_fk_datatype' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/issue_idx_fk_datatype">
+                  <span class="sidebar-text">Wrong data types on FK</span>
+                </a>
+              </li>
+
+              <li class="nav-item {% if 'issue_idx_fk_missing' in segment %} active {% endif %}">
+                <a class="nav-link submenu-link" href="/generic/issue_idx_fk_missing">
+                  <span class="sidebar-text">Missing indexes on FK</span>
+                </a>
+              </li>
+
+            </ul>
+          </div>
+        </li>
+
+      </div> {# /#sidebarAccordion #}
+
+      <div role="separator" class="dropdown-divider mt-4 mb-3 border-gray-700"></div>
+
+      <li class="nav-item">
+        <a href="{{ url_for('authentication_blueprint.logout') }}" class="nav-link">
+          <span class="sidebar-icon">
+            <svg class="icon icon-xs text-danger me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+          </span>
+          <span class="sidebar-text">Logout</span>
+        </a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item mt-3">
+        <a target="_blank"
+           href="https://beh74.github.io/pgassistant-blog/"
+           class="btn btn-secondary d-flex align-items-center justify-content-center btn-upgrade-pro">
+          <span>Documentation</span>
+        </a>
+      </li>
+
+    </ul>
+  </div>
+</nav>

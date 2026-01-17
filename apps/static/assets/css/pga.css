@@ -72,3 +72,63 @@ button#connect {
 .bg-info {
     background-color: #637D91 !important;
 }
+
+
+/* Sous-menu: indentation + taille plus petite */
+.sidebar .multi-level .submenu-link {
+  padding-left: 3.25rem;
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+/* Sous-menu actif: même logique de highlight */
+.sidebar .multi-level .nav-item.active > .submenu-link {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: .5rem;
+}
+
+/* --- Sidebar: make submenu toggles transparent when not active --- */
+.sidebar .nav-item > button.nav-link {
+  background: transparent;
+  border: 0;
+  text-align: left;
+  width: 100%;
+}
+
+/* remove grey background for non-active items */
+.sidebar .nav-item:not(.active) > button.nav-link,
+.sidebar .nav-item:not(.active) > button.nav-link.collapsed {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* remove browser/bs focus ring/outline (optional) */
+.sidebar .nav-item > button.nav-link:focus,
+.sidebar .nav-item > button.nav-link:focus-visible {
+  outline: none;
+  box-shadow: none !important;
+}
+
+/* keep a subtle hover (optional). Put transparent if you want NONE */
+.sidebar .nav-item:not(.active) > button.nav-link:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+/* --- Sidebar icons: force consistent size & alignment --- */
+.sidebar-icon {
+  width: 1.25rem;          /* largeur fixe */
+  min-width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG inside sidebar icon */
+.sidebar-icon svg,
+.sidebar-icon img {
+  width: 1.25rem;
+  height: 1.25rem;
+  max-width: 100%;
+  max-height: 100%;
+}
