@@ -632,7 +632,7 @@ def llm_primary_key(schema: str, tablename:str):
     ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.generate_primary_key_prompt(table_name=f"{schema}.{tablename}",ddl=ddl_str)
     if request.method == 'GET':
-        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Find a primary key for {schema}.{tablename}")
+        return render_template('home/primary_key_llm.html', segment='primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Find a primary key for {schema}.{tablename}")
     else:
         chatgpt_response=llm.query_chatgpt(llm_prompt)
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        

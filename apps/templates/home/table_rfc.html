@@ -24,10 +24,10 @@
             </svg> Reference
         </a>
     {% endif %}
-        <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#modal-default">Show
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modal-default">Show
             query</button>
         <!-- Refresh -->
-        <button id="refresh" type="submit" class="btn btn-info" name="submit_refresh" value="refresh"
+        <button id="refresh" type="submit" class="btn btn-primary" name="submit_refresh" value="refresh"
             onclick="refreshPage()">
             <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg">
@@ -80,12 +80,12 @@
                         <td>
                             <button
                                 onclick="location.href='/table_llm/{{ row['table_schema'] }}/{{ row['table_name'] }}'"
-                                type="button" class="btn btn-sm btn-info d-inline-flex align-items-center me-2">
+                                type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center me-2">
                                 Check RFC</button>
 
                             <button
                                 onclick="location.href='/table_llm_guidelines/{{ row['table_schema'] }}/{{ row['table_name'] }}'"
-                                type="button" class="btn btn-sm btn-info d-inline-flex align-items-center">
+                                type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center">
                                 Check Reference</button>
                         </td>
                         {% endif %}

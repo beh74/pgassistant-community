@@ -8,17 +8,19 @@
 {% endblock stylesheets %}
 
 {% block content %}
-
-<div class="py-4">
-    <div class="mb-3 mb-lg-0">
-        <h1 class="h4 mb-3">{{ description['description'] }}</h1>
-    </div>
-
-    <div class="d-flex justify-content-end">
-
-        {%if description['reference'] %}
-        <a href="{{ description['reference'] }}" target="_blank" class="btn btn-info me-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+ 
+  <div class="py-4">
+      <div class="d-flex justify-content-between w-100 flex-wrap">
+          <div class="mb-3 mb-lg-0">
+              <h1 class="h4 mb-3">{{ description['category'] }} / {{ description['description'] }}</h1>
+          </div>
+          <div class="d-flex justify-content-end"></div>
+          {%if description['reference'] %}  
+                            
+          <a href="{{ description['reference'] }}" target="_blank" class="btn btn-primary me-2">
+            Reference here : 
+    
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                 class="me-2" viewBox="0 0 16 16">
                 <path fill-rule="evenodd"
                     d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5" />
@@ -27,39 +29,36 @@
             </svg> Reference
         </a>
         {% endif %}
-        <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#modal-default">Show
-            query</button>
-        <!-- Refresh -->
-        <button id="refresh" type="submit" class="btn btn-info" name="submit_refresh" value="refresh"
-            onclick="refreshPage()">
-            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
-                </path>
-            </svg>
-            Refresh
-        </button>
-    </div>
-</div>
-<div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default"
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="h6 modal-title">Executed query</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <code>{{ description['sql'] }}</code>
-
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+          <div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-default">Show query</button>
+          </div>
+          <!-- Refresh -->
+          <div>
+            <button id="refresh" type="submit" class="btn btn-primary" name="submit_refresh" value="refresh" onclick="refreshPage()">
+                <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"></path></svg>
+                    Refresh
+            </button>  
+          </div>
+        </div>          
+      </div>
+  </div>
+   <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+          <div class="modal-content">
+              <div class="modal-header">
+                  <h2 class="h6 modal-title">Executed query</h2>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                  <code>{{ description['sql'] }}</code>
+              
+              </div>
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
+              </div>
+          </div>
+      </div></div>
 
 
 <div class="card border-0 shadow mb-4">

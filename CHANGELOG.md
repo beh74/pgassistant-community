@@ -1,14 +1,25 @@
 # Change Log
 
+## [2.3] - 2026-17-01
+
+### Features
+
+- UI/UX : left menu refactor (and bugs correction); on all forms use the new color scheme
+- LLM on analyze queries : add last_vacuum, last_autovacuum, last_analyze, last_autoanalyze in the prompt
+
+### Bug fixes
+
+- Postgresql 18 top queries : adjust column orders
+
 ## [2.2.3] - 2026-14-01
 
-## Features
+### Features
 
 - Aesthetical improvement of the Dashboard
 
 ## [2.2.2] - 2025-30-12
 
-## Features
+### Features
 
 - Adding Postgresql 18 support.
 
@@ -18,7 +29,7 @@
 
 ## [2.2.1] - 2025-17-12
 
-## Features
+### Features
 
 - Visual upgrade of the database connexion page. Change of colors, icons, alignment in the connexion form.
 

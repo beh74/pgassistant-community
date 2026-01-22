@@ -451,6 +451,48 @@ def get_existing_indexes(db_config):
     return existing_indexes
 
 
+def fetch_tables_pgstat(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Returns pg_stats for each table and its columns.
+    """
+
+    if not tables:
+        return {}
+
+    rows = {}
+    conn = None 
+    try:
+        conn, message = connectdb(db_config)
+    except Exception as e:
+        return None
+    
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT schemaname, tablename, attname,
+                   null_frac, avg_width, n_distinct,
+                   most_common_vals, most_common_freqs,
+                   histogram_bounds, correlation
+            FROM pg_stats
+            WHERE (tablename) = ANY(%s)
+            """,
+            (tables,),
+        )
+        for r in cur.fetchall():
+            key = f"{r['schemaname']}.{r['tablename']}"
+            rows.setdefault(key, {})
+            rows[key][r["attname"]] = {
+                "null_frac": float(r["null_frac"]),
+                "avg_width": int(r["avg_width"]),
+                "n_distinct": float(r["n_distinct"]),
+                "most_common_vals": r["most_common_vals"],
+                "most_common_freqs": r["most_common_freqs"],
+                "histogram_bounds": r["histogram_bounds"],
+                "correlation": float(r["correlation"]) if r["correlation"] is not None else None,
+            }
+
+    return rows
+
 def fetch_table_stats(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, Any]]:
     """
     Returns a mini-summary for each table:
