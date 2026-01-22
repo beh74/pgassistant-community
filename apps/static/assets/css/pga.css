@@ -72,3 +72,11 @@ button#connect {
 .bg-info {
     background-color: #637D91 !important;
 }
+
+.pagination .page-item.active .page-link {
+    background-color:#637D91;
+}
+
+div.dt-container div.dt-length select[name=generic_length] {
+    width: 75px;
+}
