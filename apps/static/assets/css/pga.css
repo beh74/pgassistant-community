@@ -129,4 +129,14 @@ div.dt-container div.dt-length select {
 .pagination .page-item.active .page-link {
     background-color: #336791;
 }
+div:has(> table.dataTable), div.dt-scroll-headInner {
+    border-bottom: 1px solid #D1D5DB;
+}
 
+.table-responsive {
+    overflow-x: hidden;
+}
+
+.table > :not(:last-child) > :last-child > * {
+    border-bottom-color: #D1D5DB; 
+}
