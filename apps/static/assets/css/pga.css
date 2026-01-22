@@ -140,3 +140,8 @@ div:has(> table.dataTable), div.dt-scroll-headInner {
 .table > :not(:last-child) > :last-child > * {
     border-bottom-color: #D1D5DB; 
 }
+
+table.dataTable thead > tr > th.dt-orderable-asc:hover, table.dataTable thead > tr > th.dt-orderable-desc:hover {
+    outline: none;
+    outline-offset: 0px;
+}

@@ -138,22 +138,26 @@
 
   <div class="card border-0 shadow mb-4">
     <div class="card-body">
-        <h5 class="mb-3">📌 Understanding the Query Results: Analyzing Cache Hit Ratios in PostgreSQL</h5>
+        <h5 class="mb-3">Understanding the Query Results: Analyzing Cache Hit Ratios in PostgreSQL</h5>
         <ul class="list-group">
-            <li class="list-group-item"><strong>📂 Low Cache Hit Ratios = More Disk Reads<p>
+            <li class="list-group-item"><strong>Low Cache Hit Ratios = More Disk Reads<p>
                 A low table or index cache hit ratio means that PostgreSQL frequently reads from disk instead of memory, which slows down queries and increases I/O load.</p></li>
-            <li class="list-group-item"><strong>⏳ Indexes May Be Inefficient:</strong> If a table has a high table cache hit ratio but a low index cache hit ratio, it could mean:
-            <p>- Indexes are not properly used.</p>
-            <p>- Queries rely on sequential scans instead of index scans.</p>
-            <p>- Index bloat may be affecting efficiency.</p>
+            <li class="list-group-item"><strong>Indexes May Be Inefficient:</strong> If a table has a high table cache hit ratio but a low index cache hit ratio, it could mean:
+                <ul>
+                    <li>Indexes are not properly used.</li>
+                    <li>Queries rely on sequential scans instead of index scans.</li>
+                    <li>Index bloat may be affecting efficiency.</li>
+                </ul>
             </li>
-            <li class="list-group-item"><strong>📈 Optimizing Performance</strong> : Identifying poorly cached tables allows database administrators to take actions such as:
-            <p>- Increasing shared_buffers to improve caching.</p>
-            <p>- Adding or optimizing indexes for better query performance.</p>
-            <p>- Rewriting queries to make better use of indexes.</p>
-            <p>- Using <a href="https://www.postgresql.org/docs/current/pgprewarm.html"> pg_prewarm</a> to preload frequently accessed tables into memory.</p>
+            <li class="list-group-item"><strong>Optimizing Performance</strong> : Identifying poorly cached tables allows database administrators to take actions such as:
+                <ul>
+                    <li>Increasing shared_buffers to improve caching.</li>
+                    <li>Adding or optimizing indexes for better query performance.</li>
+                    <li>Rewriting queries to make better use of indexes.</li>
+                    <li>Using <a href="https://www.postgresql.org/docs/current/pgprewarm.html"> pg_prewarm</a> to preload frequently accessed tables into memory.</li>
+                </ul>
             </li>
-            <li class="list-group-item"><strong>🔄 Conclusion</strong> This query helps prioritize database optimization efforts by highlighting tables and indexes that rely too much on disk I/O. By improving cache efficiency, PostgreSQL can serve queries faster and reduce hardware strain.
+            <li class="list-group-item"><strong>Conclusion :</strong> This query helps prioritize database optimization efforts by highlighting tables and indexes that rely too much on disk I/O. By improving cache efficiency, PostgreSQL can serve queries faster and reduce hardware strain.
             </li>
         </ul>
     </div>
