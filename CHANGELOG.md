@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.3.1] - 2026-23-01
+
+### Features
+
+- UI improvement of tables, minor changes of icons, colors and sizes
+
+### Bug fixes
+
+- UI : issues with text and icons alignment in Dashboard, generic header and left menu
+
 ## [2.3] - 2026-17-01
 
 ### Features
