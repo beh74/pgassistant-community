@@ -1,43 +1,46 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Tables {% endblock %} 
+{% block title %} Tables {% endblock %}
 
 <!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
-<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.dataTables.css">
+<link type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css" rel="stylesheet">
 {% endblock stylesheets %}
 
 {% block content %}
  
   <div class="py-4">
-      <div class="d-flex justify-content-between w-100 flex-wrap">
-          <div class="mb-3 mb-lg-0">
-              <h1 class="h4">{{ description['category'] }} / {{ description['description'] }}</h1>
-          </div>
-          {%if description['reference'] %}  
-                            
-          <a href="{{ description['reference'] }}" target="_blank">
-            Reference here : 
-    
-          <svg class="icon" fill="none" stroke="green" viewBox="0 0 24 24" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"></path>
+    <div class="mb-3 mb-lg-0">
+        <h1 class="h4">{{ description['description'] }}</h1>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        
+    {%if description['reference'] %}
+        <a href="{{ description['reference'] }}" target="_blank" class="btn btn-primary me-2 align-items-center d-inline-flex">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
+            <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
+            <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
+            </svg> Reference
+        </a>
+    {% endif %}
+        <button type="button" class="btn btn-primary me-2 align-items-center d-inline-flex" data-bs-toggle="modal" data-bs-target="#modal-default">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
+                <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/></svg>
+            Show query</button>
+        <!-- Refresh -->
+        <button id="refresh" type="submit" class="btn btn-primary align-items-center d-inline-flex" name="submit_refresh" value="refresh"
+            onclick="refreshPage()">
+            <svg class="icon icon-20 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
+                </path>
             </svg>
-          </a>
-          {% endif %}  
-          <div>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-default">Show query</button>
-          </div>
-          <!-- Refresh -->
-          <div>
-            <button id="refresh" type="submit" class="btn btn-primary" name="submit_refresh" value="refresh" onclick="refreshPage()">
-                <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"></path></svg>
-                    Refresh
-            </button>  
-          </div>
-        </div>          
-      </div>
-  </div>
+            Refresh
+        </button>
+    </div>
+</div>
    <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" role="document">
           <div class="modal-content">
@@ -55,21 +58,21 @@
           </div>
       </div></div>
 
- 
-  <div class="card border-0 shadow mb-4">
-      <div class="card-body">
+
+<div class="card border-0 shadow mb-4">
+    <div class="card-body">
         <div class="table-responsive">
-            <table id="generic" class="table table-striped" style="width:100%" >
+            <table id="generic" class="table table-striped" style="width:100%">
                 <thead class="thead-light">
                     <tr>
                         {%for row in rows[0]: %}
-                        <th>{{ row }}</th>                     
+                        <th>{{ row }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in rows: %}
-                    <tr>          
+                    <tr>
                         {% for key, value in row.items() %}
                         <td style="word-wrap: break-word; min-width: 10px; max-width: 360px; white-space: normal;">
                             {{ value }}
@@ -78,173 +81,175 @@
                             <button onclick="executeSQL('{{ value }}')">Run</button>
                             {% endif %}
                         </td>
-                        {% endfor %}                     
+                        {% endfor %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-      </div>
-  </div>
+    </div>
+</div>
 
 {# --- SECTION CODE : if any "pga_suggestion*" --- #}
 {% if rows and rows|length > 0 %}
-  {% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
+{% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
 
-  {# 1) Détecter les colonnes qui commencent par pga_suggestion* #}
-  {% for key in rows[0].keys() %}
-    {% if key.startswith('pga_suggestion') %}
-      {% set _ = ns.suggestion_keys.append(key) %}
-    {% endif %}
-  {% endfor %}
+{# 1) Détecter les colonnes qui commencent par pga_suggestion* #}
+{% for key in rows[0].keys() %}
+{% if key.startswith('pga_suggestion') %}
+{% set _ = ns.suggestion_keys.append(key) %}
+{% endif %}
+{% endfor %}
 
-  {# 2) Collecter toutes les valeurs de ces colonnes #}
-  {% for row in rows %}
-    {% for key in ns.suggestion_keys %}
-      {% if key in row and row[key] %}
-        {% set _ = ns.suggestions.append(row[key]) %}
-      {% endif %}
-    {% endfor %}
-  {% endfor %}
+{# 2) Collecter toutes les valeurs de ces colonnes #}
+{% for row in rows %}
+{% for key in ns.suggestion_keys %}
+{% if key in row and row[key] %}
+{% set _ = ns.suggestions.append(row[key]) %}
+{% endif %}
+{% endfor %}
+{% endfor %}
 
-  {# 3) Afficher la section uniquement s’il y a au moins une suggestion #}
-  {% if ns.suggestions %}
-  <div class="card border-0 shadow mb-4">
+{# 3) Afficher la section uniquement s’il y a au moins une suggestion #}
+{% if ns.suggestions %}
+<div class="card border-0 shadow mb-4">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="card-title mb-0">Code suggestions</h5>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copySuggestionsToClipboard()">
-          Copy
-        </button>
-      </div>
-      <pre id="pgaSuggestions"
-           style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Code suggestions</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copySuggestionsToClipboard()">
+                Copy
+            </button>
+        </div>
+        <pre id="pgaSuggestions"
+            style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
 {{ ns.suggestions | join('\n') }}
       </pre>
     </div>
-  </div>
-  {% endif %}
+</div>
 {% endif %}
-  <p id="current-sql">No SQL executing</p>
-  <div id="results"></div>
+{% endif %}
+<p id="current-sql">No SQL executing</p>
+<div id="results"></div>
 
-<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js" ></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js" ></script>
+<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
+<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
+<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js"></script>
 
 <script>
     function copySuggestionsToClipboard() {
-    const el = document.getElementById('pgaSuggestions');
-    if (!el) return;
-    const text = el.innerText || el.textContent || "";
+        const el = document.getElementById('pgaSuggestions');
+        if (!el) return;
+        const text = el.innerText || el.textContent || "";
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text)
-        .then(() => {
-            console.log('Suggestions copied to clipboard');
-        })
-        .catch(err => {
-            console.error('Clipboard copy failed', err);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    console.log('Suggestions copied to clipboard');
+                })
+                .catch(err => {
+                    console.error('Clipboard copy failed', err);
+                    fallbackCopyText(text);
+                });
+        } else {
             fallbackCopyText(text);
-        });
-    } else {
-        fallbackCopyText(text);
-    }
+        }
     }
 
     function fallbackCopyText(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-        document.execCommand('copy');
-        console.log('Suggestions copied to clipboard (fallback)');
-    } catch (err) {
-        console.error('Fallback copy failed', err);
-    }
-    document.body.removeChild(textarea);
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            console.log('Suggestions copied to clipboard (fallback)');
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+        }
+        document.body.removeChild(textarea);
     }
 
     function refreshPage() {
-            location.reload(); // Reloads the page
-        }
+        location.reload(); // Reloads the page
+    }
 
     async function executeSQL(sql) {
-    // Afficher la clause SQL en cours d'exécution
-    document.getElementById("current-sql").textContent = `Executing: ${sql}`;
-    document.getElementById("results").innerHTML = "Running...";
+        // Afficher la clause SQL en cours d'exécution
+        document.getElementById("current-sql").textContent = `Executing: ${sql}`;
+        document.getElementById("results").innerHTML = "Running...";
 
-    try {
+        try {
+            // Envoyer une requête POST à l'API Flask
+            const response = await fetch("/execute", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ sql })
+            });
+
+            // Vérifier si la réponse HTTP est valide
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Récupérer la réponse JSON
+            const result = await response.json();
+
+            // Afficher le résultat ou l'erreur
+            if (result.success) {
+                document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
+            } else {
+                document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
+            }
+        } catch (error) {
+            // Gérer les erreurs réseau ou JavaScript
+            document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
+        }
+    }
+
+    function executeSQL2(sql) {
+        // Afficher la clause SQL en cours d'exécution
+        document.getElementById("current-sql").textContent = `Executing: ${sql}`;
+        document.getElementById("results").innerHTML = "Running...";
+
         // Envoyer une requête POST à l'API Flask
-        const response = await fetch("/execute", {
+        fetch("/execute", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ sql })
-        });
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-        // Vérifier si la réponse HTTP est valide
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Récupérer la réponse JSON
-        const result = await response.json();
-
-        // Afficher le résultat ou l'erreur
-        if (result.success) {
-            document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
-        } else {
-            document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
-        }
-    } catch (error) {
-        // Gérer les erreurs réseau ou JavaScript
-        document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
+                return response.json();
+            })
+            .then((result) => {
+                // Afficher le résultat ou l'erreur
+                if (result.success) {
+                    document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
+                } else {
+                    document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
+                }
+            })
+            .error((err) => {
+                // Gérer les erreurs réseau ou JavaScript
+                document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
+            });
     }
-}
-
-function executeSQL2(sql) {
-    // Afficher la clause SQL en cours d'exécution
-    document.getElementById("current-sql").textContent = `Executing: ${sql}`;
-    document.getElementById("results").innerHTML = "Running...";
-
-    // Envoyer une requête POST à l'API Flask
-    fetch("/execute", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ sql })
-    })
-    .then((response) => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return response.json();
-    })
-    .then((result) => {
-        // Afficher le résultat ou l'erreur
-        if (result.success) {
-            document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
-        } else {
-            document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
-        }
-    })
-    .error((err) => {
-        // Gérer les erreurs réseau ou JavaScript
-        document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
-    }); 
-}
 </script>
 
 <script>
     // Garde les colonnes triables mais désactive le tri par défaut
     new DataTable('#generic', {
-      order: [] // Pas de tri initial
+        order: [], // Pas de tri initial
+        scrollX: true 
     });
 </script>
 

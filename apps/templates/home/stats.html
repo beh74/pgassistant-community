@@ -4,22 +4,17 @@
 
 <!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
-<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.dataTables.css">
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css">
 {% endblock stylesheets %}
 
 {% block content %}
 
   <div class="py-4">
-
-      <div class="d-flex justify-content-between w-100 flex-wrap">
-          <div class="mb-3 mb-lg-0">
-              <h1 class="h4">Tables statistics</h1>
-              <p class="mb-0">Tables statistics ordered by average execution time</p>
-          </div>
-
-
-        </div>    
-  </div>
+    <div class="mb-3 mb-lg-0">
+      <h1 class="h4">Tables statistics</h1>
+      <p class="mb-0">Tables statistics ordered by average execution time</p>
+    </div>
+</div>
 
 <!--table statistics-->
 
@@ -93,15 +88,16 @@
   </div>
 </div>
 
-<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js" ></script>
-<!--<script id="dt2" src="{{ config.ASSETS_ROOT }}/js/bootstrap.bundle.min.js" ></script>-->
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js" ></script>
-<!--<script id="dt4" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js" ></script>-->
+
+<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
+<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
+<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js"></script>
 
 
 <script>
   new DataTable('#topqueries', {
-      order: [[2, 'desc']] 
+      order: [[2, 'desc']],
+      scrollX: true
     });
 </script>
 

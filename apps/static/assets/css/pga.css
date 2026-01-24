@@ -49,6 +49,7 @@ button#connect {
 
 .sidebar .nav-item.active > .nav-link, .sidebar .nav-item .nav-link:hover {
     background-color: #466680;
+    width: 100%;
 }
 
 .sidebar .nav-link .sidebar-icon {
@@ -73,6 +74,13 @@ button#connect {
     background-color: #637D91 !important;
 }
 
+.pagination .page-item.active .page-link {
+    background-color:#637D91;
+}
+
+div.dt-container div.dt-length select {
+    width: 75px;
+}
 
 /* Sous-menu: indentation + taille plus petite */
 .sidebar .multi-level .submenu-link {
@@ -109,26 +117,31 @@ button#connect {
   box-shadow: none !important;
 }
 
-/* keep a subtle hover (optional). Put transparent if you want NONE */
-.sidebar .nav-item:not(.active) > button.nav-link:hover {
-  background: rgba(255,255,255,0.06);
+.nav-link {
+    display: inline-flex !important;
+    width: 100%;
 }
 
-/* --- Sidebar icons: force consistent size & alignment --- */
-.sidebar-icon {
-  width: 1.25rem;          /* largeur fixe */
-  min-width: 1.25rem;
-  height: 1.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.page-item.active .page-link, .page-link {
+    border-color: #D1D5DB !important;
 }
 
-/* SVG inside sidebar icon */
-.sidebar-icon svg,
-.sidebar-icon img {
-  width: 1.25rem;
-  height: 1.25rem;
-  max-width: 100%;
-  max-height: 100%;
+.pagination .page-item.active .page-link {
+    background-color: #336791;
+}
+div:has(> table.dataTable), div.dt-scroll-headInner {
+    border-bottom: 1px solid #D1D5DB;
+}
+
+.table-responsive {
+    overflow-x: hidden;
+}
+
+.table > :not(:last-child) > :last-child > * {
+    border-bottom-color: #D1D5DB; 
+}
+
+table.dataTable thead > tr > th.dt-orderable-asc:hover, table.dataTable thead > tr > th.dt-orderable-desc:hover {
+    outline: none;
+    outline-offset: 0px;
 }

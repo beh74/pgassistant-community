@@ -272,27 +272,23 @@
                             <span class="fw-bold mb-0">Top 5 tables</span>
                               <a href="/generic/table_size" class="btn btn-sm btn-primary">See all</a>
                           </div>
-                        <div class="card-body">
+                        <div class="card-body container">
                             <!-- Tables-->
                             {% for table in dbinfo['table_size'] %}
                             <div class="row align-items-center mb-3">
                                <div class="col-auto text-dark"> 
-                                <svg width="24" 
-                                height="24" 
+                                <svg width="16" 
+                                height="16" 
                                 data-slot="icon" 
                                 style="color: #336791;" 
-                                viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 2h-4v3h4zm0 4h-4v3h4zm0 4h-4v3h3a1 1 0 0 0 1-1zm-5 3v-3H6v3zm-5 0v-3H1v2a1 1 0 0 0 1 1zm-4-4h4V8H1zm0-4h4V4H1zm5-3v3h4V4zm4 4H6v3h4z"/>
                                 </svg>
                                 </div>
 
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info">
-                                            <div class="h6 mb-0">{{ table['table_name'] }}</div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ table['size'] }} (<small>≈{{ table['row_count'] }} rows)</small></span></div>
-                                        </div>
-                                    </div>
+                                <div class="col align-items-center justify-content-between d-inline-flex" style="height: 24px;">
+                                    <div class="h6 mb-0">{{ table['table_name'] }}</div>
+                                    <div class="small fw-bold text-gray-500"><span> {{ table['size'] }} (<small>≈{{ table['row_count'] }} rows)</small></span></div>
                                 </div>
                             </div>        
                             {% endfor %}
@@ -305,7 +301,7 @@
                             <span class="fw-bold mb-0">Top 5 clients</span>
                               <a href="/generic/database_activity_grouped" class="btn btn-sm btn-primary">See all</a>
                           </div>
-                        <div class="card-body">
+                        <div class="card-body container">
                             <!-- Cients -->
                             {% for client in dbinfo['top_clients'] %}
                             <div class="row align-items-center mb-3">
@@ -329,14 +325,10 @@
                                         ></path>
                                     </svg>
                                 </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info">
-                                            <div class="h6 mb-0">{{ client['client_addr'] }}</div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ client['total_connections'] }} connection(s)</span></div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ client['active_connections'] }} active(s)</span></div>
-                                        </div>
-                                    </div>
+                                <div class="col align-items-center justify-content-between d-inline-flex" style="height: 24px;">
+                                    <div class="h6 mb-0">{{ client['client_addr'] }}</div>
+                                    <div class="small fw-bold text-gray-500"><span> {{ client['total_connections'] }} connection(s)</span></div>
+                                    <div class="small fw-bold text-gray-500"><span> {{ client['active_connections'] }} active(s)</span></div>
                                 </div>
                             </div>        
                             {% endfor %}
