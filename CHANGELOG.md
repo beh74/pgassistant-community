@@ -1,5 +1,21 @@
 # Change Log
 
+## [2.3.2] - 2026-07-02
+
+### Features
+
+- Added a **DBA Corner** menu (initial feature: tables requiring ANALYZE and database report)
+- Reporting API: added a **Tables requiring ANALYZE** section
+- ANALYZE query: refactored with execution plan insights (by node type, table, index, and top-cost nodes)
+- Table Definition Helper: added **Column Tetris** support. Column Tetris is a physical row layout optimization technique in PostgreSQL that reorders table columns to minimize internal padding caused by alignment constraints in heap tuples.
+- Foreign key missing index detection is now stricter: only fully matching indexes are considered valid.
+- Updated the LLM Analyze form to display the query sent to the LLM in an accordion layout.
+
+### Bug fixes
+
+- When LLM API calls fails, http 500 error. Display the error.
+
+
 ## [2.3.1] - 2026-23-01
 
 ### Features

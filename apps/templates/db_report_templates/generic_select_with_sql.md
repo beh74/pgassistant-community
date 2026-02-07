@@ -1,3 +1,4 @@
+
 ## {{ chapter_name }}
 
 ### SQL source
@@ -22,3 +23,6 @@
 {% else %}
 Empty data
 {% endif %}
+
+---
+

@@ -141,106 +141,192 @@
 
             {% if rows %}  
 
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h5 class="m-0 font-weight-bold text-primary">Analyze results</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                    <table class="table table-sm table-bordered table-hover align-middle">
-                        <thead>
-                        <tr class="table-dark">
-                            <th>Query Plan &amp; Comments</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for row in rows %}
-                            <tr>
-                            <td class="plan-cell">{{ row['QUERY PLAN'] }}</td>
-                            </tr>
-                            {% set comment = analyze_explain_row(row) %}
-                            {% if comment %}
-                            <tr class="table-light">
-                                <td><em>{{ comment }}</em></td>
-                            </tr>
-                            {% endif %}
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                    </div>
-                </div>
-                </div>
-                
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h5 class="m-0 font-weight-bold text-primary">Index Coverage</h5>
-                    </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered table-hover align-middle">
-                            <thead>
-                                <tr class="table-dark">
-                                    <th>Table</th>
-                                    <th>Column</th>
-                                    <th class="text-center">Is Covered?</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            
-                                {% for table_name, columns_dict in coverage_info.items() %}
-                                    {# Convertir le dictionnaire en liste pour gérer les indices #}
-                                    {% set columns_list = columns_dict.items()|list %}
-                                    {% set row_span = columns_list|length %}
-            
-                                    {# On parcourt chaque élément (colonne, booléen) #}
-                                    {% for item in columns_list %}
-                                        {% set column_name = item[0] %}
-                                        {% set is_covered = item[1] %}
-                                        
-                                        {# Sur la première colonne, on affiche la table + rowspan #}
-                                        {% if loop.index0 == 0 %}
-                                        <tr>
-                                            <td rowspan="{{ row_span }}">{{ table_name }}</td>
-                                            <td>{{ column_name }}</td>
-                                            <td class="text-center">
-                                                {% if is_covered %}
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Yes
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-danger">
-                                                        <i class="bi bi-x-circle me-1"></i>No
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% else %}
-                                        {# Pour les colonnes suivantes de la même table, on n'affiche plus la table #}
-                                        <tr>
-                                            <td>{{ column_name }}</td>
-                                            <td class="text-center">
-                                                {% if is_covered %}
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Yes
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-danger">
-                                                        <i class="bi bi-x-circle me-1"></i>No
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endif %}
-            
-                                    {% endfor %}
-                                {% endfor %}
-            
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+  <div class="container py-4">
 
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Query Plan Insights</h1>
+  </div>
+
+  <!-- Summary -->
+  <div class="row g-3">
+    <div class="col-6 col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Execution time</div>
+          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.execution_time_ms) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Planning time</div>
+          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.planning_time_ms) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Nodes</div>
+          <div class="fs-5 fw-semibold">{{ fmt_int(result.summary.node_count) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Time baseline</div>
+          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.denominator_ms_for_pct) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% macro buffers_block(r) %}
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="small text-muted mb-1">Buffers</div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <tbody>
+              <tr>
+                <th class="text-muted" style="width: 180px;">Shared</th>
+                <td>hit: <strong>{{ fmt_int(r.shared_hit) }}</strong></td>
+                <td>read: <strong>{{ fmt_int(r.shared_read) }}</strong></td>
+                <td>dirtied: <strong>{{ fmt_int(r.shared_dirtied) }}</strong></td>
+                <td>written: <strong>{{ fmt_int(r.shared_written) }}</strong></td>
+              </tr>
+              <tr>
+                <th class="text-muted">Local</th>
+                <td>hit: <strong>{{ fmt_int(r.local_hit) }}</strong></td>
+                <td>read: <strong>{{ fmt_int(r.local_read) }}</strong></td>
+                <td>dirtied: <strong>{{ fmt_int(r.local_dirtied) }}</strong></td>
+                <td>written: <strong>{{ fmt_int(r.local_written) }}</strong></td>
+              </tr>
+              <tr>
+                <th class="text-muted">Temp</th>
+                <td>read: <strong>{{ fmt_int(r.temp_read) }}</strong></td>
+                <td>written: <strong>{{ fmt_int(r.temp_written) }}</strong></td>
+                <td colspan="2"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="small text-muted mb-1">Node details</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% if r.table is defined and r.table %}
+            <span class="badge text-bg-light border">
+              <span class="text-muted">table:</span> <code>{{ r.table }}</code>
+            </span>
+          {% endif %}
+          {% if r.index is defined and r.index %}
+            <span class="badge text-bg-light border">
+              <span class="text-muted">index:</span> <code>{{ r.index }}</code>
+            </span>
+          {% endif %}
+          {% if r.count is defined %}
+            <span class="badge text-bg-light border">
+              <span class="text-muted">count:</span> {{ fmt_int(r.count) }}
+            </span>
+          {% endif %}
+          <span class="badge text-bg-light border">
+            <span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}
+          </span>
+          <span class="badge text-bg-light border">
+            <span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}
+          </span>
+          <span class="badge text-bg-light border">
+            <span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  {% endmacro %}
+
+  {% macro render_compact_table(title, rows, id_prefix, show_table=true, show_index=true) %}
+    <div class="mt-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h6 text-uppercase text-muted mb-0">{{ title }}</h2>
+        <span class="badge text-bg-secondary">{{ rows|length if rows else 0 }}</span>
+      </div>
+
+      {% if rows and rows|length > 0 %}
+        <div class="card shadow-sm">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 56px;"></th>
+                  <th>Node</th>
+                  {% if show_table %}<th>Table</th>{% endif %}
+                  {% if show_index %}<th>Index</th>{% endif %}
+                  <th class="text-end">Self time</th>
+                  <th class="text-end">Self time %</th>
+                  <th class="text-end">Rows</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in rows %}
+                  {% set collapse_id = id_prefix ~ "-" ~ loop.index %}
+                  <tr>
+                    <td>
+                      <button class="btn btn-sm btn-outline-secondary"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#{{ collapse_id }}"
+                              aria-expanded="false"
+                              aria-controls="{{ collapse_id }}">
+                        Details
+                      </button>
+                    </td>
+
+                    <td>
+                      <span class="text-end">{{ r.node_type|default("—") }}</span>
+                    </td>
+
+                    {% if show_table %}
+                      <td><code>{{ r.table|default("—") }}</code></td>
+                    {% endif %}
+
+                    {% if show_index %}
+                      <td><code>{{ r.index|default("—") }}</code></td>
+                    {% endif %}
+
+                    <td class="text-end">{{ fmt_ms(r.self_time_ms) }}</td>
+                    <td class="text-end">{{ fmt_pct(r.self_time_pct) }}</td>
+                    <td class="text-end">{{ fmt_int(r.self_rows) }}</td>
+                  </tr>
+
+                  <tr class="collapse" id="{{ collapse_id }}">
+                    <td colspan="{{ 5 + (1 if show_table else 0) + (1 if show_index else 0) }}">
+                      <div class="p-3 border-top bg-body-tertiary">
+                        {{ buffers_block(r) }}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary mb-0" role="alert">
+          No data.
+        </div>
+      {% endif %}
+    </div>
+  {% endmacro %}
+
+  {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
+  {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
+  {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
+  {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+
+</div>
 
                   
                   <div>

@@ -369,6 +369,67 @@
           </div>
         </li>
 
+ {# DBA Corner submenu #}
+      {% set is_dba = segment is defined and segment.startswith('dba_') %}
+
+      <li class="nav-item{% if is_dba %} active{% endif %}">
+        <button
+          class="nav-link d-flex justify-content-between align-items-center w-100{% if not is_dba %} collapsed{% endif %}"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#sb-dbas"
+          aria-controls="sb-dbas"
+          aria-expanded="{% if is_dba %}true{% else %}false{% endif %}">
+
+          <span class="d-flex align-items-center">
+            <span class="sidebar-icon">
+              <svg class="icon icon-xs me-2"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg">
+
+                <!-- Database stack -->
+                <path d="M4 6c0-2.21 3.58-4 8-4s8 1.79 8 4-3.58 4-8 4-8-1.79-8-4z"/>
+                <path d="M4 12c0 2.21 3.58 4 8 4 2.4 0 4.55-.54 6-1.38V11
+                        c-1.6 1.6-4.8 2.5-8 2.5S5.6 12.6 4 11v1z"/>
+                <path d="M4 17c0 2.21 3.58 4 8 4s8-1.79 8-4v-1
+                        c-1.6 1.6-4.8 2.5-8 2.5S5.6 17.6 4 16v1z"/>
+
+                <!-- Key -->
+                <path d="M21 9a4 4 0 11-7.45 2H8v3H6v3H4v-6.5l6.05-6.05A4 4 0 0121 9z"/>
+              </svg>
+            </span>
+            <span class="sidebar-text">DBA Corner</span>
+          </span>
+
+          <span class="link-arrow">
+            <svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+            </svg>
+          </span>
+        </button>
+
+        <div id="sb-dbas"
+            class="multi-level collapse{% if is_dba %} show{% endif %}"
+            data-bs-parent="#sidebarAccordion">
+
+          <ul class="flex-column nav">
+            <li class="nav-item{% if segment is defined and segment == 'dba_action_table_analyze' %} active{% endif %}">
+              <a class="nav-link submenu-link" href="/generic/dba_action_table_analyze">
+                <span class="sidebar-text">Tables needs analyze</span>
+              </a>
+            </li>
+          </ul>
+          <ul class="flex-column nav">
+            <li class="nav-item{% if segment is defined and segment == 'dba_report' %} active{% endif %}">
+              <a class="nav-link submenu-link" href="/dba_report">
+                <span class="sidebar-text">Database report</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       </div> {# /#sidebarAccordion #}
 
       <div role="separator" class="dropdown-divider mt-4 mb-3 border-gray-700"></div>

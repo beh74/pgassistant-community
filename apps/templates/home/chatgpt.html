@@ -31,20 +31,55 @@
 
 {% block content %}
 
-        <div class="row">
-        <div class="col-12">
-            <div class="card card-body border-0 shadow mb-1">
-                <h2 class="h5 mb-1">LLM Response</h2>
-                <div>
-                    <code></code>
-                </div>
-                <br>
-                <!--<textarea class="form-control" name="chatgpt" id="chatgpt" rows="20">{{ chatgpt_response }}</textarea>-->
-                {{ chatgpt_response|safe }}
-            </div>        
-        </div>
-    </div>
+<div class="row">
+  <div class="col-12">
+    <div class="accordion" id="llmAccordion">
 
+      <div class="accordion-item border-0 shadow mb-1">
+        <h2 class="accordion-header" id="headingQuery">
+          <button class="accordion-button"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#collapseQuery"
+                  aria-expanded="true"
+                  aria-controls="collapseQuery">
+            LLM Query
+          </button>
+        </h2>
+        <div id="collapseQuery"
+             class="accordion-collapse collapse"
+             aria-labelledby="headingQuery"
+             data-bs-parent="#llmAccordion">
+          <div class="accordion-body">
+            {{ chatgpt_query|safe }}
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item border-0 shadow mb-1">
+        <h2 class="accordion-header" id="headingResponse">
+          <button class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#collapseResponse"
+                  aria-expanded="false"
+                  aria-controls="collapseResponse">
+            LLM Response
+          </button>
+        </h2>
+        <div id="collapseResponse"
+             class="accordion-collapse collapse show"
+             aria-labelledby="headingResponse"
+             data-bs-parent="#llmAccordion">
+          <div class="accordion-body">
+            {{ chatgpt_response|safe }}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 {% endblock content %}
 
 <!-- Specific Page JS goes HERE  -->

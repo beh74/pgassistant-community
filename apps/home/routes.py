@@ -4,10 +4,12 @@ Main routes
 """
 import traceback
 import os
+import math 
 from apps.home import blueprint
 from flask import render_template, request, session,redirect, jsonify, Response
 from jinja2 import TemplateNotFound
 from . import database
+from . import dbanalyze
 from . import llm
 from . import pgtune
 from . import sqlhelper
@@ -294,9 +296,10 @@ def analyze_query(querid):
         if session.get("db_name"):
             rows = []
             tables_and_columns = {}
+            statistics = {}
             sql_query = database.get_pgstat_query_by_id(session,querid)
             # format SQL
-            sql_query = sqlhelper.get_formated_sql(sql_query)
+            ##sql_query = sqlhelper.get_formated_sql(sql_query)
             tables = sqlhelper.get_tables(sql_query)
             
             # extract parameters list
@@ -316,27 +319,36 @@ def analyze_query(querid):
                         params[param_index] = val  # Add to dictionnary
 
                 sql_query=sqlhelper.replace_query_parameters(sql_query,params)
-                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS) {sql_query}"
+                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
 
                 if request.form.get('action')=='chatgpt':
                     rows = database.generic_select_with_sql(session,sql_query_analyze)
                     chatgpt = llm.get_llm_query_for_query_analyze(db_config=session, sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
-
-                    chatgpt_response=llm.query_chatgpt(chatgpt)
-                    return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
+                    try:
+                        chatgpt_response=llm.query_chatgpt(chatgpt)
+                        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(chatgpt))
+                    except Exception as e1:
+                        traceback.print_exc()
+                        return render_template('home/page-500.html', err=e1), 500
                 elif request.form.get('action')=='analyze':                   
                     parameters = {}
                     rows = database.generic_select_with_sql(session,sql_query_analyze)
                     chatgpt = llm.get_llm_query_for_query_analyze(db_config=session,sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
 
+                    statistics = dbanalyze.decode_explain_json_with_buffers(rows[0]["QUERY PLAN"], include_top_nodes=True, top_n=20)
+
                     # Get more informations on query
-                    existing_indexes = database.get_existing_indexes(session)
-                    analyzed_query = analyze_aquery.analyze_table_conditions(sql_query)
-                    tables_and_columns =  analyze_aquery.check_index_coverage(existing_indexes,analyzed_query)
+                    #existing_indexes = database.get_existing_indexes(session)
+                    #analyzed_query = analyze_aquery.analyze_table_conditions(sql_query)
+                    #tables_and_columns =  analyze_aquery.check_index_coverage(existing_indexes,analyzed_query)
                 elif request.form.get('action')=='optimize':
                     question_optimize=llm.get_llm_query_for_query_optimize(sql_query)
-                    chatgpt_response=llm.query_chatgpt(question_optimize)
-                    return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
+                    try:
+                        chatgpt_response=llm.query_chatgpt(question_optimize)
+                        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
+                    except Exception as e1:
+                        traceback.print_exc()
+                        return render_template('home/page-500.html', err=e1), 500
                 elif request.form.get('action')=='ddl':
                     tables=sqlhelper.get_tables(sql_query)
                     sql_text=ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
@@ -346,7 +358,28 @@ def analyze_query(querid):
                 # try to extract parameters from query
                 genius_parameters=sqlhelper.get_genius_parameters(sql_query,session)
 
-            return render_template('home/analyze.html', parameters=parameters, query=sql_query, rows=rows, description='Analyze query',chatgpt=chatgpt, tables=tables, genius_parameters=genius_parameters, analyze_explain_row=sqlhelper.analyze_explain_row, coverage_info=tables_and_columns )
+            def fmt_ms(x):
+                if x is None:
+                    return "—"
+                return f"{x:.3f} ms" if x < 1000 else f"{x/1000:.3f} s"
+
+            def fmt_pct(x):
+                if x is None:
+                    return "—"
+                return f"{x:.2f}%"
+
+            def fmt_int(x):
+                if x is None:
+                    return "—"
+                # self_rows can be float in EXPLAIN ANALYZE
+                if isinstance(x, (int, float)) and not math.isnan(x):
+                    return str(int(round(x)))
+                return str(x)
+
+            return render_template('home/analyze.html', parameters=parameters, query=sql_query, rows=rows, 
+                                   description='Analyze query',chatgpt=chatgpt, tables=tables, 
+                                   genius_parameters=genius_parameters, analyze_explain_row=sqlhelper.analyze_explain_row, 
+                                   result=statistics, fmt_ms=fmt_ms, fmt_pct=fmt_pct, fmt_int=fmt_int)
         else:
             dbinfo= {}
             return redirect("/database.html")
@@ -452,6 +485,24 @@ def api_database_report():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@blueprint.route("/dba_report", methods=["GET"])
+def dba_database_report():
+    try:
+        # Generate report
+        database_reports = reporting.get_database_report(
+            session,
+            report_yaml_definition_file="./reporting.yml",
+            template_folder="db_report_templates"
+        )
+        if not database_reports:
+            raise Exception("No report generated")
+        html_report = llm.render_markdown(database_reports)
+        print(html_report)
+        return render_template('home/report.html', report=html_report)
+
+    except Exception as e1:
+        return render_template('home/page-500.html', err=e1), 500
     
 @blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
 def api_reset_stats():
@@ -634,7 +685,11 @@ def llm_primary_key(schema: str, tablename:str):
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', segment='primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Find a primary key for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e:
+            traceback.print_exc()
+            return render_template('home/page-500.html', err=e), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
 
 @blueprint.route('/table_llm/<schema>/<tablename>', methods=['GET','POST'])
@@ -646,7 +701,11 @@ def llm_table(schema: str, tablename:str):
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze table definition for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e:
+            traceback.print_exc()
+            return render_template('home/page-500.html', err=e), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
 
 @blueprint.route('/table_llm_guidelines/<schema>/<tablename>', methods=['GET','POST'])
@@ -658,8 +717,29 @@ def llm_table_guidelines(schema: str, tablename:str):
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e:
+            traceback.print_exc()
+            return render_template('home/page-500.html', err=e), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+
+@blueprint.route('/table_tetris/<schema>/<tablename>', methods=['GET'])
+def tetris_table(schema: str, tablename:str):
+    tables = []
+    tables.append (f"{schema}.{tablename}")
+    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+    
+    tetris_sql = database.get_query_by_id('tetris_play')
+    tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
+    tetris_result = database.generic_select_with_sql(session, tetris_sql)
+    tetris_result_sql = tetris_result[0]['create_table_tetris_ddl']
+    
+    tetris_result_sql = tetris_result_sql.replace("\\n", "\n")
+    tetris_result_sql=ddl.sql_to_html(tetris_result_sql)
+    
+    return render_template('home/tetris.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", tetris=tetris_result_sql, title=f"Postgres column Tetris for {schema}.{tablename}")
+      
 
 
 # Helper - Extract current page name from request

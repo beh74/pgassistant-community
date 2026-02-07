@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Settings {% endblock %} 
+
+<!-- Specific Page CSS goes HERE  -->
+{% block stylesheets %}{% endblock stylesheets %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-12 col-xl-8">
+
+    <div class="card card-body border-0 shadow mb-1">
+      <h2 class="h5 mb-1">Technical note — Column Tetris</h2>
+
+      <p class="mb-2">
+        <strong>Column Tetris</strong> is a physical row layout optimization technique in PostgreSQL.
+        It consists in <strong>reordering table columns</strong> to minimize internal padding caused by
+        alignment constraints inside heap tuples.
+      </p>
+
+      <p class="mb-2">
+        PostgreSQL aligns each column according to its data type (8, 4, 2 or 1 bytes).
+        When columns are poorly ordered, the engine inserts <em>padding bytes</em> between attributes,
+        increasing the on-disk row size.
+      </p>
+
+      <p class="mb-2">
+        The Tetris strategy groups columns in an optimal order:
+      </p>
+
+      <ul class="mb-2">
+        <li>Fixed-length types first (bigint, integer, smallint, boolean, date, timestamp)</li>
+        <li>Ordered by decreasing alignment (8 → 4 → 2 → 1 bytes)</li>
+        <li>Variable-length types (varchar, text, bytea) placed at the end</li>
+      </ul>
+
+      <p class="mb-2">
+        This often reduces row width by <strong>5–15%</strong>, which can significantly improve:
+      </p>
+
+      <ul class="mb-2">
+        <li>Cache efficiency (more rows per page)</li>
+        <li>Sequential scan performance</li>
+        <li>I/O footprint on large tables</li>
+        <li>Backup and restore operations</li>
+      </ul>
+
+      <p class="mb-2">
+        This feature is inspired by the article
+        <a href="https://dev.to/mcadariu/postgres-column-tetris-neatly-packing-your-tables-for-fun-and-profit-1j6g"
+           target="_blank" rel="noopener noreferrer">
+          “Postgres Column Tetris: neatly packing your tables for fun and profit”
+        </a>.
+      </p>
+
+      <p class="mb-0 text-muted">
+        PostgreSQL does not support in-place column reordering.
+        Applying this optimization requires creating a new table,
+        copying data, and recreating constraints and indexes.
+      </p>
+    </div>
+
+    <div class="card card-body border-0 shadow mb-1">
+      <h2 class="h5 mb-1">{{ title }}</h2>
+      {{ sql_text|safe }}
+    </div>
+
+    <div class="card card-body border-0 shadow mb-1">
+      <h2 class="h5 mb-1">Tetris result</h2>
+      {{ tetris|safe }}
+    </div>
+
+  </div>
+</div>  
+{% endblock content %}
+
+
+<!-- Specific Page JS goes HERE  -->
+{% block javascripts %}{% endblock javascripts %}

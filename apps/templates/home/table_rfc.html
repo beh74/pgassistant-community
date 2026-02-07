@@ -87,8 +87,13 @@
 
                             <button
                                 onclick="location.href='/table_llm_guidelines/{{ row['table_schema'] }}/{{ row['table_name'] }}'"
-                                type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center">
+                                type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center me-2">
                                 Check Reference</button>
+
+                            <button
+                                onclick="location.href='/table_tetris/{{ row['table_schema'] }}/{{ row['table_name'] }}'"
+                                type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center">
+                                Play Tetris</button>
                         </td>
                         {% endif %}
                         </td>

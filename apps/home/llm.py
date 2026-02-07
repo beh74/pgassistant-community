@@ -3,7 +3,7 @@ import requests
 import markdown
 import pymdownx
 import re
-
+import json
 from urllib.parse import urlparse, urlunparse
 
 from openai import OpenAI
@@ -155,6 +155,33 @@ def query_chatgpt(question):
         )
     return html
 
+def render_markdown(md_text: str) -> str:
+    """
+    Renders Markdown text to HTML using Python-Markdown with Pymdown extensions.
+
+    :param md_text: The Markdown text to render.
+    :return: HTML-formatted string.
+    """
+    html = markdown.markdown(
+        md_text,
+        extensions=[
+            "pymdownx.superfences",
+            "pymdownx.highlight",
+            "extra",
+        ],
+        extension_configs={
+            "pymdownx.highlight": {
+                "use_pygments": True,
+                "guess_lang": False,
+                "linenums": False,
+            },
+            "pymdownx.superfences": {
+                # No special config needed for now
+            },
+        },
+        output_format="html5",
+    )
+    return html
 
 import re
 import json
@@ -281,7 +308,11 @@ def get_llm_query_for_query_analyze(
         except Exception:
             pass
 
-    plan_section = "\n".join(row['QUERY PLAN'] for row in rows)
+    #plan_section = "\n".join(row['QUERY PLAN'] for row in rows)
+    plan_section = "\n".join(
+        json.dumps(row['QUERY PLAN'], indent=2)
+        for row in rows
+    )    
 
     # 5) Final prompt (identical to the “improved” version, with the context above)
     llm = []
@@ -296,7 +327,7 @@ def get_llm_query_for_query_analyze(
     llm.append("\n**2) SQL query (original, without EXPLAIN)**\n```sql\n" + original_sql.strip() + "\n```")
     llm.append(
         "\n**3) EXPLAIN ANALYZE output**\n"
-        "Be careful with indentation and node nesting.\n"
+        "in JSON format.\n"
         + plan_section
     )
     llm.append(
@@ -319,6 +350,12 @@ def get_llm_query_for_query_analyze(
    - 3–6 bullet points. Mention bottlenecks with node names and evidence (rows, loops, time, buffers, spill/WAL if present).
 
 2. **Recommendations (ranked)**
+    IMPORTANT FORMATTING RULES:
+    - Do NOT use tables, markdown tables, grids, or any tabular layout.
+    - Do NOT align content in columns.
+    - Use a numbered list only.
+    - Each recommendation must be a standalone block of text.
+
    For each item:
    - *Action:* one line title
    - *SQL (if applicable):* a single fenced block with ready-to-run statements

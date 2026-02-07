@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="media/pgassistant.png" alt="pgAssistant" height="120px"/>
+  <img src="media/pgassistant_logo.png" alt="pgAssistant" height="120px"/>
   <br>
   <em>A PostgreSQL assistant for developers<br />
       Understand, optimize, and improve your PostgreSQL database with ease.</em>
