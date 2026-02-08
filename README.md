@@ -67,12 +67,13 @@ curl -X POST https://ov-004f8b.infomaniak.ch/api/v1/report \
 
 | | | |
 |---|---|---|
-| <a href="media/dashboard.png?raw=1"><img src="media/dashboard.png" alt="Dashboard" width="300"></a> | <a href="media/myqueries.png?raw=1"><img src="media/myqueries.png" alt="Mes requêtes" width="300"></a> | <a href="media/top_queries.png?raw=1"><img src="media/top_queries.png" alt="Top queries" width="300"></a> |
-| <a href="media/analyze_parameters.png?raw=1"><img src="media/analyze_parameters.png" alt="Analyze parameters" width="300"></a> | <a href="media/cache_usage.png?raw=1"><img src="media/cache_usage.png" alt="Cache usage" width="300"></a> | <a href="media/index_coverage.png?raw=1"><img src="media/index_coverage.png" alt="Index coverage" width="300"></a> |
-| <a href="media/issue_fk_missing.png?raw=1"><img src="media/issue_fk_missing.png" alt="Foreign key missing" width="300"></a> | <a href="media/issue_redundant_idx.png?raw=1"><img src="media/issue_redundant_idx.png" alt="Index redondant" width="300"></a> | <a href="media/pgtune.png?raw=1"><img src="media/pgtune.png" alt="PgTune" width="300"></a> |
-| <a href="media/pgtune_docker.png?raw=1"><img src="media/pgtune_docker.png" alt="PgTune Docker" width="300"></a> | <a href="media/pgrune_results.png?raw=1"><img src="media/pgrune_results.png" alt="PgRunE results" width="300"></a> | <a href="media/ddl.png?raw=1"><img src="media/ddl.png" alt="DDL Viewer" width="300"></a> |
+| <a href="media/dashboard.png?raw=1"><img src="media/dashboard.png" alt="Dashboard" width="300"></a> | <a href="media/myqueries.png?raw=1"><img src="media/myqueries.png" alt="My queries" width="300"></a> | <a href="media/top_queries.png?raw=1"><img src="media/top_queries.png" alt="Top queries" width="300"></a> |
+| <a href="media/db_report.png?raw=1"><img src="media/db_report.png" alt="Database report" width="300"></a> | <a href="media/index_coverage.png?raw=1"><img src="media/index_coverage.png" alt="Index coverage" width="300"></a> | <a href="media/cache_usage.png?raw=1"><img src="media/cache_usage.png" alt="Cache usage" width="300"></a> |
+| <a href="media/analyze_parameters.png?raw=1"><img src="media/analyze_parameters.png" alt="Analyze parameters" width="300"></a> | <a href="media/ddl.png?raw=1"><img src="media/ddl.png" alt="DDL Viewer" width="300"></a> | <a href="media/pgrune_results.png?raw=1"><img src="media/pgrune_results.png" alt="PgRunE results" width="300"></a> |
+| <a href="media/issue_fk_missing.png?raw=1"><img src="media/issue_fk_missing.png" alt="Missing foreign key" width="300"></a> | <a href="media/issue_datatype_fk.png?raw=1"><img src="media/issue_datatype_fk.png" alt="Foreign key datatype issue" width="300"></a> | <a href="media/issue_redundant_idx.png?raw=1"><img src="media/issue_redundant_idx.png" alt="Redundant index" width="300"></a> |
+| <a href="media/pgtune.png?raw=1"><img src="media/pgtune.png" alt="PgTune" width="300"></a> | <a href="media/pgtune_docker.png?raw=1"><img src="media/pgtune_docker.png" alt="PgTune Docker" width="300"></a> | <a href="media/llm_optimize_query.png?raw=1"><img src="media/llm_optimize_query.png" alt="LLM Optimize Query" width="300"></a> |
 | <a href="media/llm_prompt.png?raw=1"><img src="media/llm_prompt.png" alt="LLM Prompt" width="300"></a> | <a href="media/llm_guidelines.png?raw=1"><img src="media/llm_guidelines.png" alt="LLM Guidelines" width="300"></a> | <a href="media/llm_settings.png?raw=1"><img src="media/llm_settings.png" alt="LLM Settings" width="300"></a> |
-| <a href="media/gpt-oss-2.png?raw=1"><img src="media/gpt-oss-2.png" alt="GPT OSS 2" width="300"></a> |  |  |
+| <a href="media/gpt-oss-2.png?raw=1"><img src="media/gpt-oss-2.png" alt="GPT-OSS 2" width="300"></a> |  |  |
 
 ## Features
 
