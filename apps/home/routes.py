@@ -498,8 +498,7 @@ def dba_database_report():
         if not database_reports:
             raise Exception("No report generated")
         html_report = llm.render_markdown(database_reports)
-        print(html_report)
-        return render_template('home/report.html', report=html_report)
+        return render_template('home/report.html', report=html_report, segment='dba_report')
 
     except Exception as e1:
         return render_template('home/page-500.html', err=e1), 500
@@ -690,7 +689,7 @@ def llm_primary_key(schema: str, tablename:str):
         except Exception as e:
             traceback.print_exc()
             return render_template('home/page-500.html', err=e), 500
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt))        
 
 @blueprint.route('/table_llm/<schema>/<tablename>', methods=['GET','POST'])
 def llm_table(schema: str, tablename:str):
@@ -706,7 +705,7 @@ def llm_table(schema: str, tablename:str):
         except Exception as e:
             traceback.print_exc()
             return render_template('home/page-500.html', err=e), 500
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt))
 
 @blueprint.route('/table_llm_guidelines/<schema>/<tablename>', methods=['GET','POST'])
 def llm_table_guidelines(schema: str, tablename:str):
@@ -722,7 +721,7 @@ def llm_table_guidelines(schema: str, tablename:str):
         except Exception as e:
             traceback.print_exc()
             return render_template('home/page-500.html', err=e), 500
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt))        
 
 @blueprint.route('/table_tetris/<schema>/<tablename>', methods=['GET'])
 def tetris_table(schema: str, tablename:str):

@@ -1,6 +1,19 @@
 # Change Log
 
-## [2.3.2] - 2026-07-02
+## [2.4.1] - 2026-08-02
+
+### Features
+
+- Introduced adaptive LLM context handling. pgAssistant now estimates prompt size and automatically selects safe context limits and output budgets depending on the LLM model family. This optimizes large query-analysis prompts (DDL, statistics, EXPLAIN JSON), avoids silent truncation on long inputs, and improves compatibility with both Ollama and OpenAI-compatible providers.
+- Added "LLM Query" on all LLM forms
+
+
+### Bug fixes
+
+- Menu DBA Corner / Database report : menu is not selected after report generation.
+
+
+## [2.4.0] - 2026-07-02
 
 ### Features
 

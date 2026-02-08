@@ -12,6 +12,7 @@ from .sqlhelper import get_tables
 from .config import get_config_value
 from .database import get_pg_tune_parameter
 from .database import fetch_table_stats
+from .llm_helper import detect_model_family, estimate_tokens, choose_ctx_and_output_budget, clamp_num_ctx
 
 
 def extract_root_uri(uri):
@@ -85,18 +86,33 @@ def query_chatgpt(question):
 
     # Detect if LOCAL_LLM_URI points to an Ollama server
     use_ollama = local_llm and check_ollama_status(local_llm) == "ollama"
+    system_msg = "You are a Postgresql database expert"
 
     if use_ollama:
-        # Use Ollama's native API
-        print("⚙️ Using native Ollama API")
+        prompt = f"{system_msg}.\n\nUser: {question}"
+        prompt_tokens = estimate_tokens(prompt)
+
+        ctx_limit, out_budget = choose_ctx_and_output_budget(model_llm, prompt_tokens)
+        num_ctx = clamp_num_ctx(ctx_limit, prompt_tokens, out_budget)
+
+        family = detect_model_family(model_llm)
+        print(
+            f"⚙️ Using native Ollama API "
+            f"(model={model_llm}, family={family}, est_prompt_tokens={prompt_tokens}, "
+            f"num_ctx={num_ctx}/{ctx_limit}, num_predict={out_budget})"
+        )
 
         response = requests.post(
             f"{extract_root_uri(local_llm)}api/generate",
             json={
                 "model": model_llm,
-                "prompt": f"You are a Postgresql database expert.\n\nUser: {question}",
+                "prompt": prompt,
                 "stream": False,
                 "temperature": 0.2,
+                "options": {
+                    "num_predict": out_budget,  # output cap
+                    "num_ctx": num_ctx,         # total context
+                },
             },
             timeout=600
         )
@@ -105,31 +121,32 @@ def query_chatgpt(question):
             raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
 
         output = response.json().get("response", "")
+
     else:
-        # Use OpenAI-compatible API
         if not api_key:
             raise Exception("The environment variable OPENAI_API_KEY is not set. Cannot use OpenAI API.")
+       
+        # OpenAI path: we still reuse the same sizing heuristic (but only max_tokens applies)
+        prompt_tokens = estimate_tokens(system_msg + "\n" + question)
+        ctx_limit, out_budget = choose_ctx_and_output_budget(model_llm, prompt_tokens)
 
-        print("⚙️ Using OpenAI API")
+        print(f"⚙️ Using OpenAI API (model={model_llm}, est_prompt_tokens={prompt_tokens}, max_tokens={out_budget})")
 
-        if local_llm:
-            client = OpenAI(api_key=api_key, base_url=local_llm)
-        else:
-            client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=api_key, base_url=local_llm) if local_llm else OpenAI(api_key=api_key)
 
         completion = client.chat.completions.create(
             model=model_llm,
             messages=[
-                {"role": "system", "content": "You are a Postgresql database expert"},
-                {"role": "user", "content": question}
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": question},
             ],
             temperature=0.2,
-            max_tokens=2000,
+            max_tokens=out_budget,
             frequency_penalty=0.1,
             presence_penalty=0.6,
             n=1
         )
-        output = completion.choices[0].message.content
+        output = completion.choices[0].message.content or ""
 
     
     md_text = fix_code_blocks(output)
@@ -328,7 +345,9 @@ def get_llm_query_for_query_analyze(
     llm.append(
         "\n**3) EXPLAIN ANALYZE output**\n"
         "in JSON format.\n"
+        + "```json\n"
         + plan_section
+        + "\n```"
     )
     llm.append(
         """
