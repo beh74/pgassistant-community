@@ -191,6 +191,12 @@ def decode_explain_json_with_buffers(
       - by_node_type
       - by_table
       - by_index
+
+    Also classifies a dominant factor:
+      - planner_dominated
+      - execution_dominated
+      - io_dominated
+      - cpu_dominated
     """
     if isinstance(explain_json, str):
         doc = json.loads(explain_json)
@@ -216,6 +222,146 @@ def decode_explain_json_with_buffers(
     denom_ms = execution_time_ms if execution_time_ms > 0 else sum(n.self_ms for n in nodes)
     if denom_ms <= 0:
         denom_ms = 1.0
+
+    # -------------------- Dominant factor classification --------------------
+    # Aggregate buffers across nodes
+    buf_sum = {
+        "shared_hit": 0, "shared_read": 0, "shared_dirtied": 0, "shared_written": 0,
+        "local_hit": 0, "local_read": 0, "local_dirtied": 0, "local_written": 0,
+        "temp_read": 0, "temp_written": 0,
+    }
+    for n in nodes:
+        b = n.buffers
+        buf_sum["shared_hit"] += int(getattr(b, "shared_hit", 0) or 0)
+        buf_sum["shared_read"] += int(getattr(b, "shared_read", 0) or 0)
+        buf_sum["shared_dirtied"] += int(getattr(b, "shared_dirtied", 0) or 0)
+        buf_sum["shared_written"] += int(getattr(b, "shared_written", 0) or 0)
+
+        buf_sum["local_hit"] += int(getattr(b, "local_hit", 0) or 0)
+        buf_sum["local_read"] += int(getattr(b, "local_read", 0) or 0)
+        buf_sum["local_dirtied"] += int(getattr(b, "local_dirtied", 0) or 0)
+        buf_sum["local_written"] += int(getattr(b, "local_written", 0) or 0)
+
+        buf_sum["temp_read"] += int(getattr(b, "temp_read", 0) or 0)
+        buf_sum["temp_written"] += int(getattr(b, "temp_written", 0) or 0)
+
+    total_time_ms = planning_time_ms + execution_time_ms
+    planning_ratio = (planning_time_ms / total_time_ms) if total_time_ms > 0 else 0.0
+    execution_ratio = (execution_time_ms / total_time_ms) if total_time_ms > 0 else 0.0
+
+    read_blocks = buf_sum["shared_read"] + buf_sum["local_read"] + buf_sum["temp_read"]
+    hit_blocks = buf_sum["shared_hit"] + buf_sum["local_hit"]
+    temp_ops = buf_sum["temp_read"] + buf_sum["temp_written"]
+
+    total_buf_ops = (
+        read_blocks
+        + hit_blocks
+        + buf_sum["temp_written"]
+        + buf_sum["shared_written"]
+        + buf_sum["local_written"]
+    )
+    read_ratio = (read_blocks / total_buf_ops) if total_buf_ops > 0 else 0.0
+
+    # Thresholds (tweakable)
+    PLANNING_ABS_MS = 1.0
+    PLANNING_DOM_RATIO = 0.60
+
+    IO_READ_RATIO = 0.20
+    IO_READ_BLOCKS = 256
+    IO_TEMP_OPS = 128
+
+    CPU_LOW_READ_RATIO = 0.05
+    CPU_MIN_EXEC_MS = 2.0
+
+    # Scores
+    score_planner = 0.0
+    if planning_time_ms >= PLANNING_ABS_MS:
+        score_planner = planning_ratio  # 0..1
+
+    score_io = 0.0
+    if read_ratio >= IO_READ_RATIO:
+        score_io += min(1.0, read_ratio / 0.50)
+    if read_blocks >= IO_READ_BLOCKS:
+        score_io += 0.3
+    if temp_ops >= IO_TEMP_OPS:
+        score_io += 0.4
+    score_io = min(1.5, score_io)
+
+    score_cpu = 0.0
+    if execution_time_ms >= CPU_MIN_EXEC_MS and execution_ratio >= 0.60 and read_ratio <= CPU_LOW_READ_RATIO and temp_ops == 0:
+        score_cpu = 0.9
+    elif execution_time_ms >= CPU_MIN_EXEC_MS and execution_ratio >= 0.60 and read_ratio <= CPU_LOW_READ_RATIO:
+        score_cpu = 0.6
+
+    score_exec = execution_ratio
+
+    scores = {
+        "planner_dominated": score_planner,
+        "io_dominated": score_io,
+        "cpu_dominated": score_cpu,
+        "execution_dominated": score_exec,
+    }
+
+    dominant_factor = max(scores, key=scores.get) if scores else "execution_dominated"
+
+    # Guardrails / tie-breaks
+    low_confidence = False
+
+    # 1) Strong planner domination (normal-sized timings)
+    if planning_time_ms >= PLANNING_ABS_MS and planning_ratio >= PLANNING_DOM_RATIO:
+        dominant_factor = "planner_dominated"
+    else:
+        # 2) IO/CPU overrides when execution dominates (normal case)
+        if score_io >= 0.8 and execution_ratio >= 0.5:
+            dominant_factor = "io_dominated"
+        elif score_cpu >= 0.8 and execution_ratio >= 0.5:
+            dominant_factor = "cpu_dominated"
+
+    # 3) Tiny-query override: avoid misleading fallbacks on sub-ms totals
+    TINY_TOTAL_MS = 1.0
+    TINY_RATIO_DOM = 0.55  # slightly softer than PLANNING_DOM_RATIO
+
+    if total_time_ms > 0 and total_time_ms < TINY_TOTAL_MS:
+        low_confidence = True
+        # For tiny timings, decide by ratio (and direction), even if PLANNING_ABS_MS blocks it
+        if planning_time_ms > execution_time_ms and planning_ratio >= TINY_RATIO_DOM:
+            dominant_factor = "planner_dominated"
+        elif execution_time_ms >= planning_time_ms and execution_ratio >= TINY_RATIO_DOM:
+            dominant_factor = "execution_dominated"
+        else:
+            # keep whatever was chosen above, but it's still low confidence
+            pass
+
+    if dominant_factor == "planner_dominated":
+        dominant_explain = (
+            "Planning time dominates execution. If this query runs frequently, consider prepared statements / plan caching."
+        )
+        if low_confidence:
+            dominant_explain = (
+                "Planning exceeds execution, but timings are sub-millisecond (low confidence). "
+                "This often reflects measurement noise and planner overhead on trivial queries."
+            )
+    elif dominant_factor == "io_dominated":
+        dominant_explain = (
+            "Buffer reads (and/or temp activity) are significant, suggesting IO-bound execution. "
+            "Consider indexes, reducing scanned rows, work_mem (if temp spill), and cache effectiveness."
+        )
+    elif dominant_factor == "cpu_dominated":
+        dominant_explain = (
+            "Execution time dominates while buffer reads are low (mostly cache hits), suggesting CPU-bound work "
+            "(joins/aggregates/sorts/functions). Consider reducing row counts earlier, optimizing joins/expressions, "
+            "and checking for expensive functions."
+        )
+    else:
+        dominant_explain = (
+            "Execution time dominates overall. Investigate the most expensive nodes (top_nodes) and table/index breakdown."
+        )
+        if low_confidence:
+            dominant_explain = (
+                "Execution exceeds planning, but timings are sub-millisecond (low confidence). "
+                "This often reflects measurement noise on trivial queries."
+            )
+    # -----------------------------------------------------------------------
 
     # 1) by node type
     by_node_type = defaultdict(_agg_row_init)
@@ -275,7 +421,6 @@ def decode_explain_json_with_buffers(
     # Optional: top nodes list (useful for drilling down)
     top_nodes = None
     if include_top_nodes:
-        # show most expensive nodes by self time
         tmp = sorted(nodes, key=lambda n: n.self_ms, reverse=True)[:top_n]
         top_nodes = []
         for n in tmp:
@@ -298,6 +443,16 @@ def decode_explain_json_with_buffers(
             "planning_time_ms": planning_time_ms,
             "denominator_ms_for_pct": denom_ms,
             "node_count": len(nodes),
+
+            # NEW
+            "total_time_ms": total_time_ms,
+            "planning_ratio": planning_ratio,     # 0..1
+            "execution_ratio": execution_ratio,   # 0..1
+            "dominant_factor": dominant_factor,   # planner_dominated|execution_dominated|io_dominated|cpu_dominated
+            "dominant_scores": scores,            # debug
+            "dominant_explain": dominant_explain,
+            "buffers_total": buf_sum,
+            "buffers_read_ratio": read_ratio,
         },
         "by_node_type": node_type_rows,
         "by_table": table_rows,

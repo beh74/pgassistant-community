@@ -1,5 +1,22 @@
 # Change Log
 
+## [2.5.0] - 2026-18-02
+
+### Features
+
+- On analyze query form, added a **Relational View** between the tables involved in the query.
+- On analyze query form, added a link to explain.dalibo.com (PEV2 tool)
+- On analyze query form, classifies a dominant factor:
+      - planner dominated
+      - execution dominated
+      - io dominated
+      - cpu dominated
+- Added a **Relational View** to the Table Definition Helpers to visualize foreign key dependencies.
+
+### Bug fixes
+
+- get_genius_parameters fails sometimes if the query is using ARRAY expression.
+
 ## [2.4.1] - 2026-08-02
 
 ### Features

@@ -20,6 +20,8 @@ from . import analyze_aquery
 from . import config
 from . import reporting
 from . import action
+from . import graph
+from . import graph_table
 import re
 import requests
 import json
@@ -297,7 +299,11 @@ def analyze_query(querid):
             rows = []
             tables_and_columns = {}
             statistics = {}
+            mermaid_code = None
+            queryplan = None
+            plan_text = None
             sql_query = database.get_pgstat_query_by_id(session,querid)
+            
             # format SQL
             ##sql_query = sqlhelper.get_formated_sql(sql_query)
             tables = sqlhelper.get_tables(sql_query)
@@ -335,7 +341,18 @@ def analyze_query(querid):
                     rows = database.generic_select_with_sql(session,sql_query_analyze)
                     chatgpt = llm.get_llm_query_for_query_analyze(db_config=session,sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
 
+                    # get statistics from EXPLAIN ANALYZE result
+                    queryplan = rows[0]["QUERY PLAN"]
+                    if isinstance(queryplan, str):
+                        # si c'est déjà du JSON texte, garde tel quel
+                        plan_text = queryplan
+                    else:
+                        # si c'est une structure Python (list/dict), sérialise en JSON
+                        plan_text = json.dumps(queryplan, indent=2, ensure_ascii=False)                    
                     statistics = dbanalyze.decode_explain_json_with_buffers(rows[0]["QUERY PLAN"], include_top_nodes=True, top_n=20)
+
+                    # generate mermaid code
+                    mermaid_code, err = graph.build_mermaid_erd_from_explain_stats(statistics, session)
 
                     # Get more informations on query
                     #existing_indexes = database.get_existing_indexes(session)
@@ -356,7 +373,10 @@ def analyze_query(querid):
                     return render_template('home/ddl.html', sql_text=sql_text, tables=tables, query=sql_query)
             else:
                 # try to extract parameters from query
-                genius_parameters=sqlhelper.get_genius_parameters(sql_query,session)
+                try:
+                    genius_parameters=sqlhelper.get_genius_parameters(sql_query,session)
+                except Exception:
+                    genius_parameters = []
 
             def fmt_ms(x):
                 if x is None:
@@ -379,7 +399,7 @@ def analyze_query(querid):
             return render_template('home/analyze.html', parameters=parameters, query=sql_query, rows=rows, 
                                    description='Analyze query',chatgpt=chatgpt, tables=tables, 
                                    genius_parameters=genius_parameters, analyze_explain_row=sqlhelper.analyze_explain_row, 
-                                   result=statistics, fmt_ms=fmt_ms, fmt_pct=fmt_pct, fmt_int=fmt_int)
+                                   result=statistics, fmt_ms=fmt_ms, fmt_pct=fmt_pct, fmt_int=fmt_int, mermaid_code=mermaid_code, queryplan=plan_text)
         else:
             dbinfo= {}
             return redirect("/database.html")
@@ -698,7 +718,9 @@ def llm_table(schema: str, tablename:str):
     ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_table_format(ddl=ddl_str)
     if request.method == 'GET':
-        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze table definition for {schema}.{tablename}")
+        mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
+        print(mermaid_graph)
+        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, mermaid_code=mermaid_graph, title=f"Analyze table definition for {schema}.{tablename}")
     else:
         try:
             chatgpt_response=llm.query_chatgpt(llm_prompt)
@@ -714,7 +736,8 @@ def llm_table_guidelines(schema: str, tablename:str):
     ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_with_sql_quide(ddl=ddl_str, guidelines=config.get_config_value("LLM_SQL_GUIDELINES"))
     if request.method == 'GET':
-        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
+        mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
+        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", mermaid_code=mermaid_graph, llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
     else:
         try:
             chatgpt_response=llm.query_chatgpt(llm_prompt)

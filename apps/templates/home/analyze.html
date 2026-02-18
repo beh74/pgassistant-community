@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% block title %} Settings {% endblock %}
+{% block title %} Analyze query {% endblock %}
 
 <!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
@@ -32,6 +32,49 @@
         cursor: pointer;
         color: #888;
     }
+
+    .badge-soft {
+      border: 1px solid rgba(0,0,0,.1);
+      background: rgba(0,0,0,.02);
+    }
+    .insight-kpi {
+      min-height: 92px;
+    }
+
+    :root{
+      --pg-blue:#336791;
+    }
+    .kpi-card{ min-height: 108px; }
+    .kpi-title{ font-size:.82rem; color:#6c757d; }
+    .kpi-value{ font-size:1.55rem; font-weight:700; letter-spacing:-.02em; }
+    .pg-badge{
+      background: var(--pg-blue);
+      color:#fff;
+      padding:.55rem .8rem;
+      border-radius:.6rem;
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+    }
+    .pg-pill{
+      border:1px solid rgba(0,0,0,.08);
+      background:#fff;
+      border-radius:999px;
+      padding:.25rem .55rem;
+      font-size:.8rem;
+      color:#334155;
+    }
+    .progress.pg-progress{ height: 10px; border-radius: 999px; }
+    .progress.pg-progress .progress-bar{ background: var(--pg-blue); }
+    .muted-small{ font-size:.85rem; color:#6c757d; }
+    .metric-chip{
+      display:inline-flex; align-items:center; gap:.35rem;
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:999px; padding:.25rem .55rem;
+      font-size:.82rem; background:#fff;
+    }
+    .chip-label{ color:#6c757d; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
 </style>
 {% endblock stylesheets %}
@@ -118,13 +161,7 @@
                             </svg>
                             Analyze with LLM
                         </button>
-                        <button id="optimizeopenai" type="submit" class="btn btn-danger" name="submit_analyze" value="optimize" onclick="myButtonAnalyzeOptimizeAI(this)">
-                            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
-                            </svg>
-                            Optimize with LLM
-                        </button>
+
                         {% endif %} 
                         <button id="ddl" type="submit" class="btn btn-primary" name="submit_analyze" value="ddl" onclick="myButtonDDL(this)">
                             <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -139,198 +176,418 @@
                 </form>
             </div>
 
-            {% if rows %}  
 
-  <div class="container py-4">
+{% if rows %}
 
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h1 class="h4 mb-0">Query Plan Insights</h1>
-  </div>
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mt-3" id="analyzeTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active"
+              id="insights-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#insights"
+              type="button"
+              role="tab"
+              aria-controls="insights"
+              aria-selected="true">
+        Query Plan Insights
+      </button>
+    </li>
 
-  <!-- Summary -->
-  <div class="row g-3">
-    <div class="col-6 col-lg-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Execution time</div>
-          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.execution_time_ms) }}</div>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link"
+              id="graph-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#graph"
+              type="button"
+              role="tab"
+              aria-controls="graph"
+              aria-selected="false">
+        Relational View
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="analyzeTabsContent">
+
+    <!-- Tab 1: Insights -->
+    <div class="tab-pane fade show active" id="insights" role="tabpanel" aria-labelledby="insights-tab">
+
+      <div class="container py-4">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h4 mb-0">Query Plan Insights</h1>
         </div>
-      </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Planning time</div>
-          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.planning_time_ms) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Nodes</div>
-          <div class="fs-5 fw-semibold">{{ fmt_int(result.summary.node_count) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Time baseline</div>
-          <div class="fs-5 fw-semibold">{{ fmt_ms(result.summary.denominator_ms_for_pct) }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  {% macro buffers_block(r) %}
-    <div class="row g-3">
-      <div class="col-12">
-        <div class="small text-muted mb-1">Buffers</div>
-        <div class="table-responsive">
-          <table class="table table-sm mb-0">
-            <tbody>
-              <tr>
-                <th class="text-muted" style="width: 180px;">Shared</th>
-                <td>hit: <strong>{{ fmt_int(r.shared_hit) }}</strong></td>
-                <td>read: <strong>{{ fmt_int(r.shared_read) }}</strong></td>
-                <td>dirtied: <strong>{{ fmt_int(r.shared_dirtied) }}</strong></td>
-                <td>written: <strong>{{ fmt_int(r.shared_written) }}</strong></td>
-              </tr>
-              <tr>
-                <th class="text-muted">Local</th>
-                <td>hit: <strong>{{ fmt_int(r.local_hit) }}</strong></td>
-                <td>read: <strong>{{ fmt_int(r.local_read) }}</strong></td>
-                <td>dirtied: <strong>{{ fmt_int(r.local_dirtied) }}</strong></td>
-                <td>written: <strong>{{ fmt_int(r.local_written) }}</strong></td>
-              </tr>
-              <tr>
-                <th class="text-muted">Temp</th>
-                <td>read: <strong>{{ fmt_int(r.temp_read) }}</strong></td>
-                <td>written: <strong>{{ fmt_int(r.temp_written) }}</strong></td>
-                <td colspan="2"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+{% set dom = result.summary.dominant_factor|default('execution_dominated') %}
+{% set dom_labels = {
+  'planner_dominated': 'Planner dominated',
+  'execution_dominated': 'Execution dominated',
+  'io_dominated': 'I/O dominated',
+  'cpu_dominated': 'CPU dominated'
+} %}
+{% set dom_icons = {
+  'planner_dominated': '⚙️',
+  'execution_dominated': '⏱️',
+  'io_dominated': '💾',
+  'cpu_dominated': '🧠'
+} %}
 
-      <div class="col-12">
-        <div class="small text-muted mb-1">Node details</div>
-        <div class="d-flex flex-wrap gap-2">
-          {% if r.table is defined and r.table %}
-            <span class="badge text-bg-light border">
-              <span class="text-muted">table:</span> <code>{{ r.table }}</code>
-            </span>
-          {% endif %}
-          {% if r.index is defined and r.index %}
-            <span class="badge text-bg-light border">
-              <span class="text-muted">index:</span> <code>{{ r.index }}</code>
-            </span>
-          {% endif %}
-          {% if r.count is defined %}
-            <span class="badge text-bg-light border">
-              <span class="text-muted">count:</span> {{ fmt_int(r.count) }}
-            </span>
-          {% endif %}
-          <span class="badge text-bg-light border">
-            <span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}
-          </span>
-          <span class="badge text-bg-light border">
-            <span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}
-          </span>
-          <span class="badge text-bg-light border">
-            <span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}
-          </span>
-        </div>
-      </div>
-    </div>
-  {% endmacro %}
+{% set exec_ratio = result.summary.execution_ratio|default(0) %}
+{% set plan_ratio = result.summary.planning_ratio|default(0) %}
+{% set total_ms = result.summary.total_time_ms
+    |default(result.summary.planning_time_ms + result.summary.execution_time_ms) %}
 
-  {% macro render_compact_table(title, rows, id_prefix, show_table=true, show_index=true) %}
-    <div class="mt-4">
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <h2 class="h6 text-uppercase text-muted mb-0">{{ title }}</h2>
-        <span class="badge text-bg-secondary">{{ rows|length if rows else 0 }}</span>
-      </div>
 
-      {% if rows and rows|length > 0 %}
-        <div class="card shadow-sm">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th style="width: 56px;"></th>
-                  <th>Node</th>
-                  {% if show_table %}<th>Table</th>{% endif %}
-                  {% if show_index %}<th>Index</th>{% endif %}
-                  <th class="text-end">Self time</th>
-                  <th class="text-end">Self time %</th>
-                  <th class="text-end">Rows</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for r in rows %}
-                  {% set collapse_id = id_prefix ~ "-" ~ loop.index %}
-                  <tr>
-                    <td>
-                      <button class="btn btn-sm btn-outline-secondary"
-                              type="button"
-                              data-bs-toggle="collapse"
-                              data-bs-target="#{{ collapse_id }}"
-                              aria-expanded="false"
-                              aria-controls="{{ collapse_id }}">
-                        Details
-                      </button>
-                    </td>
+<!-- Summary -->
+<div class="row g-3">
 
-                    <td>
-                      <span class="text-end">{{ r.node_type|default("—") }}</span>
-                    </td>
+  <!-- Dominant factor (hero) -->
+  <div class="col-12 col-xl-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
 
-                    {% if show_table %}
-                      <td><code>{{ r.table|default("—") }}</code></td>
-                    {% endif %}
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="kpi-title">Dominant factor</div>
 
-                    {% if show_index %}
-                      <td><code>{{ r.index|default("—") }}</code></td>
-                    {% endif %}
+            <div class="mt-2">
+              <span class="pg-badge">
+                <span aria-hidden="true">{{ dom_icons.get(dom,'⏱️') }}</span>
+                <span class="fs-5 fw-semibold">{{ dom_labels.get(dom,'Execution dominated') }}</span>
+              </span>
 
-                    <td class="text-end">{{ fmt_ms(r.self_time_ms) }}</td>
-                    <td class="text-end">{{ fmt_pct(r.self_time_pct) }}</td>
-                    <td class="text-end">{{ fmt_int(r.self_rows) }}</td>
-                  </tr>
+              {% if result.summary.low_confidence %}
+                <span class="ms-2 pg-pill" title="Timings are sub-millisecond, classification may be noisy.">
+                  low confidence
+                </span>
+              {% endif %}
+            </div>
 
-                  <tr class="collapse" id="{{ collapse_id }}">
-                    <td colspan="{{ 5 + (1 if show_table else 0) + (1 if show_index else 0) }}">
-                      <div class="p-3 border-top bg-body-tertiary">
-                        {{ buffers_block(r) }}
-                      </div>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          </div>
+
+          <div class="text-end">
+            <div class="kpi-title">Total</div>
+            <div class="kpi-value">{{ fmt_ms(total_ms) }}</div>
           </div>
         </div>
-      {% else %}
-        <div class="alert alert-secondary mb-0" role="alert">
-          No data.
-        </div>
-      {% endif %}
-    </div>
-  {% endmacro %}
 
-  {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
-  {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
-  {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
-  {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+        <div class="mt-3">
+          {% if result.summary.dominant_explain %}
+            <div class="alert alert-info mb-0 py-2">
+              <span class="fw-semibold">Insight:</span>
+              {{ result.summary.dominant_explain }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-3 d-flex flex-wrap gap-2">
+          <span class="metric-chip"><span class="chip-label">Nodes</span> <span class="fw-semibold">{{ fmt_int(result.summary.node_count) }}</span></span>
+          <span class="metric-chip"><span class="chip-label">Baseline</span> <span class="fw-semibold">{{ fmt_ms(result.summary.denominator_ms_for_pct) }}</span></span>
+          {% if result.summary.buffers_read_ratio is defined %}
+            <span class="metric-chip"><span class="chip-label">Read ratio</span> <span class="fw-semibold">{{ fmt_pct(100 * result.summary.buffers_read_ratio) }}</span></span>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Execution -->
+  <div class="col-12 col-md-6 col-xl-2">
+    <div class="card shadow-sm kpi-card">
+      <div class="card-body">
+        <div class="kpi-title">Execution time</div>
+        <div class="kpi-value">{{ fmt_ms(result.summary.execution_time_ms) }}</div>
+
+        <div class="mt-2 muted-small">{{ fmt_pct(100 * exec_ratio) }} of total</div>
+        <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100*exec_ratio }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar" style="width: {{ 100*exec_ratio }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planning -->
+  <div class="col-12 col-md-6 col-xl-2">
+    <div class="card shadow-sm kpi-card">
+      <div class="card-body">
+        <div class="kpi-title">Planning time</div>
+        <div class="kpi-value">{{ fmt_ms(result.summary.planning_time_ms) }}</div>
+
+        <div class="mt-2 muted-small">{{ fmt_pct(100 * plan_ratio) }} of total</div>
+        <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100*plan_ratio }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar" style="width: {{ 100*plan_ratio }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nodes -->
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card shadow-sm kpi-card">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="kpi-title">Nodes</div>
+            <div class="kpi-value">{{ fmt_int(result.summary.node_count) }}</div>
+            <div class="muted-small">plan nodes</div>
+          </div>
+          <div class="text-end">
+            <div class="kpi-title">Exec/Plan</div>
+            {% if result.summary.planning_time_ms > 0 %}
+              <div class="fw-semibold">
+                {{ fmt_pct(100 * (result.summary.execution_time_ms / result.summary.planning_time_ms)) }}
+              </div>
+            {% else %}
+              <div class="fw-semibold">—</div>
+            {% endif %}
+            <div class="muted-small">ratio</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
+{# Buffers overview (new) #}
+{% if result.summary.buffers_total is defined %}
+  {% set bt = result.summary.buffers_total %}
+  {% set rr = result.summary.buffers_read_ratio|default(0) %}
+  {% set rr_pct = (100 * rr) %}
+
+  <div class="row g-3 mt-2">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="kpi-title">Buffers overview</div>
+              <div class="fs-5 fw-semibold">Read ratio: {{ fmt_pct(rr_pct) }}</div>
+            </div>
+          </div>
+
+          <div class="progress pg-progress" role="progressbar" aria-valuenow="{{ rr_pct }}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width: {{ rr_pct }}%"></div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <span class="metric-chip"><span class="chip-label">shared_hit</span> <span class="fw-semibold">{{ fmt_int(bt.shared_hit) }}</span></span>
+            <span class="metric-chip"><span class="chip-label">shared_read</span> <span class="fw-semibold">{{ fmt_int(bt.shared_read) }}</span></span>
+            <span class="metric-chip"><span class="chip-label">temp_read</span> <span class="fw-semibold">{{ fmt_int(bt.temp_read) }}</span></span>
+            <span class="metric-chip"><span class="chip-label">temp_written</span> <span class="fw-semibold">{{ fmt_int(bt.temp_written) }}</span></span>
+            <span class="metric-chip"><span class="chip-label">shared_written</span> <span class="fw-semibold">{{ fmt_int(bt.shared_written) }}</span></span>
+          </div>
+
+          {% if result.summary.dominant_scores is defined %}
+            <details class="mt-3">
+              <summary class="muted-small">Show classification details</summary>
+              <pre class="mono small mb-0">{{ result.summary.dominant_scores | tojson(indent=2) }}</pre>
+            </details>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+        {% macro buffers_block(r) %}
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="small text-muted mb-1">Buffers</div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <tbody>
+                    <tr>
+                      <th class="text-muted" style="width: 180px;">Shared</th>
+                      <td>hit: <strong>{{ fmt_int(r.shared_hit) }}</strong></td>
+                      <td>read: <strong>{{ fmt_int(r.shared_read) }}</strong></td>
+                      <td>dirtied: <strong>{{ fmt_int(r.shared_dirtied) }}</strong></td>
+                      <td>written: <strong>{{ fmt_int(r.shared_written) }}</strong></td>
+                    </tr>
+                    <tr>
+                      <th class="text-muted">Local</th>
+                      <td>hit: <strong>{{ fmt_int(r.local_hit) }}</strong></td>
+                      <td>read: <strong>{{ fmt_int(r.local_read) }}</strong></td>
+                      <td>dirtied: <strong>{{ fmt_int(r.local_dirtied) }}</strong></td>
+                      <td>written: <strong>{{ fmt_int(r.local_written) }}</strong></td>
+                    </tr>
+                    <tr>
+                      <th class="text-muted">Temp</th>
+                      <td>read: <strong>{{ fmt_int(r.temp_read) }}</strong></td>
+                      <td>written: <strong>{{ fmt_int(r.temp_written) }}</strong></td>
+                      <td colspan="2"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="small text-muted mb-1">Node details</div>
+              <div class="d-flex flex-wrap gap-2">
+                {% if r.table is defined and r.table %}
+                  <span class="badge text-bg-light border">
+                    <span class="text-muted">table:</span> <code>{{ r.table }}</code>
+                  </span>
+                {% endif %}
+                {% if r.index is defined and r.index %}
+                  <span class="badge text-bg-light border">
+                    <span class="text-muted">index:</span> <code>{{ r.index }}</code>
+                  </span>
+                {% endif %}
+                {% if r.count is defined %}
+                  <span class="badge text-bg-light border">
+                    <span class="text-muted">count:</span> {{ fmt_int(r.count) }}
+                  </span>
+                {% endif %}
+                <span class="badge text-bg-light border">
+                  <span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}
+                </span>
+                <span class="badge text-bg-light border">
+                  <span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}
+                </span>
+                <span class="badge text-bg-light border">
+                  <span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        {% endmacro %}
+
+        {% macro render_compact_table(title, rows, id_prefix, show_table=true, show_index=true) %}
+          <div class="mt-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h2 class="h6 text-uppercase text-muted mb-0">{{ title }}</h2>
+              <span class="badge text-bg-secondary">{{ rows|length if rows else 0 }}</span>
+            </div>
+
+            {% if rows and rows|length > 0 %}
+              <div class="card shadow-sm">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 56px;"></th>
+                        <th>Node</th>
+                        {% if show_table %}<th>Table</th>{% endif %}
+                        {% if show_index %}<th>Index</th>{% endif %}
+                        <th class="text-end">Self time</th>
+                        <th class="text-end">Self time %</th>
+                        <th class="text-end">Rows</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for r in rows %}
+                        {% set collapse_id = id_prefix ~ "-" ~ loop.index %}
+                        <tr>
+                          <td>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#{{ collapse_id }}"
+                                    aria-expanded="false"
+                                    aria-controls="{{ collapse_id }}">
+                              Details
+                            </button>
+                          </td>
+
+                          <td><span class="text-end">{{ r.node_type|default("—") }}</span></td>
+
+                          {% if show_table %}
+                            <td><code>{{ r.table|default("—") }}</code></td>
+                          {% endif %}
+
+                          {% if show_index %}
+                            <td><code>{{ r.index|default("—") }}</code></td>
+                          {% endif %}
+
+                          <td class="text-end">{{ fmt_ms(r.self_time_ms) }}</td>
+                          <td class="text-end">{{ fmt_pct(r.self_time_pct) }}</td>
+                          <td class="text-end">{{ fmt_int(r.self_rows) }}</td>
+                        </tr>
+
+                        <tr class="collapse" id="{{ collapse_id }}">
+                          <td colspan="{{ 5 + (1 if show_table else 0) + (1 if show_index else 0) }}">
+                            <div class="p-3 border-top bg-body-tertiary">
+                              {{ buffers_block(r) }}
+                            </div>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {% else %}
+              <div class="alert alert-secondary mb-0" role="alert">
+                No data.
+              </div>
+            {% endif %}
+          </div>
+        {% endmacro %}
+
+        {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
+        {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
+        {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
+        {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+
+      </div>
+
+      {# --- modal LLM  --- #}
+      <div>
+        <!-- Button Modal -->
+        <button type="button" class="btn btn-block btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalSubscribe">
+          Give me an LLM prompt
+          <svg class="icon icon-xs me-2" fill="none" stroke="currentColor"
+               viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"></path>
+          </svg>
+        </button>
+      </div>
+      
+    </div>
+
+    <!-- Tab 2: Graph -->
+    <div class="tab-pane fade" id="graph" role="tabpanel" aria-labelledby="graph-tab">
+      <div class="container py-4">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h4 mb-0">Relational View</h1>
+          {% if tables is defined and tables %}
+            <span class="badge text-bg-secondary">{{ tables|length }} tables</span>
+          {% endif %}
+        </div>
+
+        <div class="card shadow-sm">
+          <div class="card-body">
+            {% if mermaid_code %}
+              <div class="mermaid-wrap" style="overflow:auto; max-height:70vh;">
+                <pre class="mermaid" id="mermaidGraph">{{ mermaid_code }}</pre>
+              </div>
+              <div class="small text-muted mt-2">
+                Tip: the table color intensity reflects self-time percentage (hotter = higher self-time).
+              </div>
+            {% else %}
+              <div class="alert alert-secondary mb-0">No graph available.</div>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div> <!-- /tab-content -->
+
+
+
                   
                   <div>
-                    <!-- Button Modal -->
+                    <!-- Button Modal 
                     <button type="button" class="btn btn-block btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalSubscribe">Give me an LLM prompt
                         <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" 
                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -338,6 +595,20 @@
                             d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
                         </svg>                    
                     </button>
+                      -->
+
+
+
+                    <!-- Open in Dalibo (POST /new) -->
+                    <form id="daliboForm" method="POST" action="https://explain.dalibo.com/new" target="_blank">
+                      <input type="hidden" name="title" value="pgAssistant plan">
+                      <textarea name="plan" style="display:none;">{{ queryplan |safe }}</textarea>
+                      <textarea name="query" style="display:none;">{{ query |safe }}</textarea>
+                      <button type="submit" class="btn btn-secondary" form="daliboForm">
+                       Open in explain.dalibo.com
+                      </button>
+                    </form>
+
 
                     <!-- Modal Content -->
                     <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
@@ -374,6 +645,8 @@
     </div>
 
     <script>
+
+      
     document.addEventListener('DOMContentLoaded', function () {
         console.log("JavaScript loaded and ready to handle events.");
 
@@ -579,4 +852,36 @@
 {% endblock content %}
 
 <!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose'
+  });
+
+  async function renderMermaid() {
+    await mermaid.run({
+      querySelector: '#graph pre.mermaid'
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+
+    const graphTab = document.getElementById('graph-tab');
+
+    if (graphTab) {
+      graphTab.addEventListener('shown.bs.tab', async () => {
+        await renderMermaid();
+      });
+    }
+
+    // si visible par défaut
+    if (document.querySelector('#graph.show')) {
+      renderMermaid();
+    }
+
+  });
+</script>
+{% endblock javascripts %}
