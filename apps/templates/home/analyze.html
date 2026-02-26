@@ -147,29 +147,9 @@
                             </svg>
                             Analyze
                         </button>
-                        <button type="button" class="btn btn-info" onclick="window.open('https://www.postgresql.org/docs/current/sql-explain.html','_blank')">
-                            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                            </svg>
-                            Help
-                        </button>
-                        <button id="analyzeopenai" type="submit" class="btn btn-tertiary" name="submit_analyze" value="chatgpt" onclick="myButtonAnalyzeOpenAI(this)">
-                            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
-                            </svg>
-                            Analyze with LLM
-                        </button>
 
                         {% endif %} 
-                        <button id="ddl" type="submit" class="btn btn-primary" name="submit_analyze" value="ddl" onclick="myButtonDDL(this)">
-                            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                            </svg>
-                           DDL
-                        </button>
+
                     </div>
 
                     <div class="mt-3"></div> 
@@ -206,6 +186,18 @@
         Relational View
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link"
+              id="stats-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#stats"
+              type="button"
+              role="tab"
+              aria-controls="stats"
+              aria-selected="false">
+        Statistics
+      </button>
+    </li>    
   </ul>
 
   <div class="tab-content" id="analyzeTabsContent">
@@ -280,15 +272,6 @@
             </div>
           {% endif %}
         </div>
-
-        <div class="mt-3 d-flex flex-wrap gap-2">
-          <span class="metric-chip"><span class="chip-label">Nodes</span> <span class="fw-semibold">{{ fmt_int(result.summary.node_count) }}</span></span>
-          <span class="metric-chip"><span class="chip-label">Baseline</span> <span class="fw-semibold">{{ fmt_ms(result.summary.denominator_ms_for_pct) }}</span></span>
-          {% if result.summary.buffers_read_ratio is defined %}
-            <span class="metric-chip"><span class="chip-label">Read ratio</span> <span class="fw-semibold">{{ fmt_pct(100 * result.summary.buffers_read_ratio) }}</span></span>
-          {% endif %}
-        </div>
-
       </div>
     </div>
   </div>
@@ -324,25 +307,13 @@
   </div>
 
   <!-- Nodes -->
-  <div class="col-12 col-md-6 col-xl-3">
+  <div class="col-12 col-md-6 col-xl-2">
     <div class="card shadow-sm kpi-card">
       <div class="card-body">
         <div class="d-flex align-items-start justify-content-between">
           <div>
             <div class="kpi-title">Nodes</div>
             <div class="kpi-value">{{ fmt_int(result.summary.node_count) }}</div>
-            <div class="muted-small">plan nodes</div>
-          </div>
-          <div class="text-end">
-            <div class="kpi-title">Exec/Plan</div>
-            {% if result.summary.planning_time_ms > 0 %}
-              <div class="fw-semibold">
-                {{ fmt_pct(100 * (result.summary.execution_time_ms / result.summary.planning_time_ms)) }}
-              </div>
-            {% else %}
-              <div class="fw-semibold">—</div>
-            {% endif %}
-            <div class="muted-small">ratio</div>
           </div>
         </div>
       </div>
@@ -357,41 +328,68 @@
   {% set rr = result.summary.buffers_read_ratio|default(0) %}
   {% set rr_pct = (100 * rr) %}
 
-  <div class="row g-3 mt-2">
-    <div class="col-12">
-      <div class="card shadow-sm">
-        <div class="card-body">
+<div class="row g-3 mt-2">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
 
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              <div class="kpi-title">Buffers overview</div>
-              <div class="fs-5 fw-semibold">Read ratio: {{ fmt_pct(rr_pct) }}</div>
-            </div>
+        <div class="kpi-title mb-3">Buffers overview</div>
+
+        {# Values #}
+        {% set sh = bt.shared_hit|default(0) %}
+        {% set sr = bt.shared_read|default(0) %}
+        {% set denom = (sh + sr) %}
+        {% set hit_ratio = (100 * sh / denom) if denom > 0 else 0 %}
+
+        {# --- READ RATIO --- #}
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="fs-5 fw-semibold">Read ratio</div>
+            <div class="fs-5 fw-semibold">{{ fmt_pct(rr_pct) }}</div>
           </div>
 
-          <div class="progress pg-progress" role="progressbar" aria-valuenow="{{ rr_pct }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress pg-progress mt-2" role="progressbar"
+               aria-valuenow="{{ rr_pct }}" aria-valuemin="0" aria-valuemax="100">
             <div class="progress-bar" style="width: {{ rr_pct }}%"></div>
           </div>
+        </div>
 
-          <div class="d-flex flex-wrap gap-2 mt-3">
-            <span class="metric-chip"><span class="chip-label">shared_hit</span> <span class="fw-semibold">{{ fmt_int(bt.shared_hit) }}</span></span>
-            <span class="metric-chip"><span class="chip-label">shared_read</span> <span class="fw-semibold">{{ fmt_int(bt.shared_read) }}</span></span>
-            <span class="metric-chip"><span class="chip-label">temp_read</span> <span class="fw-semibold">{{ fmt_int(bt.temp_read) }}</span></span>
-            <span class="metric-chip"><span class="chip-label">temp_written</span> <span class="fw-semibold">{{ fmt_int(bt.temp_written) }}</span></span>
-            <span class="metric-chip"><span class="chip-label">shared_written</span> <span class="fw-semibold">{{ fmt_int(bt.shared_written) }}</span></span>
+        {# --- SHARED CACHE HIT RATIO --- #}
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="fs-5 fw-semibold">Shared cache hit ratio</div>
+            <div class="fs-5 fw-semibold">{{ fmt_pct(hit_ratio) }}</div>
           </div>
 
-          {% if result.summary.dominant_scores is defined %}
-            <details class="mt-3">
-              <summary class="muted-small">Show classification details</summary>
-              <pre class="mono small mb-0">{{ result.summary.dominant_scores | tojson(indent=2) }}</pre>
-            </details>
-          {% endif %}
+          <div class="progress pg-progress mt-2" role="progressbar"
+               aria-valuenow="{{ hit_ratio }}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width: {{ hit_ratio }}%"></div>
+          </div>
 
+          <div class="muted-small mt-1">
+            shared_hit / (shared_hit + shared_read)
+          </div>
         </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <span class="metric-chip"><span class="chip-label">shared_hit</span> <span class="fw-semibold">{{ fmt_int(bt.shared_hit) }}</span></span>
+          <span class="metric-chip"><span class="chip-label">shared_read</span> <span class="fw-semibold">{{ fmt_int(bt.shared_read) }}</span></span>
+          <span class="metric-chip"><span class="chip-label">temp_read</span> <span class="fw-semibold">{{ fmt_int(bt.temp_read) }}</span></span>
+          <span class="metric-chip"><span class="chip-label">temp_written</span> <span class="fw-semibold">{{ fmt_int(bt.temp_written) }}</span></span>
+          <span class="metric-chip"><span class="chip-label">shared_written</span> <span class="fw-semibold">{{ fmt_int(bt.shared_written) }}</span></span>
+        </div>
+
+        {% if result.summary.dominant_scores is defined %}
+          <details class="mt-3">
+            <summary class="muted-small">Show classification details</summary>
+            <pre class="mono small mb-0">{{ result.summary.dominant_scores | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+
       </div>
     </div>
   </div>
+</div>
 {% endif %}
 
         {% macro buffers_block(r) %}
@@ -530,24 +528,44 @@
           </div>
         {% endmacro %}
 
-        {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
-        {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
-        {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
-        {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
 
       </div>
 
       {# --- modal LLM  --- #}
-      <div>
-        <!-- Button Modal -->
-        <button type="button" class="btn btn-block btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalSubscribe">
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+
+        <!-- LLM Prompt -->
+        <button type="button"
+                class="btn btn-primary d-inline-flex align-items-center"
+                data-bs-toggle="modal"
+                data-bs-target="#modalSubscribe">
+
           Give me an LLM prompt
-          <svg class="icon icon-xs me-2" fill="none" stroke="currentColor"
-               viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"></path>
-          </svg>
         </button>
+
+        <!-- Help -->
+        <button type="button"
+                class="btn btn-info d-inline-flex align-items-center"
+                onclick="window.open('https://www.postgresql.org/docs/current/sql-explain.html','_blank')">
+          Help
+        </button>
+
+        <!-- Analyze with LLM -->
+        <button id="analyzeopenai"
+                type="submit"
+                class="btn btn-tertiary d-inline-flex align-items-center"
+                onclick="myButtonAnalyzeOpenAI(this)">
+          Analyze with LLM
+        </button>
+
+        <!-- DDL -->
+        <button id="ddl"
+                type="submit"
+                class="btn btn-primary d-inline-flex align-items-center"
+                onclick="myButtonDDL(this)">
+          DDL
+        </button>
+
       </div>
       
     </div>
@@ -581,23 +599,26 @@
       </div>
     </div>
 
+    <!-- Tab 3: Statistics -->
+    <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+      <div class="container py-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h4 mb-0">Statistics</h1>
+          <span class="badge text-bg-secondary">{{ fmt_int(result.summary.node_count) }} nodes</span>
+        </div>
+
+        {# Reuse the same macros already defined above (buffers_block / render_compact_table) #}
+
+        {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
+        {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
+        {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
+        {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+
+      </div>
+    </div>
   </div> <!-- /tab-content -->
 
-
-
-                  
                   <div>
-                    <!-- Button Modal 
-                    <button type="button" class="btn btn-block btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalSubscribe">Give me an LLM prompt
-                        <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" 
-                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                            d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
-                        </svg>                    
-                    </button>
-                      -->
-
-
 
                     <!-- Open in Dalibo (POST /new) -->
                     <form id="daliboForm" method="POST" action="https://explain.dalibo.com/new" target="_blank">

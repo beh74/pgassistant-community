@@ -461,3 +461,44 @@ def decode_explain_json_with_buffers(
     }
 
 
+def tables_from_decode_stats(stats: dict) -> list[str]:
+    """
+    Deterministic extraction from decode_explain_json_with_buffers() output:
+    stats["by_table"] = [{"table": "schema.table", ...}, ...]
+    Returns a de-duplicated list preserving first-seen order.
+    """
+    if not isinstance(stats, dict):
+        return []
+    by_table = stats.get("by_table")
+    if not isinstance(by_table, list):
+        return []
+
+    out = []
+    seen = set()
+    for row in by_table:
+        if not isinstance(row, dict):
+            continue
+        t = row.get("table")
+        if isinstance(t, str):
+            t = t.strip()
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+    return out
+
+def union_tables(list1, list2):
+    """
+    Return stable union of two table lists (preserve first-seen order).
+    """
+    out = []
+    seen = set()
+
+    for t in (list1 or []) + (list2 or []):
+        if not t:
+            continue
+        t = t.strip()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+
+    return out

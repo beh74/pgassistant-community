@@ -92,41 +92,60 @@ MODEL_CTX_LIMITS = {
     "yi": 16384,
     "command-r": 128000,  # Command R often long-context (advertised), but very deployment-dependent
 
-    # Your custom / OSS
+    # GPT OSS
     "gpt-oss-20b": 32768,
 
     "unknown": 8192,
 }
 
-def choose_ctx_and_output_budget(model_llm: str | None, prompt_tokens: int) -> tuple[int, int]:
+def choose_ctx_and_output_budget(model_llm: str | None, prompt_tokens: int) -> tuple[int, int, str]:
     """
-    Return (ctx_limit, out_tokens_budget).
-    - ctx_limit: chosen by family table
-    - out_tokens_budget: derived from remaining headroom, clamped
+    Return (ctx_limit, out_tokens_budget, mode)
+    mode:
+      - "ok": normal
+      - "tight": low remaining margin, reduced output
+      - "overflow": prompt too large -> minimal output (truncate/summarize upstream)
     """
     family = detect_model_family(model_llm)
     ctx_limit = MODEL_CTX_LIMITS.get(family, MODEL_CTX_LIMITS["unknown"])
 
-    # Safety margin: keep room for formatting/system overhead and avoid edge truncation
+    # More realistic margins
     margin = 512 if ctx_limit <= 8192 else 1024
 
-    remaining = max(0, ctx_limit - prompt_tokens - margin)
+    # If the prompt is already too large (or nearly), switch to degraded mode
+    if prompt_tokens >= ctx_limit - margin:
+        # Minimal output; ideally truncate the prompt upstream
+        return ctx_limit, 64, "overflow"
 
-    # Practical output caps
-    hard_cap = 2500 if ctx_limit <= 8192 else 4000
+    remaining = ctx_limit - prompt_tokens - margin  # > 0 here
 
-    # Use up to ~60% of remaining, but keep minimum viable answer size
-    out_budget = min(hard_cap, int(remaining * 0.6))
-    out_budget = max(600, out_budget)
+    # Safer caps to avoid timeouts (especially 20B models)
+    # Adjust according to your infrastructure
+    if family in ("gpt-oss-20b", "mixtral", "mistral3"):
+        hard_cap = 1200
+    elif ctx_limit <= 8192:
+        hard_cap = 800
+    else:
+        hard_cap = 1500
 
-    return ctx_limit, out_budget
+    # Proportional output, without an unrealistic floor
+    out_budget = min(hard_cap, int(remaining * 0.35))
+
+    # Apply floor only if there is actually enough space
+    if out_budget < 128:
+        return ctx_limit, max(64, out_budget), "tight"
+
+    return ctx_limit, out_budget, "ok"
 
 def clamp_num_ctx(ctx_limit: int, prompt_tokens: int, out_budget: int) -> int:
     """
-    Choose num_ctx to cover (prompt + output + margin), but never exceed ctx_limit.
+    num_ctx covers prompt + output + margin, but does not enforce an excessively large minimum
+    if ctx_limit is small.
     """
     margin = 256 if ctx_limit <= 8192 else 512
     needed = prompt_tokens + out_budget + margin
 
-    # Clamp to ctx_limit; also enforce a minimum (avoid weird tiny contexts)
-    return max(2048, min(ctx_limit, needed))
+    # Reasonable minimum = min(2048, ctx_limit)
+    # (otherwise you would request 2048 on a 1024/1536 model, etc.)
+    min_ctx = min(2048, ctx_limit)
+    return max(min_ctx, min(ctx_limit, needed))

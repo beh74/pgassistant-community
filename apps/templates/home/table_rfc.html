@@ -13,7 +13,7 @@
     <div class="mb-3 mb-lg-0">
         <h1 class="h4">{{ description['description'] }}</h1>
     </div>
-
+ 
     <div class="d-flex justify-content-end">
         
     {%if description['reference'] %}
@@ -88,7 +88,7 @@
                             <button
                                 onclick="location.href='/table_llm_guidelines/{{ row['table_schema'] }}/{{ row['table_name'] }}'"
                                 type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center me-2">
-                                Check Reference</button>
+                                Check conventions</button>
 
                             <button
                                 onclick="location.href='/table_tetris/{{ row['table_schema'] }}/{{ row['table_name'] }}'"

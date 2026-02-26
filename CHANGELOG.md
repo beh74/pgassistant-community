@@ -1,5 +1,36 @@
 # Change Log
 
+## [2.5.1] - 2026-26-02
+
+### Features
+
+### Improved Analyze Query – Extended DDL Scope
+
+The **analyze query** logic has been deeply reworked to improve schema context resolution.
+
+The DDL provided to the LLM now includes:
+
+- All tables detected through SQL syntactic analysis  
+- **Plus** all tables effectively used during query execution by the `ANALYZE` query  
+
+In particular, when a query references views, the system now also includes:
+
+- The view definitions  
+- The underlying tables used by those views  
+
+This extended DDL scope ensures the LLM receives a complete structural representation of the effective data model involved in the query, significantly improving analysis accuracy for queries involving views and indirect dependencies.
+
+### Analyze Query UI Improvements
+
+The **Analyze Query** form has been redesigned to improve readability and navigation.  
+It now includes three dedicated tabs:
+
+- **Query Plan Insights**
+- **Relational View**
+- **Statistics**
+
+This tab-based layout provides clearer separation of concerns and enhances the overall analysis workflow.
+
 ## [2.5.0] - 2026-18-02
 
 ### Features
