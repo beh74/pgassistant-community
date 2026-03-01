@@ -71,7 +71,6 @@ def replace_query_parameters(query, params):
 def parse_most_common_vals(value):
     """Parse PostgreSQL's most_common_vals field into a Python list."""
     
-    print(value)
     if not value or value == "{}":
         return []  # returns an empty list if NULL or empty
 
@@ -164,7 +163,6 @@ def fetch_column_data(table, column, data_type, session):
                 cursor.execute(query)
                 rows = cursor.fetchall()
                 
-
                 # Map PostgreSQL types to Python types
                 def convert_value(value):
                     if value is None:
@@ -178,8 +176,15 @@ def fetch_column_data(table, column, data_type, session):
                     else:
                         return str(value)  # Default: Treat as string
 
-                # Process the results
-                result = [convert_value(row[0]) for row in rows]
+                result = []
+                seen = set()
+
+                for row in rows:
+                    v = convert_value(row[0])
+                    if v not in seen:
+                        seen.add(v)
+                        result.append(v)
+
                 return result
 
     except Exception as e:

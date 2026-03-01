@@ -166,8 +166,8 @@ def handle_primarykey_get(template: str, segment: str):
 
 def handle_table_rfc_get(template: str, segment: str):
     if session.get("db_name"):
-            query_rows,description=database.generic_select(session,"table_list")
-            return render_template("home/table_rfc.html", rows=query_rows, segment=segment, description=description )
+            query_rows,description=database.generic_select(session,"table_size")
+            return render_template("home/tables_cards.html", tables=query_rows, segment="tables_cards.html" )
     else:
         return redirect("/database.html")
 
@@ -200,6 +200,9 @@ def handle_reset_pg_stat():
 def handle_myqueries_get():
     queries=database.get_my_queries()
     return render_template(f"home/search.html", segment='search.html', rows=queries, searchkey='My queries')
+
+def handle_tools_get():
+    return render_template(f"home/tools.html", segment='tools.html')
 
 def handle_reset_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_reset")
@@ -739,7 +742,7 @@ def route_template(template: str):
             return handle_myqueries_get()
         elif segment == "primary_key.html" and request.method == 'GET':
             return handle_primarykey_get(template, segment)
-        elif segment == "table_rfc.html"  and request.method == 'GET':
+        elif segment == "tables_cards.html"  and request.method == 'GET':
             return handle_table_rfc_get(template, segment)
         elif segment == "cache_table.html" and request.method == 'GET':
             return handle_cache_table_get(template, segment)
@@ -767,6 +770,11 @@ def route_template(template: str):
     except Exception as e:
         traceback.print_exc()
         return render_template('home/page-500.html', err=str(e)), 500
+
+@blueprint.route("/tools")
+def tools():
+    selected_category = request.args.get("cat")  # e.g. /tools?cat=database
+    return render_template("home/tools.html", selected_category=selected_category)
 
 @blueprint.route('/primary_key_llm/<schema>/<tablename>', methods=['GET','POST'])
 def llm_primary_key(schema: str, tablename:str):

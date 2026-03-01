@@ -1,5 +1,18 @@
 # Change Log
 
+## [2.5.2] - 2026-28-02
+
+### Features
+
+- Added a [full menu](media/tools.png?raw=1) (click on the pgAssistant menu to open it)
+- Optimized some queries
+- Menu refactoring : no more submenus / using the main menu with filter
+- Review the Table definition helper with card, table size and table rows (estimated)
+
+### Bug fixes
+
+- On analyze form, lookup on column values are not unique ;
+
 ## [2.5.1] - 2026-26-02
 
 ### Features

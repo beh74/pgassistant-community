@@ -75,7 +75,7 @@
             "id": "table_size",
             "description": "All tables size",                        
             "category": "Table",        
-            "sql": "SELECT schemaname, relname AS table_name, n_live_tup AS row_count,  pg_size_pretty(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname))) AS size,  pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes FROM pg_stat_user_tables ORDER BY size_bytes DESC",
+            "sql": "WITH t AS (SELECT schemaname, relname, n_live_tup, n_dead_tup, (n_live_tup + n_dead_tup) AS total_tup, pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes FROM pg_stat_user_tables) SELECT schemaname, relname AS table_name, n_live_tup AS row_count, n_dead_tup AS dead_tuples, pg_size_pretty(size_bytes) AS size, size_bytes, ROUND(100.0 * n_dead_tup / NULLIF(total_tup, 0), 2) AS dead_pct, (size_bytes * n_dead_tup / NULLIF(total_tup, 0))::bigint AS estimated_dead_bytes, CASE WHEN total_tup = 0 THEN 'NO_STATS' WHEN size_bytes < 128*1024*1024 THEN 'SMALL_TABLE' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 30 THEN 'HIGH' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 10 THEN 'MEDIUM' ELSE 'LOW' END AS bloat_indicator FROM t ORDER BY size_bytes DESC;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
         },
@@ -99,7 +99,7 @@
             "id": "table_io",
             "category": "Table",
             "description": "All tables IO",
-            "sql": "SELECT * from pg_statio_user_tables order by heap_blks_read desc;",
+            "sql": "SELECT schemaname, relname, heap_blks_read, heap_blks_hit, ROUND(100.0 * heap_blks_hit / NULLIF(heap_blks_hit + heap_blks_read, 0), 2) AS heap_hit_pct, idx_blks_read, idx_blks_hit, ROUND(100.0 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) AS idx_hit_pct, toast_blks_read, toast_blks_hit, ROUND(100.0 * toast_blks_hit / NULLIF(toast_blks_hit + toast_blks_read, 0), 2) AS toast_hit_pct, tidx_blks_read, tidx_blks_hit, ROUND(100.0 * tidx_blks_hit / NULLIF(tidx_blks_hit + tidx_blks_read, 0), 2) AS tidx_hit_pct FROM pg_statio_user_tables ORDER BY heap_blks_read DESC;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-TABLES-VIEW"
         },        
@@ -202,7 +202,7 @@
             "id": "index_io",
             "category": "Indexe",
             "description": "Indexes IO",
-            "sql": "SELECT schemaname, relname,indexrelname,idx_blks_read,idx_blks_hit FROM pg_statio_user_indexes order by idx_blks_read desc;",
+            "sql": "WITH s AS (SELECT schemaname, relname, indexrelname, idx_blks_read, idx_blks_hit, (idx_blks_hit + idx_blks_read) AS total_access, ROUND(100.0 * idx_blks_hit / NULLIF(idx_blks_hit + idx_blks_read, 0), 2) AS cache_hit_pct FROM pg_statio_user_indexes) SELECT schemaname, relname, indexrelname, idx_blks_read, idx_blks_hit, total_access, cache_hit_pct, CASE WHEN total_access = 0 THEN 'NO_ACTIVITY' WHEN idx_blks_read = 0 AND total_access >= 1000 THEN 'OK' WHEN total_access < 1000 THEN 'MONITOR' WHEN cache_hit_pct >= 99 THEN 'OK' WHEN cache_hit_pct >= 95 THEN 'MONITOR' WHEN cache_hit_pct >= 90 AND idx_blks_read < 100000 THEN 'INVESTIGATE' WHEN idx_blks_read >= 100000 AND cache_hit_pct < 95 THEN 'TUNE_MEMORY' ELSE 'INVESTIGATE' END AS severity, CASE WHEN total_access = 0 THEN 'No activity' WHEN idx_blks_read = 0 AND total_access >= 1000 THEN 'Fully cached' WHEN total_access < 1000 THEN 'Low volume' WHEN cache_hit_pct >= 99 THEN 'Very good cache hit' WHEN cache_hit_pct >= 95 THEN 'Good cache hit' WHEN cache_hit_pct >= 90 THEN 'Moderate cache hit' WHEN idx_blks_read >= 100000 THEN 'Hot on disk' ELSE 'Low cache hit' END AS recommendation_short, CASE WHEN total_access = 0 THEN 'Ignore (index not accessed since stats reset)' WHEN total_access < 1000 THEN 'Monitor only (insufficient volume to conclude)' WHEN idx_blks_read = 0 THEN 'No action (index served from cache)' WHEN cache_hit_pct >= 99 THEN 'No action (cache hit is excellent)' WHEN cache_hit_pct >= 95 THEN 'Monitor (watch if reads increase)' WHEN idx_blks_read >= 100000 AND cache_hit_pct < 95 THEN 'Consider more RAM/shared_buffers, check index size & query patterns, VACUUM/REINDEX if bloated' ELSE 'Investigate: RAM pressure vs index size; check frequent queries, locality, and whether index is used efficiently' END AS recommendation_action FROM s ORDER BY idx_blks_read DESC, total_access DESC;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STATIO-ALL-INDEXES-VIEW"
         },

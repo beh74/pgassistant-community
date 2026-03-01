@@ -701,7 +701,7 @@
 
                         if (data.data && data.data.length > 0) {
                             suggestionsBox.innerHTML = "";
-                            data.data.slice(0, 10).forEach(value => {
+                            data.data.slice(0, 20).forEach(value => {
                                 let suggestionItem = document.createElement("div");
                                 suggestionItem.classList.add("suggestion-item");
                                 suggestionItem.textContent = value;
@@ -785,7 +785,7 @@
             .then(data => {
                 if (data.data && data.data.length > 0) {
                     suggestionsBox.innerHTML = '';
-                    data.data.slice(0, 10).forEach(value => {
+                    data.data.slice(0, 20).forEach(value => {
                         let suggestionItem = document.createElement("div");
                         suggestionItem.classList.add("suggestion-item");
                         suggestionItem.textContent = value;
