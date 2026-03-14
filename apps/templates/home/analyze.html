@@ -97,43 +97,52 @@
                     {% set param_key = param.lstrip('$') %}  {# Supprime le `$` devant le numéro #}
                 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="param">Parameter {{ param }}</label>
-                            <div class="position-relative">
-                                <input 
-                                    class="form-control suggestion-field" 
-                                    value="" 
-                                    id="{{ param }}" 
-                                    name="{{ param }}" 
-                                    type="text" 
-                                    placeholder="Enter parameter value"
-                                    autocomplete="off"
-                                    data-table="{{ genius_parameters[param_key][0] if param_key in genius_parameters else '' }}"
-                                    data-column="{{ genius_parameters[param_key][1] if param_key in genius_parameters else '' }}"
-                                    data-type="{{ genius_parameters[param_key][2] if param_key in genius_parameters else '' }}"
-                                >
-                                {% if param_key in genius_parameters %}
-                                <span class="search-icon" onclick="showSuggestions('{{ param }}')">
-                                    <!-- You can use an icon library or an SVG here instead -->
-                                    🔍
-                                </span>
-                                {% endif %}
-                                <div class="suggestions-box" id="suggestions-{{ param }}" >
-                                    <!-- Suggestions will be dynamically inserted here -->
-                                </div>
-                            </div>
-                        </div>
+                      <div class="col-md-6 mb-3">
+                          <label for="param">Parameter {{ param }}</label>
+                          <div class="position-relative">
+                              <input 
+                                  class="form-control suggestion-field" 
+                                  value="" 
+                                  id="{{ param }}" 
+                                  name="{{ param }}" 
+                                  type="text" 
+                                  placeholder="Enter parameter value"
+                                  autocomplete="off"
+                                  data-table="{{ genius_parameters[param_key][0] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
+                                  data-column="{{ genius_parameters[param_key][1] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
+                                  data-type="{{ genius_parameters[param_key][2] if param_key in genius_parameters else '' }}"
+                              >
+
+                              {% if param_key in genius_parameters and genius_parameters[param_key][0] is not none %}
+                              <span class="search-icon" onclick="showSuggestions('{{ param }}')">
+                                  🔍
+                              </span>
+                              {% endif %}
+
+                              <div class="suggestions-box" id="suggestions-{{ param }}">
+                                  <!-- Suggestions will be dynamically inserted here -->
+                              </div>
+                          </div>
+                      </div>
                 
                         <!-- genius_parameters -->
                         <div class="col-md-6 mb-3">
-                            {% if param_key in genius_parameters %}
-                            <div class="alert alert-info">
-                                <p>Potential match for parameter</p>
-                                Table: <strong>{{ genius_parameters[param_key][0] }}</strong>, 
-                                Column: <strong>{{ genius_parameters[param_key][1] }}</strong>, 
-                                Type: <strong>{{ genius_parameters[param_key][2] }}</strong>
-                            </div>
-                            {% endif %}
+                          {% if param_key in genius_parameters %}
+                          {% set param = genius_parameters[param_key] %}
+
+                          <div class="alert alert-info">
+                              <p>Potential match for parameter</p>
+
+                              {% if param[0] is none or param[1] is none %}
+                                  Type: <strong>{{ param[2] }}</strong>
+                              {% else %}
+                                  Table: <strong>{{ param[0] }}</strong>, 
+                                  Column: <strong>{{ param[1] }}</strong>, 
+                                  Type: <strong>{{ param[2] }}</strong>
+                              {% endif %}
+
+                          </div>
+                          {% endif %}
                         </div>
                     </div>
                 {% endfor %}

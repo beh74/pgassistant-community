@@ -1,5 +1,20 @@
 # Change Log
 
+## Improvements
+-	Improved the accuracy of SQL query parameter discovery, leading to better detection and typing of query parameters.
+
+## Bug Fixes
+-	Fixed pagination issues in the Table Pagination Helper view where all tables could be displayed instead of the selected page.
+-	Improved DDL extraction by properly quoting schema and table names when calling pg_dump
+
+## User Interface
+-	Added a modal dialog when executing a SQL suggestion. The dialog now displays:
+- the SQL query being executed,
+-	the execution status,
+- the execution time,
+-	and the execution result.
+
+
 ## [2.5.2] - 2026-28-02
 
 ### Features

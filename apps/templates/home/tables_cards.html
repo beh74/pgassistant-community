@@ -31,7 +31,6 @@
 
   .muted-kpi { color: #6c757d; font-size: .85rem; }
 
-  /* optional: reduce button width on small */
   @media (max-width: 576px) {
     .tbl-actions .btn { width: 100%; }
   }
@@ -42,22 +41,32 @@
 <div class="container-fluid py-4">
 
   {# Expected context:
-     tables: list of dict rows with keys: schemaname, table_name, row_count, size, size_bytes, dead_pct, bloat_indicator...
-     page: int, per_page: int, total: int
+     tables: full list of dict rows with keys: schemaname, table_name, row_count, size, size_bytes, dead_pct, bloat_indicator...
+     page: int, per_page: int, total: int (optional, defaults to tables|length)
      q: current search string (optional)
   #}
-  {% set q = q|default('') %}
-  {% set page = page|default(1) %}
-  {% set per_page = per_page|default(24) %}
-  {% set total = total|default(tables|length) %}
+  {% set q = request.args.get('q', q|default('')) %}
+  {% set page = request.args.get('page', page|default(1))|int %}
+  {% set per_page = request.args.get('per_page', per_page|default(24))|int %}
+  {% set total = total|default(tables|length)|int %}
   {% set total_pages = ((total + per_page - 1) // per_page) if per_page else 1 %}
 
+  {% if page < 1 %}
+    {% set page = 1 %}
+  {% endif %}
+  {% if total_pages > 0 and page > total_pages %}
+    {% set page = total_pages %}
+  {% endif %}
+
+  {% set start_idx = (page - 1) * per_page %}
+  {% set end_idx = start_idx + per_page %}
+  {% set paged_tables = tables[start_idx:end_idx] %}
   <!-- Header -->
   <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
     <div>
       <h1 class="h4 mb-1">Tables</h1>
       <div class="text-muted small">
-        Showing {{ tables|length }} table(s){% if total %} out of {{ total }}{% endif %}.
+        Showing {{ paged_tables|length }} table(s){% if total %} out of {{ total }}{% endif %}.
       </div>
     </div>
 
@@ -88,7 +97,7 @@
   <!-- Grid -->
   <div class="row g-3" id="tablesGrid">
 
-    {% for r in tables %}
+    {% for r in paged_tables %}
       {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
       {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
       {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
@@ -106,7 +115,6 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <span class="pill"><i class="bi bi-diagram-3"></i>{{ schema }}</span>
 
-                  {# ---- BLOAT BADGE ---- #}
                   {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
 
                   {% if b == 'HIGH' %}
@@ -153,8 +161,6 @@
                   </div>
                 </div>
               </div>
-
-  
             </div>
 
             <div class="mt-auto pt-3 tbl-actions d-flex flex-column flex-sm-row gap-2">
@@ -192,7 +198,6 @@
            href="?page={{ prev_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">Previous</a>
       </li>
 
-      {# windowed pagination #}
       {% set start = page - 2 %}
       {% if start < 1 %}{% set start = 1 %}{% endif %}
       {% set end = page + 2 %}
@@ -229,14 +234,12 @@
 </div>
 
 <script>
-  // Client-side quick filter (does not replace server-side q, just helps)
   (function () {
     const input = document.getElementById("tableSearch");
     const cards = Array.from(document.querySelectorAll(".tbl-card"));
 
     if (!input) return;
 
-    // Only do client-side filtering on input events (no submit needed)
     input.addEventListener("input", function () {
       const q = (input.value || "").toLowerCase().trim();
       cards.forEach(card => {

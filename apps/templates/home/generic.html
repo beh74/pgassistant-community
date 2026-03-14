@@ -2,7 +2,6 @@
 
 {% block title %} Query {% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css" rel="stylesheet">
 {% endblock stylesheets %}
@@ -28,7 +27,6 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
                 <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/></svg>
             Show query</button>
-        <!-- Refresh -->
         <button id="refresh" type="submit" class="btn btn-primary align-items-center d-inline-flex" name="submit_refresh" value="refresh"
             onclick="refreshPage()">
             <svg class="icon icon-20 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -41,23 +39,58 @@
         </button>
     </div>
 </div>
-   <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-              <div class="modal-header">
-                  <h2 class="h6 modal-title">Executed query</h2>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                  <code>{{ description['sql'] }}</code>
-              
-              </div>
-              <div class="modal-footer">
-                  <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
-              </div>
-          </div>
-      </div></div>
 
+<div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="h6 modal-title">Executed query</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <code>{{ description['sql'] }}</code>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal for SQL execution #}
+<div class="modal fade" id="executeSqlModal" tabindex="-1" aria-labelledby="executeSqlModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="h6 modal-title" id="executeSqlModalLabel">SQL execution</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Query</div>
+                    <pre id="modal-current-sql" class="mb-0"
+                         style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;"></pre>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Execution time</div>
+                    <div id="modal-execution-time" class="fw-semibold">Pending...</div>
+                </div>
+
+                <div>
+                    <div class="small text-muted mb-1">Result</div>
+                    <div id="modal-results"
+                         style="white-space: pre-wrap; font-size: 0.95rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                        Waiting...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="card border-0 shadow mb-4">
     <div class="card-body">
@@ -76,9 +109,8 @@
                         {% for key, value in row.items() %}
                         <td style="word-wrap: break-word; min-width: 10px; max-width: 360px; white-space: normal;">
                             {{ value }}
-                            <!-- Afficher le bouton uniquement pour la colonne 'pga_suggestion' -->
-                            {% if key == 'pga_suggestion' and value %}
-                            <button onclick="executeSQL('{{ value }}')">Run</button>
+                            {% if key == 'pga_suggestion' and value and not value.lstrip().startswith('--') %}
+                            <button type="button" class="btn btn-sm btn-primary ms-2" onclick='executeSQL({{ value|tojson }})'>Run</button>
                             {% endif %}
                         </td>
                         {% endfor %}
@@ -90,27 +122,23 @@
     </div>
 </div>
 
-{# --- SECTION CODE : if any "pga_suggestion*" --- #}
 {% if rows and rows|length > 0 %}
 {% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
 
-{# 1) Détecter les colonnes qui commencent par pga_suggestion* #}
 {% for key in rows[0].keys() %}
 {% if key.startswith('pga_suggestion') %}
 {% set _ = ns.suggestion_keys.append(key) %}
 {% endif %}
 {% endfor %}
 
-{# 2) Collecter toutes les valeurs de ces colonnes #}
 {% for row in rows %}
 {% for key in ns.suggestion_keys %}
-{% if key in row and row[key] %}
+{% if key in row and row[key] and not row[key].lstrip().startswith('--') %}
 {% set _ = ns.suggestions.append(row[key]) %}
 {% endif %}
 {% endfor %}
 {% endfor %}
 
-{# 3) Afficher la section uniquement s’il y a au moins une suggestion #}
 {% if ns.suggestions %}
 <div class="card border-0 shadow mb-4">
     <div class="card-body">
@@ -128,8 +156,6 @@
 </div>
 {% endif %}
 {% endif %}
-<p id="current-sql">No SQL executing</p>
-<div id="results"></div>
 
 <script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
 <script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
@@ -172,16 +198,25 @@
     }
 
     function refreshPage() {
-        location.reload(); // Reloads the page
+        location.reload();
     }
 
     async function executeSQL(sql) {
-        // Afficher la clause SQL en cours d'exécution
-        document.getElementById("current-sql").textContent = `Executing: ${sql}`;
-        document.getElementById("results").innerHTML = "Running...";
+        const modalEl = document.getElementById("executeSqlModal");
+        const modalSql = document.getElementById("modal-current-sql");
+        const modalTime = document.getElementById("modal-execution-time");
+        const modalResults = document.getElementById("modal-results");
+
+        modalSql.textContent = sql;
+        modalTime.textContent = "Running...";
+        modalResults.innerHTML = "Running...";
+
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        const start = performance.now();
 
         try {
-            // Envoyer une requête POST à l'API Flask
             const response = await fetch("/execute", {
                 method: "POST",
                 headers: {
@@ -190,70 +225,43 @@
                 body: JSON.stringify({ sql })
             });
 
-            // Vérifier si la réponse HTTP est valide
+            const end = performance.now();
+            const elapsedMs = Math.round(end - start);
+            modalTime.textContent = `${elapsedMs} ms`;
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // Récupérer la réponse JSON
             const result = await response.json();
 
-            // Afficher le résultat ou l'erreur
             if (result.success) {
-                document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
+                modalResults.innerHTML = `<div class="text-success"><strong>Success</strong></div><div class="mt-2">${escapeHtml(result.message || "Query executed successfully.")}</div>`;
             } else {
-                document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
+                modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(result.error || "Unknown error.")}</div>`;
             }
         } catch (error) {
-            // Gérer les erreurs réseau ou JavaScript
-            document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
+            const end = performance.now();
+            const elapsedMs = Math.round(end - start);
+            modalTime.textContent = `${elapsedMs} ms`;
+            modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(error.message)}</div>`;
         }
     }
 
-    function executeSQL2(sql) {
-        // Afficher la clause SQL en cours d'exécution
-        document.getElementById("current-sql").textContent = `Executing: ${sql}`;
-        document.getElementById("results").innerHTML = "Running...";
-
-        // Envoyer une requête POST à l'API Flask
-        fetch("/execute", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ sql })
-        })
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                return response.json();
-            })
-            .then((result) => {
-                // Afficher le résultat ou l'erreur
-                if (result.success) {
-                    document.getElementById("results").innerHTML = `<strong>Success:</strong> ${result.message}`;
-                } else {
-                    document.getElementById("results").innerHTML = `<strong>Error:</strong> ${result.error}`;
-                }
-            })
-            .error((err) => {
-                // Gérer les erreurs réseau ou JavaScript
-                document.getElementById("results").innerHTML = `<strong>Error:</strong> ${error.message}`;
-            });
+    function escapeHtml(value) {
+        const div = document.createElement("div");
+        div.textContent = value == null ? "" : String(value);
+        return div.innerHTML;
     }
 </script>
 
 <script>
-    // Garde les colonnes triables mais désactive le tri par défaut
     new DataTable('#generic', {
-        order: [], // Pas de tri initial
+        order: [],
         scrollX: true 
     });
 </script>
 
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
 {% block javascripts %}{% endblock javascripts %}

@@ -6,6 +6,14 @@ from sql_formatter.core import format_sql
 from . import database
 from . import analyze_param
 import json
+import uuid
+from typing import List, Any
+import re
+import uuid
+from typing import Any, Dict, List, Optional, Tuple
+
+
+
 
 def get_tables(query):
     """
@@ -191,14 +199,111 @@ def fetch_column_data(table, column, data_type, session):
         print(f"Error: {e}")
         return []
 
+
+def get_postgres_parameter_types(query: str, connection: Any) -> List[str]:
+    """
+    Return PostgreSQL inferred parameter types for a SQL query.
+
+    Works with psycopg2 / psycopg3 connections.
+
+    Behavior:
+    - If already inside a transaction, use a SAVEPOINT so errors don't poison
+      the caller transaction.
+    - If not inside a transaction (e.g. autocommit), don't use SAVEPOINT.
+    - Always try to DEALLOCATE the prepared statement.
+    """
+    stmt_name = f"pgassistant_{uuid.uuid4().hex}"
+    savepoint_name = f"sp_{uuid.uuid4().hex}"
+
+    prepare_sql = f"PREPARE {stmt_name} AS {query}"
+    deallocate_sql = f"DEALLOCATE {stmt_name}"
+    savepoint_sql = f"SAVEPOINT {savepoint_name}"
+    rollback_to_savepoint_sql = f"ROLLBACK TO SAVEPOINT {savepoint_name}"
+    release_savepoint_sql = f"RELEASE SAVEPOINT {savepoint_name}"
+
+    def _in_transaction(conn: Any) -> bool:
+        """
+        Best-effort detection for psycopg2 / psycopg3.
+        """
+        # psycopg3
+        info = getattr(conn, "info", None)
+        if info is not None and hasattr(info, "transaction_status"):
+            # 0 = idle / no transaction
+            return info.transaction_status != 0
+
+        # psycopg2
+        status = getattr(conn, "status", None)
+        # STATUS_IN_TRANSACTION is usually 2 in psycopg2
+        return status == 2
+
+    with connection.cursor() as cur:
+        prepared = False
+        use_savepoint = _in_transaction(connection)
+
+        try:
+            if use_savepoint:
+                cur.execute(savepoint_sql)
+
+            cur.execute(prepare_sql)
+            prepared = True
+
+            cur.execute(
+                """
+                SELECT parameter_types::text[]
+                FROM pg_prepared_statements
+                WHERE name = %s
+                """,
+                (stmt_name,),
+            )
+            row = cur.fetchone()
+            param_types = row[0] if row and row[0] is not None else []
+
+            cur.execute(deallocate_sql)
+            prepared = False
+
+            if use_savepoint:
+                cur.execute(release_savepoint_sql)
+
+            return list(param_types)
+
+        except Exception as e:
+            if prepared:
+                try:
+                    cur.execute(deallocate_sql)
+                except Exception:
+                    pass
+
+            if use_savepoint:
+                try:
+                    cur.execute(rollback_to_savepoint_sql)
+                    cur.execute(release_savepoint_sql)
+                except Exception:
+                    pass
+
+            print(f"Warning: could not infer PostgreSQL parameter types with PREPARE: {e}")
+            return []
+
+def extract_ordered_parameters(query: str) -> List[str]:
+    """
+    Return parameters found in query ordered by parameter number.
+    Example: ['$1', '$2', '$4']
+    """
+    params = sorted(
+        {int(x) for x in re.findall(r"\$(\d+)", query)}
+    )
+    return [f"${p}" for p in params]
+
+
 def get_column_data_types(connection, table_column_pairs):
     """
     Query PostgreSQL to get the data types of specific columns in tables.
+
     Args:
         connection: psycopg2 connection object.
         table_column_pairs: A list of tuples (table_name, column_name).
+
     Returns:
-        A dictionary { (table_name, column_name): column_type }.
+        A dictionary { (schema.table_name, column_name): column_type }.
     """
     column_types = {}
     query = """
@@ -213,13 +318,11 @@ def get_column_data_types(connection, table_column_pairs):
             (table_name, column_name) IN %s;
     """
     try:
-        # Prepare data for the IN clause
         formatted_pairs = [(table, column) for table, column in table_column_pairs]
         if not formatted_pairs:
             print("No table-column pairs provided.")
             return {}
 
-        # Execute the query
         with connection.cursor() as cursor:
             cursor.execute(query, (tuple(formatted_pairs),))
             for row in cursor.fetchall():
@@ -228,83 +331,210 @@ def get_column_data_types(connection, table_column_pairs):
                 column_name = row[2]
                 column_type = row[3]
                 column_types[(f"{schema_name}.{table_name}", column_name)] = column_type
+
     except Exception as e:
         print(f"Error querying column data types: {e}")
-    
+
     return column_types
 
 
 def map_query_parameters(query, connection):
     """
-    Extracts SQL parameters and retrieves their corresponding data types from PostgreSQL.
-    
+    Extract SQL parameters and retrieve their corresponding data types from PostgreSQL.
+
     Args:
         query: The SQL query string.
         connection: psycopg2 connection object.
-    
+
     Returns:
         A dictionary { parameter: (table_name, column_name, data_type) }.
     """
-    # Extract the SQL parameters and their associated columns
     param_columns = analyze_param.extract_parameter_columns(query)
 
     if not param_columns:
-        print("No SQL parameters found.")
+        print("No SQL parameters found by SQL parser.")
         return {}
 
-    # Convert data for PostgreSQL query
-    table_column_pairs = [(table_column.split('.')[0], table_column.split('.')[1]) for table_column in param_columns.values()]
+    table_column_pairs = []
+    for table_column in param_columns.values():
+        parts = table_column.split(".")
+        if len(parts) >= 2:
+            table_name = parts[0]
+            column_name = parts[1]
+            table_column_pairs.append((table_name, column_name))
 
-    # Retrieve column data types
     column_types = get_column_data_types(connection, table_column_pairs)
 
-
-    # Associate each SQL parameter with its (table, column, data_type)
     param_mapping = {}
     for param, column in param_columns.items():
-        table_name, column_name = column.split('.')
+        parts = column.split(".")
+        if len(parts) < 2:
+            param_mapping[param] = ("UNKNOWN", "UNKNOWN", "UNKNOWN")
+            continue
+
+        table_name, column_name = parts[0], parts[1]
         column_key = (table_name, column_name)
 
-        # Check if the key is present with a schema (e.g., public.authors)
-        matching_key = next((key for key in column_types.keys() if key[1] == column_name and key[0].endswith(table_name)), None)
+        matching_key = next(
+            (
+                key
+                for key in column_types.keys()
+                if key[1] == column_name and key[0].endswith(f".{table_name}")
+            ),
+            None,
+        )
 
         if matching_key:
             column_type = column_types[matching_key]
-            resolved_table_name = matching_key[0]  # Use the table name with schema
+            resolved_table_name = matching_key[0]
         else:
             column_type = "UNKNOWN"
             resolved_table_name = table_name
             print(f"⚠️ Warning: Column {column_key} not found in column_types. Returning UNKNOWN.")
 
         param_mapping[param] = (resolved_table_name, column_name, column_type)
+
     return param_mapping
 
 
 def split_query_by_parameters(query, parameters):
     """
     Split the query into smaller parts based on the presence of multiple parameters in a single line.
+
     Args:
         query: The SQL query string.
         parameters: List of parameters ($1, $2, etc.).
+
     Returns:
         A list of query fragments, each containing at most one parameter.
     """
     fragments = []
+    if not parameters:
+        return fragments
+
     for line in query.splitlines():
-        # Split the line further if it contains multiple parameters
-        parts = re.split(rf"({'|'.join(parameters)})", line)
+        parts = re.split(rf"({'|'.join(re.escape(p) for p in parameters)})", line)
         for part in parts:
-            if part.strip():  # Ignore empty parts
+            if part.strip():
                 fragments.append(part.strip())
     return fragments
 
-def get_genius_parameters (sql_query, session):
-    conn, msg = database.connectdb(session)
-    if "OK" in msg:     
-        parameter_mapping = map_query_parameters(sql_query, conn)   
-        return parameter_mapping
-    return None
+def merge_parameter_mappings(sql_query, parser_mapping, postgres_types):
+    """
+    Merge parser-based mapping with PostgreSQL inferred types.
 
+    Rule:
+    - PostgreSQL inferred type always wins when present.
+    - Parser/catalog type is only a fallback.
+    - Keeps parser-resolved table/column when available.
+    - Parameters not resolved by parser are still returned.
+
+    Output format:
+        {
+            '1': ('public.orders', 'customer_id', 'integer'),
+            '2': ('UNKNOWN', 'UNKNOWN', 'bigint')
+        }
+    """
+    result = {}
+
+    ordered_params = extract_ordered_parameters(sql_query)
+
+    # Normalize parser mapping keys to '1', '2', ...
+    normalized_parser_mapping = {}
+    for param, value in (parser_mapping or {}).items():
+        normalized_param = normalize_parameter_name(param)
+        normalized_parser_mapping[normalized_param] = value
+
+    # Start from parser mapping so we keep table/column info
+    for param, value in normalized_parser_mapping.items():
+        result[param] = value
+
+    # PostgreSQL inferred types have priority
+    for idx, param in enumerate(ordered_params):
+        pg_type = postgres_types[idx] if idx < len(postgres_types) else None
+
+        if param in result:
+            table_name, column_name, parser_type = result[param]
+
+            if pg_type and str(pg_type).upper() != "UNKNOWN":
+                # PostgreSQL is the source of truth
+                result[param] = (table_name, column_name, pg_type)
+            else:
+                # Fallback to parser/catalog type
+                result[param] = (table_name, column_name, parser_type or None)
+        else:
+            # Parameter not found by parser
+            if pg_type and str(pg_type).upper() != "UNKNOWN":
+                result[param] = (None, None, pg_type)
+            else:
+                result[param] = (None, None, None)
+
+    return dict(sorted(result.items(), key=lambda x: int(x[0])))
+def normalize_parameter_name(param: str) -> str:
+    """
+    Normalize parameter name to numeric format: '1', '2', '3'
+    Accepts '1', '$1', ' 2 ' etc.
+    """
+    if param is None:
+        return param
+
+    param = str(param).strip()
+
+    m = re.fullmatch(r"\$?(\d+)", param)
+    if not m:
+        return param
+
+    return m.group(1)
+
+def extract_ordered_parameters(query):
+    """
+    Return parameters found in query ordered numerically.
+
+    Example:
+        SELECT * WHERE a=$1 AND b=$3
+
+    returns:
+        ['1','3']
+    """
+    params = sorted({int(x) for x in re.findall(r"\$(\d+)", query)})
+    return [str(p) for p in params]
+
+def get_genius_parameters(sql_query, session):
+
+    """
+    Return parameter mapping enriched with PostgreSQL inferred parameter types.
+
+    Output format:
+        {
+            '$1': ('public.orders', 'customer_id', 'integer'),
+            '$2': ('public.orders', 'created_at', 'timestamp without time zone'),
+            '$3': ('UNKNOWN', 'UNKNOWN', 'bigint')
+        }
+    """
+    conn, msg = database.connectdb(session)
+    if "OK" not in msg:
+        return None
+
+    try:
+        parser_mapping = map_query_parameters(sql_query, conn)
+        postgres_types = get_postgres_parameter_types(sql_query, conn)
+
+        final_mapping = merge_parameter_mappings(
+            sql_query=sql_query,
+            parser_mapping=parser_mapping or {},
+            postgres_types=postgres_types or [],
+        )
+
+        return final_mapping
+
+    except Exception as e:
+        print(f"Error in get_genius_parameters: {e}")
+        # fallback to current behavior
+        try:
+            return map_query_parameters(sql_query, conn)
+        except Exception:
+            return None
+        
 def analyze_explain_row(row):
     """
     Generates a comment based on the content of an EXPLAIN ANALYZE row.

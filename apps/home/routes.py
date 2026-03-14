@@ -438,6 +438,7 @@ def analyze_query(querid):
                 # try to extract parameters from query
                 try:
                     genius_parameters = sqlhelper.get_genius_parameters(sql_query, session)
+                    print("Genius parameters extracted:", genius_parameters)
                 except Exception:
                     genius_parameters = []
 
