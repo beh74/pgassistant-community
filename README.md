@@ -146,6 +146,9 @@ AI is optional. pgAssistant remains fully usable without it.
 ![Query Insight](media/analyze_relational.png)
 
 ## AI Query Optimization
+![LLM Optimize Query](media/analyze_advisor.png)
+
+## AI Query Optimization
 ![LLM Optimize Query](media/llm_optimize_query.png)
 
 ## Schema Issue Detection
