@@ -47,6 +47,11 @@ The goal: turn raw PostgreSQL internals into **actionable optimization decisions
 
 ---
 
+## Changelog
+
+Stay up to date with the latest features and improvements:  
+[View the full changelog](CHANGELOG.md)
+
 # Why pgAssistant is Different
 
 Most tools show metrics.

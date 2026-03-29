@@ -22,6 +22,8 @@ from . import reporting
 from . import action
 from . import graph
 from . import graph_table
+from . import pgstat_helper
+from . import analyze_advisor
 import re
 import requests
 import json
@@ -80,7 +82,7 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             rows_filtered = [row for row in rows_filtered if tablename in row['tables']]
 
         # Render the template with the filtered data
-        return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename)
+        return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename,column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
     else:
         return redirect("/database.html")
@@ -305,6 +307,7 @@ def analyze_query(querid):
             mermaid_code = None
             queryplan = None
             plan_text = None
+            advisor_result = None
 
             # Clear any previous analyze-derived table list when opening a new query page (optional but recommended)
             prev_qid = session.get("analyze_querid")
@@ -341,10 +344,19 @@ def analyze_query(querid):
                 if request.form.get('action') == 'analyze':
                     parameters = {}
                     rows = database.generic_select_with_sql(session, sql_query_analyze)
+
                     session["full_query"] = sql_query  # Store the full query with parameters in session
 
                     # get statistics from EXPLAIN ANALYZE result
                     queryplan = rows[0]["QUERY PLAN"]
+
+                    try:
+                        advisor_result = analyze_advisor.analyze_plan_for_safe_indexes(queryplan, session, 0)
+                        analyze_advisor.pretty_print_analysis(advisor_result)
+                    except Exception as e:
+                        advisor_result = None
+                        print("Error during advisor analysis:", e)
+
                     if isinstance(queryplan, str):
                         plan_text = queryplan
                     else:
@@ -475,6 +487,7 @@ def analyze_query(querid):
                 fmt_pct=fmt_pct,
                 fmt_int=fmt_int,
                 mermaid_code=mermaid_code,
+                advisor_result=advisor_result,
                 queryplan=plan_text
             )
         else:

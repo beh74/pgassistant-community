@@ -1,5 +1,17 @@
 # Change Log
 
+
+## [2.6] - 2026-28-03
+
+### Added
+- Introduced **SQL Advisor**, a new **safe-by-design** advisor focused on SQL query analysis and guidance.
+  It is designed to provide helpful recommendations while staying conservative and avoiding risky automated actions.
+
+### Improved
+- Top queries are now displayed as **cards**, making them easier to scan, compare, and review visually.
+
+## [2.5.3] - 2026-16-03
+
 ## Improvements
 -	Improved the accuracy of SQL query parameter discovery, leading to better detection and typing of query parameters.
 

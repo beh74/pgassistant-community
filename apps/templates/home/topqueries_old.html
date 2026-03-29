@@ -41,6 +41,38 @@
   height: 38px;
 }
 
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+}
+
+.clear-search-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.clear-search-btn:hover {
+  color: #111827;
+}
+
 @media (max-width: 992px) {
   .topqueries-toolbar {
     align-items: stretch;
@@ -257,12 +289,23 @@
     <div class="topqueries-toolbar">
       <div class="topqueries-search-group">
         <label for="querySearch" class="form-label mb-1">Search</label>
-        <input
-          type="text"
-          id="querySearch"
-          class="form-control"
-          placeholder="SQL text, table name, operation type..."
-        >
+        <div class="search-input-wrapper">
+          <input
+            type="text"
+            id="querySearch"
+            class="form-control search-input"
+            placeholder="SQL text, table name, operation type..."
+          >
+          <button
+            type="button"
+            id="clearSearchBtn"
+            class="clear-search-btn"
+            aria-label="Clear search"
+            title="Clear search"
+          >
+            &times;
+          </button>
+        </div>
       </div>
 
       <div class="topqueries-toolbar-right">
@@ -284,7 +327,7 @@
           <label for="pageSizeSelect" class="form-label mb-1">Cards per page</label>
           <select id="pageSizeSelect" class="form-select">
             <option value="6">6</option>
-            <option value="8" selected>8</option>
+            <option value="9" selected>9</option>
             <option value="12">12</option>
             <option value="18">18</option>
           </select>
@@ -329,11 +372,11 @@
                   {% endif %}
 
                   {% if row['mean_exec_time'] | float < 0.5 %}
-                    <span class="badge bg-success perf-badge">Perf</span>
+                    <span class="badge bg-success perf-badge">OK</span>
                   {% elif row['mean_exec_time'] | float < 1 %}
-                    <span class="badge bg-secondary perf-badge">Perf</span>
+                    <span class="badge bg-secondary perf-badge">OK</span>
                   {% elif row['mean_exec_time'] | float < 5 %}
-                    <span class="badge bg-warning text-dark perf-badge">Perf</span>
+                    <span class="badge bg-warning text-dark perf-badge">Warning</span>
                   {% else %}
                     <span class="badge bg-danger perf-badge">Perf</span>
                   {% endif %}
@@ -341,7 +384,7 @@
               </div>
 
               <div class="d-flex align-items-center gap-2">
-                <span class="small text-muted">Cache Hit Ratio</span>
+                <span class="small text-muted">Cache Hit</span>
                 {% set cache_ratio = row['hit_cache_ratio'] | float if row['hit_cache_ratio'] is not none else -1 %}
                 {% if row['hit_cache_ratio'] is none %}
                   <span class="badge bg-secondary cache-badge">N/A</span>
@@ -485,6 +528,7 @@
 <script>
 (function () {
   const searchInput = document.getElementById('querySearch');
+  const clearSearchBtn = document.getElementById('clearSearchBtn');
   const pageSizeSelect = document.getElementById('pageSizeSelect');
   const sortBySelect = document.getElementById('sortBySelect');
 
@@ -498,6 +542,10 @@
 
   let currentPage = 1;
   let pageSize = parseInt(pageSizeSelect.value, 10);
+
+  function updateClearButton() {
+    clearSearchBtn.style.display = searchInput.value.trim() ? 'flex' : 'none';
+  }
 
   function normalizeText(value) {
     return (value || '').toString().toLowerCase().trim();
@@ -725,12 +773,22 @@
     const tableName = btn.dataset.tableName || '';
     searchInput.value = tableName;
     currentPage = 1;
+    updateClearButton();
     renderCards();
   });
 
   searchInput.addEventListener('input', function () {
     currentPage = 1;
+    updateClearButton();
     renderCards();
+  });
+
+  clearSearchBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    currentPage = 1;
+    updateClearButton();
+    renderCards();
+    searchInput.focus();
   });
 
   pageSizeSelect.addEventListener('change', function () {
@@ -759,6 +817,7 @@
     }
   });
 
+  updateClearButton();
   renderCards();
 })();
 </script>
