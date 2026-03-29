@@ -145,8 +145,8 @@ AI is optional. pgAssistant remains fully usable without it.
 ## Query Insight Relational view
 ![Query Insight](media/analyze_relational.png)
 
-## AI Query Optimization
-![LLM Optimize Query](media/analyze_advisor.png)
+## SQL Advisor
+![SQL Advisor](media/analyze_advisor.png)
 
 ## AI Query Optimization
 ![LLM Optimize Query](media/llm_optimize_query.png)
