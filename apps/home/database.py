@@ -150,7 +150,7 @@ def get_top_queries(db_config):
     con, message = connectdb(db_config)
     if con:
        try:
-            print("DB VERSION =", db_config.get('version'))
+            #print("DB VERSION =", db_config.get('version'))
             if db_config.get('version')==18:
                rows,description=db_query(con,'top_queries_18')
             else:

@@ -209,12 +209,12 @@ def handle_tools_get():
 def handle_reset_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_reset")
     rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows)
+    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
 def handle_enable_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_enable")
     rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows)
+    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
 def handle_lint_post():
     original_sql = request.form.get('sqlo')
@@ -351,8 +351,26 @@ def analyze_query(querid):
                     queryplan = rows[0]["QUERY PLAN"]
 
                     try:
-                        advisor_result = analyze_advisor.analyze_plan_for_safe_indexes(queryplan, session, 0)
+                        advisor_result = analyze_advisor.analyze_plan_for_safe_indexes(
+                            queryplan, session, querid
+                        )
+
+                        # ------------------------------------------------------------
+                        # SORT ONLY BY CONFIDENCE (safe > review > none)
+                        # ------------------------------------------------------------
+                        if advisor_result and advisor_result.get("recommendations"):
+
+                            priority = {
+                                "safe": 0,
+                                "review": 1,
+                                "none": 2,
+                            }
+                            advisor_result["recommendations"] = sorted(
+                                advisor_result["recommendations"],
+                                key=lambda r: priority.get(r.get("confidence"), 99)
+                            )
                         analyze_advisor.pretty_print_analysis(advisor_result)
+
                     except Exception as e:
                         advisor_result = None
                         print("Error during advisor analysis:", e)

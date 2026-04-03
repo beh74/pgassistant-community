@@ -1,5 +1,21 @@
 # Change Log
 
+## [2.6.1] - 2026-03-04
+
+## Improvements
+- Major improvements on Advisor:
+  - Added support for detecting and reporting actual access paths (Seq Scan, Index Scan, Bitmap, etc.)
+  - Display of used index name and full index definition when applicable
+  - Detection of planner misestimation (gap between estimated vs actual rows)
+  - Improved visibility of filters and candidate columns extracted from execution plans
+  - Systematic inclusion of column statistics (n_distinct, null_frac, MCV, histogram)
+  - More robust handling of predicates without requiring full SQL parsing
+  - Enhanced recommendations with better contextual explanations
+  - UI improvements: clearer grouping of information (access path, filter, stats, index usage)
+  - Recommendations are now sorted by confidence (SAFE > REVIEW > NONE) for better prioritization
+
+## Bug Fixes
+- On top queries, reset pg_stat_statements produces an error
 
 ## [2.6] - 2026-28-03
 

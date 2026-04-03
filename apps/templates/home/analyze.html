@@ -5,6 +5,192 @@
 {% block stylesheets %}
 <style>
     /* Suggestions box styling */
+
+    .advisor-card {
+      border-radius: 1rem;
+      background: #ffffff;
+    }
+
+    .advisor-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1f2a44;
+    }
+
+    .advisor-summary {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: #46566f;
+    }
+
+    .advisor-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.42rem 0.72rem;
+      border-radius: 999px;
+      background: #f4f7fb;
+      border: 1px solid #dde5f0;
+    }
+
+    .advisor-meta-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #708198;
+    }
+
+    .advisor-meta-value {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #24324a;
+    }
+
+    .advisor-confidence-wrap {
+      text-align: right;
+      min-width: 110px;
+    }
+
+    .advisor-confidence-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #708198;
+      margin-bottom: 0.35rem;
+    }
+
+    .advisor-confidence-badge {
+      display: inline-block;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+
+    .advisor-confidence-safe {
+      background: #1f5faa;
+      color: #ffffff;
+    }
+
+    .advisor-confidence-review {
+      background: #77a9df;
+      color: #0f2742;
+    }
+
+    .advisor-confidence-none {
+      background: #dbe8f6;
+      color: #335273;
+    }
+
+    .advisor-sql-box {
+      padding-top: 0.25rem;
+    }
+
+    .advisor-details {
+      margin-top: 0.75rem;
+      border-top: 1px dashed #d8e1ee;
+      padding-top: 0.85rem;
+    }
+
+    .advisor-details-summary {
+      cursor: pointer;
+      list-style: none;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #39557a;
+      user-select: none;
+    }
+
+    .advisor-details-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advisor-details-summary::before {
+      content: "▸";
+      display: inline-block;
+      margin-right: 0.45rem;
+      color: #6a89ac;
+      transition: transform 0.15s ease;
+    }
+
+    .advisor-details[open] .advisor-details-summary::before {
+      transform: rotate(90deg);
+    }
+
+    .advisor-section {
+      padding: 0.9rem 1rem;
+      border: 1px solid #e4ebf4;
+      border-radius: 0.85rem;
+      background: #fbfcfe;
+    }
+
+    .advisor-section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #60738e;
+      margin-bottom: 0.45rem;
+    }
+
+    .advisor-text-block {
+      color: #334155;
+      line-height: 1.55;
+    }
+
+    .advisor-code-block {
+      background: #f6f8fc;
+      border: 1px solid #dde5f0;
+      border-radius: 0.75rem;
+      padding: 0.75rem 0.85rem;
+      overflow-x: auto;
+    }
+
+    .advisor-code-block code {
+      color: #c72574;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .advisor-code-block-strong {
+      background: #f8fafc;
+      border-color: #d8e1ee;
+    }
+
+    .advisor-code-inline code {
+      color: #334155;
+      background: #f3f6fb;
+      padding: 0.25rem 0.45rem;
+      border-radius: 0.45rem;
+    }
+
+    .advisor-column-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid #d8e1ee;
+      background: #ffffff;
+      color: #26364d;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .advisor-copy-btn {
+      border: 1px solid #d8e1ee;
+      background: #fff;
+      border-radius: 0.6rem;
+      padding: 0.3rem 0.55rem;
+    }
+
+    .advisor-copy-btn:hover {
+      background: #f4f7fb;
+    }
+
+    
     .suggestions-box {
         display: none;
         position: absolute;
@@ -627,109 +813,177 @@
         </div>
 
         {% if advisor_result and advisor_result.recommendations %}
-          <div class="row g-3">
+        <div class="row g-3">
 
-            {% for rec in advisor_result.recommendations %}
-            <div class="col-12 col-xl-6">
-              <div class="card shadow-sm h-100">
+          {% for rec in advisor_result.recommendations %}
+          <div class="col-12 col-xxl-6">
+            <div class="card shadow-sm border-0 h-100 advisor-card">
+              <div class="card-body p-4">
 
-                <div class="card-body">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                  <div class="flex-grow-1">
+                    <h5 class="mb-2 advisor-title">{{ rec.schema }}.{{ rec.table }}</h5>
 
-                  <!-- Header -->
-                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% if rec.node_type %}
+                        <span class="advisor-meta-pill">
+                          <span class="advisor-meta-label">Access path</span>
+                          <span class="advisor-meta-value">{{ rec.node_type }}</span>
+                        </span>
+                      {% endif %}
 
-                    <div>
-                      <div class="fw-semibold">
-                        {{ rec.schema }}.{{ rec.table }}
+                      {% if rec.used_index_name %}
+                        <span class="advisor-meta-pill">
+                          <span class="advisor-meta-label">Index used</span>
+                          <span class="advisor-meta-value">{{ rec.used_index_name }}</span>
+                        </span>
+                      {% endif %}
+
+                      {% if rec.candidate_columns %}
+                        <span class="advisor-meta-pill">
+                          <span class="advisor-meta-label">Columns</span>
+                          <span class="advisor-meta-value">{{ rec.candidate_columns | join(', ') }}</span>
+                        </span>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <!-- Confidence -->
+                  <div class="advisor-confidence-wrap">
+                    <div class="advisor-confidence-label">Confidence</div>
+                    <span class="
+                      advisor-confidence-badge
+                      {% if rec.confidence == 'safe' %}
+                        advisor-confidence-safe
+                      {% elif rec.confidence == 'review' %}
+                        advisor-confidence-review
+                      {% else %}
+                        advisor-confidence-none
+                      {% endif %}
+                    ">
+                      {{ rec.confidence | upper }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Main reason -->
+                <div class="advisor-summary mb-3">
+                  {{ rec.reason }}
+                </div>
+
+                <!-- Optional SQL action right away -->
+                {% if rec.create_index_sql %}
+                <div class="advisor-sql-box mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="advisor-section-title mb-0">Suggested index</div>
+                    <button
+                      class="btn btn-sm copy-btn advisor-copy-btn"
+                      data-sql="{{ rec.create_index_sql }}"
+                      title="Copy SQL"
+                      type="button"
+                    >
+                      📋
+                    </button>
+                  </div>
+
+                  <div class="advisor-code-block advisor-code-block-strong">
+                    <code class="small d-block">{{ rec.create_index_sql }}</code>
+                  </div>
+                </div>
+                {% endif %}
+
+                <!-- Foldable technical details -->
+                <details class="advisor-details">
+                  <summary class="advisor-details-summary">Technical details</summary>
+
+                  <div class="vstack gap-3 mt-3">
+
+                    {% if rec.filter_expr %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Filter</div>
+                      <div class="advisor-code-block">
+                        <code class="small">{{ rec.filter_expr }}</code>
                       </div>
                     </div>
+                    {% endif %}
 
-                    <!-- Confidence badge -->
-                    {% if rec.confidence == "safe" %}
-                      <span class="badge bg-success">SAFE</span>
-                    {% elif rec.confidence == "review" %}
-                      <span class="badge bg-warning text-dark">REVIEW</span>
-                    {% else %}
-                      <span class="badge bg-secondary">NONE</span>
+                    {% if rec.index_cond %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Index condition</div>
+                      <div class="advisor-code-block">
+                        <code class="small">{{ rec.index_cond }}</code>
+                      </div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.recheck_cond %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Recheck condition</div>
+                      <div class="advisor-code-block">
+                        <code class="small">{{ rec.recheck_cond }}</code>
+                      </div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.used_index_def %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Index definition</div>
+                      <div class="advisor-code-block">
+                        <code class="small">{{ rec.used_index_def }}</code>
+                      </div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.candidate_columns %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Candidate columns</div>
+                      <div class="d-flex flex-wrap gap-2">
+                        {% for col in rec.candidate_columns %}
+                          <span class="advisor-column-pill">{{ col }}</span>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.stats_reason %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Column statistics</div>
+                      <div class="advisor-text-block small">{{ rec.stats_reason }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.row_estimation_reason %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Planner row estimation</div>
+                      <div class="advisor-text-block small">{{ rec.row_estimation_reason }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if rec.existing_index_match %}
+                    <div class="advisor-section">
+                      <div class="advisor-section-title">Existing matching index</div>
+                      <div class="advisor-code-inline">
+                        <code class="small">{{ rec.existing_index_match }}</code>
+                      </div>
+                    </div>
                     {% endif %}
 
                   </div>
+                </details>
 
-                  <!-- Reason -->
-                  <div class="small text-muted mb-2">
-                    {{ rec.reason }}
-                  </div>
-
-                  <!-- Filter -->
-                  {% if rec.filter_expr %}
-                  <div class="mb-2">
-                    <div class="small text-muted">Filter</div>
-                    <code class="small">{{ rec.filter_expr }}</code>
-                  </div>
-                  {% endif %}
-
-                  <!-- Columns -->
-                  {% if rec.candidate_columns %}
-                  <div class="mb-2">
-                    <div class="small text-muted">Columns</div>
-                    <div class="d-flex flex-wrap gap-1">
-                      {% for col in rec.candidate_columns %}
-                        <span class="badge border text-body bg-white">{{ col }}</span>
-                      {% endfor %}
-                    </div>
-                  </div>
-                  {% endif %}
-
-                  <!-- Stats -->
-                  {% if rec.stats_reason %}
-                  <div class="mb-2">
-                    <div class="small text-muted">Statistics</div>
-                    <div class="small">{{ rec.stats_reason }}</div>
-                  </div>
-                  {% endif %}
-
-                  <!-- Existing index -->
-                  {% if rec.existing_index_match %}
-                  <div class="mb-2">
-                    <div class="small text-muted">Existing index</div>
-                    <code class="small">{{ rec.existing_index_match }}</code>
-                  </div>
-                  {% endif %}
-
-                  <!-- SQL -->
-                  {% if rec.create_index_sql %}
-                  <div class="mt-3">
-                    <div class="small text-muted mb-1">Suggested index</div>
-
-                    <div class="bg-light border rounded p-2 position-relative">
-                      <code class="small d-block pe-4">{{ rec.create_index_sql }}</code>
-
-                      <!-- Copy button -->
-                      <button
-                        class="btn btn-sm position-absolute top-0 end-0 m-1 copy-btn"
-                        data-sql="{{ rec.create_index_sql }}"
-                        title="Copy SQL"
-                        style="border:none;background:transparent;"
-                      >
-                        📋
-                      </button>
-                    </div>
-                  </div>
-                  {% endif %}
-
-                </div>
               </div>
             </div>
-            {% endfor %}
-
           </div>
+          {% endfor %}
 
-        {% else %}
-          <div class="alert alert-secondary">
-            No recommendations available.
-          </div>
-        {% endif %}
-
+        </div>
+      {% else %}
+        <div class="alert alert-secondary">
+          No recommendations available.
+        </div>
+      {% endif %}
+      
       </div>
     </div>
 

@@ -26,6 +26,9 @@ class ScanFinding:
     table: str
     alias: Optional[str]
     node_type: str
+    index_name: Optional[str]
+    index_cond: Optional[str]
+    recheck_cond: Optional[str]
     filter_expr: Optional[str]
     actual_rows: float
     plan_rows: float
@@ -34,6 +37,25 @@ class ScanFinding:
     shared_hit_blocks: int
     shared_read_blocks: int
     actual_total_time: float
+    index_def: Optional[str] = None
+
+
+@dataclass
+class JoinFinding:
+    join_node_type: str
+    join_type: str
+    cond_type: str
+    cond_expr: str
+    left_alias: Optional[str]
+    left_column: Optional[str]
+    right_alias: Optional[str]
+    right_column: Optional[str]
+    actual_rows: float
+    plan_rows: float
+    actual_loops: float
+    actual_total_time: float
+    shared_hit_blocks: int
+    shared_read_blocks: int
 
 
 @dataclass
@@ -69,13 +91,20 @@ class ColumnStats:
 class Recommendation:
     schema: str
     table: str
-    confidence: str  # "safe" | "review" | "none"
+    confidence: str
     reason: str
     filter_expr: Optional[str] = None
     candidate_columns: Optional[List[str]] = None
     create_index_sql: Optional[str] = None
     existing_index_match: Optional[str] = None
     stats_reason: Optional[str] = None
+    node_type: Optional[str] = None
+    access_path: Optional[str] = None
+    used_index_name: Optional[str] = None
+    used_index_def: Optional[str] = None
+    index_cond: Optional[str] = None
+    recheck_cond: Optional[str] = None
+    row_estimation_reason: Optional[str] = None
 
 
 # --------------------------------------------------------------------
@@ -89,19 +118,8 @@ def analyze_plan_for_safe_indexes(
 ) -> Dict[str, Any]:
     """
     Analyse un plan EXPLAIN ANALYZE FORMAT JSON et propose des index "safe only".
-
-    Parameters
-    ----------
-    plan_json:
-        Structure Python issue du JSON ou string JSON.
-    session:
-        Session applicative permettant d'extraire db_config.
-    queryid:
-        Optionnel. Permet de récupérer le contexte pg_stat_statements.
-
-    Returns
-    -------
-    dict
+    Remonte aussi le chemin d'accès déjà utilisé (Seq Scan, Index Scan, etc.)
+    ainsi que l'index utilisé quand applicable.
     """
     db_config = get_db_config_from_session(session)
     con, message = database.connectdb(db_config)
@@ -112,6 +130,7 @@ def analyze_plan_for_safe_indexes(
             "message": message or "Unable to connect to database.",
             "recommendations": [],
             "scan_findings": [],
+            "join_findings": [],
             "query_stats": None,
         }
 
@@ -119,14 +138,21 @@ def analyze_plan_for_safe_indexes(
         parsed_plan = normalize_plan_json(plan_json)
         root = extract_root_plan(parsed_plan)
 
-        findings: List[ScanFinding] = []
-        walk_plan_for_seq_scans(root, findings)
+        scan_findings: List[ScanFinding] = []
+        join_findings: List[JoinFinding] = []
+        alias_map: Dict[str, Dict[str, str]] = {}
+
+        collect_relation_aliases(root, alias_map)
+        walk_plan_collect_findings(root, scan_findings, join_findings)
 
         query_stats = load_query_stats(con, queryid) if queryid is not None else None
 
         recommendations: List[Recommendation] = []
 
-        for finding in findings:
+        # ------------------------------------------------------------
+        # Scan-based recommendations / observations
+        # ------------------------------------------------------------
+        for finding in scan_findings:
             meta = load_table_meta(con, finding.schema, finding.table)
             if meta is None:
                 recommendations.append(
@@ -135,19 +161,38 @@ def analyze_plan_for_safe_indexes(
                         table=finding.table,
                         confidence="none",
                         reason="Could not load table metadata.",
+                        node_type=finding.node_type,
+                        access_path=finding.node_type,
+                        used_index_name=finding.index_name,
+                        used_index_def=None,
+                        index_cond=finding.index_cond,
+                        recheck_cond=finding.recheck_cond,
                         filter_expr=finding.filter_expr,
+                        row_estimation_reason=build_row_estimation_reason(
+                            finding.plan_rows,
+                            finding.actual_rows,
+                        ),
                     )
                 )
                 continue
 
-            rec = evaluate_seq_scan_candidate(con, finding, meta, query_stats)
+            rec = evaluate_scan_candidate(con, finding, meta, query_stats)
             recommendations.append(rec)
+
+        # ------------------------------------------------------------
+        # Join-based recommendations
+        # ------------------------------------------------------------
+        for join in join_findings:
+            recommendations.extend(
+                evaluate_join_candidate(con, join, alias_map, query_stats)
+            )
 
         return {
             "ok": True,
             "message": "Plan analyzed successfully.",
             "recommendations": [asdict(r) for r in recommendations],
-            "scan_findings": [asdict(f) for f in findings],
+            "scan_findings": [asdict(f) for f in scan_findings],
+            "join_findings": [asdict(j) for j in join_findings],
             "query_stats": asdict(query_stats) if query_stats else None,
         }
 
@@ -195,16 +240,47 @@ def extract_root_plan(plan_json: Any) -> Dict[str, Any]:
     raise ValueError("Unsupported plan JSON structure.")
 
 
-def walk_plan_for_seq_scans(node: Dict[str, Any], findings: List[ScanFinding]) -> None:
+def collect_relation_aliases(
+    node: Dict[str, Any],
+    alias_map: Dict[str, Dict[str, str]],
+) -> None:
+    relation = node.get("Relation Name")
+    schema = node.get("Schema")
+    alias = node.get("Alias")
+
+    if relation and schema:
+        key = alias or relation
+        alias_map[key] = {
+            "schema": schema,
+            "table": relation,
+            "alias": alias or relation,
+        }
+
+    for child in node.get("Plans", []) or []:
+        collect_relation_aliases(child, alias_map)
+
+
+def walk_plan_collect_findings(
+    node: Dict[str, Any],
+    scan_findings: List[ScanFinding],
+    join_findings: List[JoinFinding],
+) -> None:
     node_type = node.get("Node Type", "")
 
-    if node_type == "Seq Scan" and node.get("Relation Name") and node.get("Schema"):
-        findings.append(
+    # ------------------------------------------------------------
+    # Scan findings
+    # ------------------------------------------------------------
+    if node_type in {"Seq Scan", "Index Scan", "Index Only Scan", "Bitmap Heap Scan"} \
+       and node.get("Relation Name") and node.get("Schema"):
+        scan_findings.append(
             ScanFinding(
                 schema=node["Schema"],
                 table=node["Relation Name"],
                 alias=node.get("Alias"),
                 node_type=node_type,
+                index_name=node.get("Index Name"),
+                index_cond=node.get("Index Cond"),
+                recheck_cond=node.get("Recheck Cond"),
                 filter_expr=node.get("Filter"),
                 actual_rows=float(node.get("Actual Rows", 0) or 0),
                 plan_rows=float(node.get("Plan Rows", 0) or 0),
@@ -216,8 +292,46 @@ def walk_plan_for_seq_scans(node: Dict[str, Any], findings: List[ScanFinding]) -
             )
         )
 
+    # ------------------------------------------------------------
+    # Join findings
+    # ------------------------------------------------------------
+    join_cond_type = None
+    join_cond_expr = None
+
+    if node_type == "Hash Join" and node.get("Hash Cond"):
+        join_cond_type = "Hash Cond"
+        join_cond_expr = node.get("Hash Cond")
+    elif node_type == "Merge Join" and node.get("Merge Cond"):
+        join_cond_type = "Merge Cond"
+        join_cond_expr = node.get("Merge Cond")
+    elif node_type == "Nested Loop" and node.get("Join Filter"):
+        join_cond_type = "Join Filter"
+        join_cond_expr = node.get("Join Filter")
+
+    if join_cond_type and join_cond_expr:
+        left_alias, left_column, right_alias, right_column = extract_simple_join_columns(join_cond_expr)
+
+        join_findings.append(
+            JoinFinding(
+                join_node_type=node_type,
+                join_type=node.get("Join Type", "Unknown"),
+                cond_type=join_cond_type,
+                cond_expr=join_cond_expr,
+                left_alias=left_alias,
+                left_column=left_column,
+                right_alias=right_alias,
+                right_column=right_column,
+                actual_rows=float(node.get("Actual Rows", 0) or 0),
+                plan_rows=float(node.get("Plan Rows", 0) or 0),
+                actual_loops=float(node.get("Actual Loops", 0) or 0),
+                actual_total_time=float(node.get("Actual Total Time", 0) or 0),
+                shared_hit_blocks=int(node.get("Shared Hit Blocks", 0) or 0),
+                shared_read_blocks=int(node.get("Shared Read Blocks", 0) or 0),
+            )
+        )
+
     for child in node.get("Plans", []) or []:
-        walk_plan_for_seq_scans(child, findings)
+        walk_plan_collect_findings(child, scan_findings, join_findings)
 
 
 # --------------------------------------------------------------------
@@ -359,12 +473,6 @@ def load_query_stats(con, queryid: int | str) -> Optional[QueryStats]:
 # --------------------------------------------------------------------
 
 def parse_pg_array_text(value: Optional[str]) -> Optional[List[str]]:
-    """
-    Parse simple d'un tableau PostgreSQL renvoyé sous forme texte.
-    Ex:
-      "{0.1,0.2,0.3}"
-      "{\"A\",\"B\"}"
-    """
     if value is None:
         return None
 
@@ -457,13 +565,94 @@ def load_column_stats(con, schema: str, table: str, column: str) -> Optional[Col
     )
 
 
+def build_column_stats_summary(stats: Optional[ColumnStats]) -> str:
+    if stats is None:
+        return "n_distinct=unknown"
+
+    parts = [f"n_distinct={stats.n_distinct:g}", f"null_frac={stats.null_frac:.4f}"]
+
+    if stats.most_common_vals:
+        parts.append(f"mcv_count={len(stats.most_common_vals)}")
+    else:
+        parts.append("mcv_count=0")
+
+    if stats.histogram_bounds:
+        parts.append(f"histogram_bounds={len(stats.histogram_bounds)}")
+    else:
+        parts.append("histogram_bounds=0")
+
+    return ", ".join(parts)
+
+
+def build_candidate_columns_stats_reason(
+    con,
+    schema: str,
+    table: str,
+    candidate_columns: List[str],
+) -> str:
+    parts: List[str] = []
+
+    for col in candidate_columns:
+        stats = load_column_stats(con, schema, table, col)
+        parts.append(f"{col}: {build_column_stats_summary(stats)}")
+
+    return " | ".join(parts)
+
+
+def try_extract_constant_text(filter_expr: str) -> Optional[str]:
+    m = re.search(
+        r"""(=|>=|<=|>|<)\s*(?:
+            '(?P<quoted>[^']*)'(?:::.*)? |
+            (?P<bare>[^\s\)]+)
+        )""",
+        filter_expr,
+        flags=re.IGNORECASE | re.VERBOSE,
+    )
+    if not m:
+        return None
+
+    value = m.group("quoted")
+    if value is not None:
+        return value.strip()
+
+    value = m.group("bare")
+    if value is not None:
+        return value.strip()
+
+    return None
+
+
+def estimate_equality_selectivity_from_stats(
+    filter_expr: str,
+    column_stats: ColumnStats,
+) -> Optional[float]:
+    op = extract_simple_operator(filter_expr)
+    if op != "=":
+        return None
+
+    const_text = try_extract_constant_text(filter_expr)
+    if const_text is None:
+        return None
+
+    null_frac = column_stats.null_frac or 0.0
+
+    mcv_vals = column_stats.most_common_vals
+    mcv_freqs = column_stats.most_common_freqs
+
+    if mcv_vals and mcv_freqs and len(mcv_vals) == len(mcv_freqs):
+        for value, freq in zip(mcv_vals, mcv_freqs):
+            if str(value) == const_text:
+                return max(0.0, min(float(freq), 1.0))
+
+    nd = column_stats.n_distinct
+    if nd > 0:
+        sel = 1.0 / max(nd, 1.0)
+        return max(0.0, min(sel * (1.0 - null_frac), 1.0))
+
+    return None
+
+
 def try_parse_numeric_constant(filter_expr: str) -> Optional[float]:
-    """
-    Extrait une constante numérique simple depuis:
-      col > '0.25'::double precision
-      col > 0.25
-      col >= 10
-    """
     m = re.search(
         r"""(=|>=|<=|>|<)\s*(?:'(?P<qnum>-?\d+(?:\.\d+)?)'(?:::.*)?|(?P<num>-?\d+(?:\.\d+)?))""",
         filter_expr,
@@ -493,20 +682,6 @@ def estimate_selectivity_from_stats(
     filter_expr: str,
     column_stats: ColumnStats,
 ) -> Optional[float]:
-    """
-    Estimation prudente et partielle.
-    Supporte:
-      col = constant
-      col > constant
-      col >= constant
-      col < constant
-      col <= constant
-
-    Priorité:
-      1. most_common_vals + most_common_freqs
-      2. histogram_bounds
-      3. n_distinct pour "="
-    """
     op = extract_simple_operator(filter_expr)
     if not op:
         return None
@@ -514,15 +689,15 @@ def estimate_selectivity_from_stats(
     if op in {"LIKE", "ILIKE", "~~"}:
         return None
 
+    if op == "=":
+        return estimate_equality_selectivity_from_stats(filter_expr, column_stats)
+
     const = try_parse_numeric_constant(filter_expr)
     if const is None:
         return None
 
     null_frac = column_stats.null_frac or 0.0
 
-    # ----------------------------------------------------------------
-    # 1) Utiliser les MCV si disponibles
-    # ----------------------------------------------------------------
     mcv_vals = column_stats.most_common_vals
     mcv_freqs = column_stats.most_common_freqs
 
@@ -536,9 +711,7 @@ def estimate_selectivity_from_stats(
             matched_freq = 0.0
 
             for value, freq in zip(numeric_mcv_vals, mcv_freqs):
-                if op == "=" and value == const:
-                    matched_freq += freq
-                elif op == ">" and value > const:
+                if op == ">" and value > const:
                     matched_freq += freq
                 elif op == ">=" and value >= const:
                     matched_freq += freq
@@ -547,33 +720,10 @@ def estimate_selectivity_from_stats(
                 elif op == "<=" and value <= const:
                     matched_freq += freq
 
-            # Si toutes les valeurs distinctes semblent couvertes par les MCV,
-            # on peut retourner directement cette estimation.
-            if column_stats.n_distinct > 0 and len(numeric_mcv_vals) >= int(column_stats.n_distinct):
-                return max(0.0, min(matched_freq, 1.0))
-
-            # Sinon, pour "=", on peut déjà s'en contenter si trouvé
-            if op == "=" and matched_freq > 0:
-                return max(0.0, min(matched_freq, 1.0))
-
-            # Pour un range, si on a déjà une bonne part des valeurs dans MCV,
-            # c'est une estimation utile.
             total_mcv_freq = sum(mcv_freqs)
             if total_mcv_freq >= 0.80:
                 return max(0.0, min(matched_freq, 1.0 - null_frac))
 
-    # ----------------------------------------------------------------
-    # 2) Cas "=" avec n_distinct
-    # ----------------------------------------------------------------
-    if op == "=":
-        if column_stats.n_distinct > 0:
-            sel = 1.0 / max(column_stats.n_distinct, 1.0)
-            return max(0.0, min(sel * (1.0 - null_frac), 1.0))
-        return None
-
-    # ----------------------------------------------------------------
-    # 3) Fallback histogram_bounds pour les ranges
-    # ----------------------------------------------------------------
     bounds = column_stats.histogram_bounds
     if not bounds or len(bounds) < 2:
         return None
@@ -594,7 +744,6 @@ def estimate_selectivity_from_stats(
             return 1.0 - null_frac
         if const >= max_b:
             return 0.0
-
         sel = (max_b - const) / (max_b - min_b)
         return max(0.0, min(sel * (1.0 - null_frac), 1.0))
 
@@ -603,7 +752,6 @@ def estimate_selectivity_from_stats(
             return 0.0
         if const >= max_b:
             return 1.0 - null_frac
-
         sel = (const - min_b) / (max_b - min_b)
         return max(0.0, min(sel * (1.0 - null_frac), 1.0))
 
@@ -611,8 +759,98 @@ def estimate_selectivity_from_stats(
 
 
 # --------------------------------------------------------------------
-# Safe recommendation engine
+# Recommendation engine
 # --------------------------------------------------------------------
+
+def evaluate_scan_candidate(
+    con,
+    finding: ScanFinding,
+    meta: TableMeta,
+    query_stats: Optional[QueryStats] = None,
+) -> Recommendation:
+    if finding.node_type == "Seq Scan":
+        return evaluate_seq_scan_candidate(con, finding, meta, query_stats)
+
+    if finding.node_type in {"Index Scan", "Index Only Scan", "Bitmap Heap Scan"}:
+        return evaluate_indexed_scan_candidate(con, finding, meta, query_stats)
+
+    return Recommendation(
+        schema=finding.schema,
+        table=finding.table,
+        confidence="none",
+        reason=f"Unsupported scan type for advisor: {finding.node_type}",
+        node_type=finding.node_type,
+        access_path=finding.node_type,
+        used_index_name=finding.index_name,
+        index_cond=finding.index_cond,
+        recheck_cond=finding.recheck_cond,
+        filter_expr=finding.filter_expr,
+    )
+
+
+def evaluate_indexed_scan_candidate(
+    con,
+    finding: ScanFinding,
+    meta: TableMeta,
+    query_stats: Optional[QueryStats] = None,
+) -> Recommendation:
+    candidate_columns: List[str] = []
+    stats_reason: Optional[str] = None
+
+    if finding.filter_expr:
+        candidate_columns = extract_simple_filter_columns(
+            finding.filter_expr,
+            alias=finding.alias,
+            table=finding.table,
+        )
+        if candidate_columns:
+            stats_reason = build_candidate_columns_stats_reason(
+                con,
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            )
+
+    used_index_def = find_index_definition(meta.indexes, finding.index_name)
+
+    row_gap_flag, row_gap_reason = has_large_row_estimation_gap(
+        finding.actual_rows,
+        finding.plan_rows,
+        threshold=3.0,
+    )
+
+    if finding.index_name:
+        reason = f'{finding.node_type} already in use via index "{finding.index_name}".'
+    else:
+        reason = f"{finding.node_type} already in use."
+
+    if row_gap_flag:
+        reason += " A notable planner row-estimation gap was observed for this indexed access path."
+    else:
+        reason += " Planner row estimation for this indexed access path looks acceptable."
+
+    if finding.filter_expr:
+        reason += " No additional simple index recommendation is produced by the current advisor logic for this indexed scan."
+    else:
+        reason += " No additional simple index recommendation is produced."
+
+    return Recommendation(
+        schema=finding.schema,
+        table=finding.table,
+        confidence="none",
+        reason=reason,
+        node_type=finding.node_type,
+        access_path=finding.node_type,
+        used_index_name=finding.index_name,
+        used_index_def=used_index_def,
+        index_cond=finding.index_cond,
+        recheck_cond=finding.recheck_cond,
+        filter_expr=finding.filter_expr,
+        candidate_columns=candidate_columns or None,
+        stats_reason=stats_reason,
+        row_estimation_reason=row_gap_reason,
+    )
+
 
 def evaluate_seq_scan_candidate(
     con,
@@ -620,13 +858,42 @@ def evaluate_seq_scan_candidate(
     meta: TableMeta,
     query_stats: Optional[QueryStats] = None,
 ) -> Recommendation:
+    candidate_columns: List[str] = []
+    stats_reason: Optional[str] = None
+
+    if finding.filter_expr:
+        candidate_columns = extract_simple_filter_columns(
+            finding.filter_expr,
+            alias=finding.alias,
+            table=finding.table,
+        )
+        if candidate_columns:
+            stats_reason = build_candidate_columns_stats_reason(
+                con,
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            )
+    row_gap_flag, row_gap_reason = has_large_row_estimation_gap(
+        finding.actual_rows,
+        finding.plan_rows,
+    )
+
     if not finding.filter_expr:
         return Recommendation(
             schema=finding.schema,
             table=finding.table,
             confidence="none",
             reason="Sequential scan without filter: an index would not be a safe recommendation.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            row_estimation_reason=row_gap_reason,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
         )
 
     if is_small_table(meta):
@@ -638,7 +905,15 @@ def evaluate_seq_scan_candidate(
                 "Table is small; sequential scan is usually appropriate and "
                 "an automatic index recommendation would not be safe."
             ),
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
     if finding.actual_total_time < 1.0 and not is_high_workload(query_stats):
@@ -647,7 +922,15 @@ def evaluate_seq_scan_candidate(
             table=finding.table,
             confidence="none",
             reason="Scan is already very fast and workload is not significant enough.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
     selected_fraction = estimate_selected_fraction(finding)
@@ -657,7 +940,15 @@ def evaluate_seq_scan_candidate(
             table=finding.table,
             confidence="none",
             reason="Unable to estimate filter selectivity safely from execution stats.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
     if selected_fraction >= 0.50:
@@ -669,18 +960,16 @@ def evaluate_seq_scan_candidate(
                 f"Filter keeps a very large fraction of rows "
                 f"({selected_fraction:.1%}); a sequential scan is likely appropriate."
             ),
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
-
-    if selected_fraction >= 0.20:
-        # on continue l'analyse, mais on ne classera pas ça en "safe"
-        pass
-
-    candidate_columns = extract_simple_filter_columns(
-        finding.filter_expr,
-        alias=finding.alias,
-        table=finding.table,
-    )
 
     if not candidate_columns:
         return Recommendation(
@@ -688,7 +977,15 @@ def evaluate_seq_scan_candidate(
             table=finding.table,
             confidence="none",
             reason="Filter is not simple enough for a safe automatic index recommendation.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
+            candidate_columns=None,
+            stats_reason=None,
+            row_estimation_reason=row_gap_reason,
         )
 
     matched_index = find_equivalent_index(meta.indexes, candidate_columns)
@@ -698,9 +995,16 @@ def evaluate_seq_scan_candidate(
             table=finding.table,
             confidence="none",
             reason="An equivalent index already exists.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
             existing_index_match=matched_index,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
     if looks_like_prefix_search(finding.filter_expr):
@@ -712,9 +1016,16 @@ def evaluate_seq_scan_candidate(
                 "Prefix LIKE filter detected. An index may help, but operator class / collation "
                 "should be verified before recommending it automatically."
             ),
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
             create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
     if looks_suspicious_predicate(finding.filter_expr):
@@ -726,12 +1037,18 @@ def evaluate_seq_scan_candidate(
                 "Highly selective filter on a non-small table, but the predicate looks unusual. "
                 "Review before creating an index."
             ),
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
             create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
         )
 
-    # Validation par pg_stats pour réserver "safe" aux cas solides
     if len(candidate_columns) == 1:
         stats = load_column_stats(con, finding.schema, finding.table, candidate_columns[0])
 
@@ -744,10 +1061,16 @@ def evaluate_seq_scan_candidate(
                     "Execution suggests a selective filtered scan, but pg_stats are unavailable; "
                     "review before creating the index."
                 ),
+                node_type=finding.node_type,
+                access_path=finding.node_type,
+                used_index_name=finding.index_name,
+                index_cond=finding.index_cond,
+                recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
                 create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
-                stats_reason="No pg_stats entry found.",
+                stats_reason=stats_reason,
+                row_estimation_reason=row_gap_reason,
             )
 
         estimated_selectivity = estimate_selectivity_from_stats(finding.filter_expr, stats)
@@ -759,12 +1082,18 @@ def evaluate_seq_scan_candidate(
                 confidence="review",
                 reason=(
                     "Execution suggests a selective filtered scan, but column statistics do not "
-                    "allow a confident selectivity estimate."
+                    "allow a confident selectivity estimate without deeper predicate parsing."
                 ),
+                node_type=finding.node_type,
+                access_path=finding.node_type,
+                used_index_name=finding.index_name,
+                index_cond=finding.index_cond,
+                recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
                 create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
-                stats_reason="Could not estimate selectivity from pg_stats.",
+                stats_reason=stats_reason,
+                row_estimation_reason=row_gap_reason,
             )
 
         if estimated_selectivity >= 0.20:
@@ -776,10 +1105,20 @@ def evaluate_seq_scan_candidate(
                     "Execution was selective, but pg_stats suggest the predicate may not be "
                     "selective enough overall to justify a safe automatic index recommendation."
                 ),
+                node_type=finding.node_type,
+                access_path=finding.node_type,
+                used_index_name=finding.index_name,
+                index_cond=finding.index_cond,
+                recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
                 create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
-                stats_reason=f"Estimated selectivity from pg_stats: {estimated_selectivity:.1%}",
+                stats_reason=(
+                    f"{stats_reason} | estimated_selectivity={estimated_selectivity:.1%}"
+                    if stats_reason
+                    else f"estimated_selectivity={estimated_selectivity:.1%}"
+                ),
+                row_estimation_reason=row_gap_reason,
             )
 
         return Recommendation(
@@ -790,10 +1129,20 @@ def evaluate_seq_scan_candidate(
                 "Highly selective filtered sequential scan on a non-small table with no equivalent "
                 "existing index, confirmed by pg_stats."
             ),
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
             create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
-            stats_reason=f"Estimated selectivity from pg_stats: {estimated_selectivity:.1%}",
+            stats_reason=(
+                f"{stats_reason} | estimated_selectivity={estimated_selectivity:.1%}"
+                if stats_reason
+                else f"estimated_selectivity={estimated_selectivity:.1%}"
+            ),
+            row_estimation_reason=row_gap_reason,
         )
 
     return Recommendation(
@@ -801,10 +1150,174 @@ def evaluate_seq_scan_candidate(
         table=finding.table,
         confidence="review",
         reason="Multiple candidate columns detected. Review manually before creating a composite index.",
+        node_type=finding.node_type,
+        access_path=finding.node_type,
+        used_index_name=finding.index_name,
+        index_cond=finding.index_cond,
+        recheck_cond=finding.recheck_cond,
         filter_expr=finding.filter_expr,
         candidate_columns=candidate_columns,
         create_index_sql=build_create_index_sql(finding.schema, finding.table, candidate_columns),
+        stats_reason=stats_reason,
+        row_estimation_reason=row_gap_reason,
     )
+
+
+def evaluate_join_candidate(
+    con,
+    join: JoinFinding,
+    alias_map: Dict[str, Dict[str, str]],
+    query_stats: Optional[QueryStats] = None,
+) -> List[Recommendation]:
+    recommendations: List[Recommendation] = []
+
+    if not all([join.left_alias, join.left_column, join.right_alias, join.right_column]):
+        return recommendations
+
+    left_rel = alias_map.get(join.left_alias)
+    right_rel = alias_map.get(join.right_alias)
+
+    if not left_rel or not right_rel:
+        return recommendations
+
+    left_meta = load_table_meta(con, left_rel["schema"], left_rel["table"])
+    right_meta = load_table_meta(con, right_rel["schema"], right_rel["table"])
+
+    if left_meta is None or right_meta is None:
+        return recommendations
+
+    if not is_small_table(left_meta):
+        existing_left = find_equivalent_index(left_meta.indexes, [join.left_column])
+        if not existing_left:
+            recommendations.append(
+                Recommendation(
+                    schema=left_meta.schema,
+                    table=left_meta.table,
+                    confidence="review",
+                    reason=(
+                        f"{join.cond_type} on {join.left_alias}.{join.left_column} = "
+                        f"{join.right_alias}.{join.right_column}. "
+                        "No equivalent single-column index found on this non-small table; "
+                        "review whether a join-supporting index would help."
+                    ),
+                    node_type=join.join_node_type,
+                    access_path=join.join_node_type,
+                    filter_expr=join.cond_expr,
+                    candidate_columns=[join.left_column],
+                    create_index_sql=build_create_index_sql(
+                        left_meta.schema,
+                        left_meta.table,
+                        [join.left_column],
+                    ),
+                )
+            )
+
+    if not is_small_table(right_meta):
+        existing_right = find_equivalent_index(right_meta.indexes, [join.right_column])
+        if not existing_right:
+            recommendations.append(
+                Recommendation(
+                    schema=right_meta.schema,
+                    table=right_meta.table,
+                    confidence="review",
+                    reason=(
+                        f"{join.cond_type} on {join.left_alias}.{join.left_column} = "
+                        f"{join.right_alias}.{join.right_column}. "
+                        "No equivalent single-column index found on this non-small table; "
+                        "review whether a join-supporting index would help."
+                    ),
+                    node_type=join.join_node_type,
+                    access_path=join.join_node_type,
+                    filter_expr=join.cond_expr,
+                    candidate_columns=[join.right_column],
+                    create_index_sql=build_create_index_sql(
+                        right_meta.schema,
+                        right_meta.table,
+                        [join.right_column],
+                    ),
+                )
+            )
+
+    return recommendations
+
+
+# --------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------
+def has_large_row_estimation_gap(
+    actual_rows: float,
+    plan_rows: float,
+    threshold: float = 5.0,   
+) -> tuple[bool, Optional[str]]:
+    """
+    Détecte un écart significatif entre estimation planner et exécution réelle.
+
+    threshold = facteur multiplicatif (ex: 5 => x5 ou /5)
+    """
+
+    if plan_rows <= 0:
+        return False, None
+
+    ratio = actual_rows / plan_rows
+
+    if ratio >= threshold:
+        return True, f"Underestimation (~{ratio:.1f}x more rows than expected)"
+
+    if ratio <= 1 / threshold:
+        return True, f"Overestimation (~{1/ratio:.1f}x fewer rows than expected)"
+
+    return False, None
+
+def find_index_definition(indexes: List[Dict[str, Any]], index_name: Optional[str]) -> Optional[str]:
+    if not index_name:
+        return None
+
+    for idx in indexes:
+        if idx.get("index_name") == index_name:
+            return idx.get("indexdef")
+    return None
+
+def compute_row_estimation_ratio(plan_rows: float, actual_rows: float) -> Optional[float]:
+    """
+    Retourne un ratio >= 1.0 représentant l'écart absolu entre estimation et réel.
+
+    Exemples:
+      plan=100, actual=100   -> 1.0
+      plan=100, actual=1000  -> 10.0
+      plan=1000, actual=100  -> 10.0
+    """
+    if plan_rows < 0 or actual_rows < 0:
+        return None
+
+    # éviter division par zéro tout en restant interprétable
+    p = max(plan_rows, 1.0)
+    a = max(actual_rows, 1.0)
+
+    return max(a / p, p / a)
+
+def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
+    ratio = compute_row_estimation_ratio(plan_rows, actual_rows)
+    if ratio is None:
+        return "Row estimate comparison unavailable."
+
+    abs_diff = actual_rows - plan_rows
+
+    if ratio <= 1.5:
+        quality = "Planner row estimate is close to actual rows."
+    elif ratio <= 3.0:
+        quality = "Planner row estimate differs moderately from actual rows."
+    elif ratio <= 10.0:
+        quality = "Planner row estimate differs significantly from actual rows."
+    else:
+        quality = "Planner row estimate differs very strongly from actual rows."
+
+    return (
+        f"{quality} "
+        f"plan_rows={plan_rows:.0f}, actual_rows={actual_rows:.0f}, "
+        f"absolute_diff={abs_diff:.0f}, mismatch_ratio={ratio:.2f}x."
+    )
+
+
 
 
 def is_small_table(meta: TableMeta) -> bool:
@@ -850,9 +1363,6 @@ def strip_outer_parentheses(expr: str) -> str:
 
 
 def split_top_level_and(expr: str) -> List[str]:
-    """
-    Découpe uniquement sur les AND au niveau racine.
-    """
     parts: List[str] = []
     current: List[str] = []
     depth = 0
@@ -874,9 +1384,9 @@ def split_top_level_and(expr: str) -> List[str]:
             i += 1
             continue
 
-        if depth == 0 and upper_expr[i:i+3] == "AND":
-            prev_ok = (i == 0) or expr[i-1].isspace() or expr[i-1] == ")"
-            next_ok = (i + 3 >= len(expr)) or expr[i+3].isspace() or expr[i+3] == "("
+        if depth == 0 and upper_expr[i:i + 3] == "AND":
+            prev_ok = (i == 0) or expr[i - 1].isspace() or expr[i - 1] == ")"
+            next_ok = (i + 3 >= len(expr)) or expr[i + 3].isspace() or expr[i + 3] == "("
 
             if prev_ok and next_ok:
                 part = "".join(current).strip()
@@ -894,6 +1404,7 @@ def split_top_level_and(expr: str) -> List[str]:
         parts.append(tail)
 
     return parts
+
 
 def strip_trivial_lhs_casts(expr: str) -> str:
     expr = expr.strip()
@@ -916,21 +1427,6 @@ def strip_trivial_lhs_casts(expr: str) -> str:
 
 
 def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:
-    """
-    Cas supportés:
-      alias.col = const
-      alias.col > const
-      alias.col >= const
-      alias.col < const
-      alias.col <= const
-      alias.col LIKE 'abc%'
-      alias.col ~~ 'abc%'
-      AND entre clauses simples
-
-    Tolère aussi:
-      ((o.col)::text = 'x'::text)
-      ((o.order_date >= '1998-04-21'::date) AND (o.order_date < '1998-04-17'::date))
-    """
     expr = strip_outer_parentheses(filter_expr.strip())
     clauses = split_top_level_and(expr)
 
@@ -979,6 +1475,28 @@ def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table:
     return deduped
 
 
+def extract_simple_join_columns(
+    cond_expr: str,
+) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    expr = strip_outer_parentheses(cond_expr.strip())
+
+    m = re.match(
+        r'^(?P<left_alias>[A-Za-z_][A-Za-z0-9_]*)\.(?P<left_col>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*'
+        r'(?P<right_alias>[A-Za-z_][A-Za-z0-9_]*)\.(?P<right_col>[A-Za-z_][A-Za-z0-9_]*)$',
+        expr,
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        return None, None, None, None
+
+    return (
+        m.group("left_alias"),
+        m.group("left_col"),
+        m.group("right_alias"),
+        m.group("right_col"),
+    )
+
+
 def looks_like_prefix_search(filter_expr: str) -> bool:
     return bool(
         re.search(r"(LIKE|~~)\s+'[^%_']+%'", filter_expr, flags=re.IGNORECASE)
@@ -995,10 +1513,6 @@ def looks_suspicious_predicate(filter_expr: str) -> bool:
 
 
 def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List[str]) -> Optional[str]:
-    """
-    Vérifie un préfixe simple.
-    Si candidate_columns == ['a'] et un index (a, b) existe, on considère que ça couvre.
-    """
     wanted = [c.strip('"') for c in candidate_columns]
 
     for idx in indexes:
@@ -1009,9 +1523,9 @@ def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List
 
 
 def build_create_index_sql(schema: str, table: str, columns: List[str]) -> str:
-    idx_name = f"idx_{table}_{'_'.join(columns)}"
+    idx_name = f"pga_idx_{table}_{'_'.join(columns)}"
     cols_sql = ", ".join(f'"{c}"' for c in columns)
-    return f'CREATE INDEX "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
+    return f'CREATE INDEX CONCURRENTLY "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
 
 
 def is_high_workload(query_stats: Optional[QueryStats]) -> bool:
@@ -1030,11 +1544,59 @@ def is_high_workload(query_stats: Optional[QueryStats]) -> bool:
 
 def pretty_print_analysis(result: Dict[str, Any]) -> None:
     print(result["message"])
+
+    if result.get("scan_findings"):
+        print("=" * 80)
+        print("SCAN FINDINGS")
+        for finding in result["scan_findings"]:
+            print("-" * 80)
+            print(f"{finding['schema']}.{finding['table']} ({finding['node_type']})")
+            if finding.get("alias"):
+                print(f"alias: {finding['alias']}")
+            if finding.get("index_name"):
+                print(f"index: {finding['index_name']}")
+            if finding.get("index_cond"):
+                print(f"index_cond: {finding['index_cond']}")
+            if finding.get("recheck_cond"):
+                print(f"recheck_cond: {finding['recheck_cond']}")
+            if finding.get("filter_expr"):
+                print(f"filter: {finding['filter_expr']}")
+            print(f"actual_rows: {finding['actual_rows']}")
+            print(f"plan_rows: {finding['plan_rows']}")
+            print(f"actual_total_time: {finding['actual_total_time']}")
+
+    if result.get("join_findings"):
+        print("=" * 80)
+        print("JOIN FINDINGS")
+        for join in result["join_findings"]:
+            print("-" * 80)
+            print(f"{join['join_node_type']} / {join['join_type']}")
+            print(f"{join['cond_type']}: {join['cond_expr']}")
+            print(
+                f"left: {join.get('left_alias')}.{join.get('left_column')} | "
+                f"right: {join.get('right_alias')}.{join.get('right_column')}"
+            )
+            print(f"actual_rows: {join['actual_rows']}")
+            print(f"plan_rows: {join['plan_rows']}")
+            print(f"actual_total_time: {join['actual_total_time']}")
+
+    print("=" * 80)
+    print("RECOMMENDATIONS")
     for rec in result["recommendations"]:
         print("-" * 80)
         print(f"{rec['schema']}.{rec['table']}")
         print(f"confidence: {rec['confidence']}")
+        if rec.get("node_type"):
+            print(f"node_type: {rec['node_type']}")
+        if rec.get("access_path"):
+            print(f"access_path: {rec['access_path']}")
         print(f"reason: {rec['reason']}")
+        if rec.get("used_index_name"):
+            print(f"used_index: {rec['used_index_name']}")
+        if rec.get("index_cond"):
+            print(f"index_cond: {rec['index_cond']}")
+        if rec.get("recheck_cond"):
+            print(f"recheck_cond: {rec['recheck_cond']}")
         if rec.get("filter_expr"):
             print(f"filter: {rec['filter_expr']}")
         if rec.get("candidate_columns"):
