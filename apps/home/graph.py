@@ -22,9 +22,11 @@ def build_mermaid_erd_from_explain_stats(
       - mermaid_code: Mermaid ER diagram as string (empty if error)
       - message: status / error message (empty if OK)
     """
+    
 
     # ---- 1) Validate and aggregate by table ----
     by_table = explain_stats.get("by_table") or []
+
     if not isinstance(by_table, list):
         return "", "Invalid explain_stats: 'by_table' must be a list."
 
@@ -37,6 +39,7 @@ def build_mermaid_erd_from_explain_stats(
 
     for r in by_table:
         t = r.get("table")
+        
         if not t:
             continue
         ms = float(r.get("self_time_ms") or 0.0)
@@ -69,9 +72,11 @@ def build_mermaid_erd_from_explain_stats(
 
     try:
         with conn.cursor() as cur:
-            pk_cols = _fetch_pk_columns(cur, tables_pairs)
-            fk_edges = _fetch_fk_edges(cur, tables_pairs)
-            est_rows = _fetch_est_rows(cur, tables_pairs) if include_est_rows else {}
+            resolved_tables = _resolve_input_relations(cur, tables_pairs)
+
+            pk_cols = _fetch_pk_columns(cur, resolved_tables)
+            fk_edges = _fetch_fk_edges(cur, resolved_tables)
+            est_rows = _fetch_est_rows(cur, resolved_tables) if include_est_rows else {}
 
         # Child-side FK columns for box content
         fk_cols_by_table = defaultdict(list)
@@ -147,6 +152,60 @@ def build_mermaid_erd_from_explain_stats(
 
 
 # ---------------- internal helpers ----------------
+def _resolve_input_relations(cur, tables: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
+    """
+    Resolve exact input (schema, table) pairs to rel OIDs once, then reuse those OIDs
+    for PK/FK/stats lookups.
+
+    Returns a list of dicts:
+      {
+        "schema": ...,
+        "table": ...,
+        "full_name": "schema.table",
+        "oid": ...,
+        "relkind": ...
+      }
+    """
+    if not tables:
+        return []
+
+    values_sql = ",".join(["(%s,%s)"] * len(tables))
+    params = [x for pair in tables for x in pair]
+
+    sql = f"""
+    WITH input_tables(schema_name, table_name) AS (
+      VALUES {values_sql}
+    )
+    SELECT
+      it.schema_name,
+      it.table_name,
+      c.oid,
+      c.relkind
+    FROM input_tables it
+    JOIN pg_namespace n
+      ON n.nspname = it.schema_name
+    JOIN pg_class c
+      ON c.relnamespace = n.oid
+     AND c.relname = it.table_name
+    WHERE c.relkind IN ('r', 'p', 'm')
+    ORDER BY it.schema_name, it.table_name;
+    """
+
+    cur.execute(sql, params)
+
+    out = []
+    for schema_name, table_name, oid, relkind in cur.fetchall():
+        out.append(
+            {
+                "schema": schema_name,
+                "table": table_name,
+                "full_name": f"{schema_name}.{table_name}",
+                "oid": oid,
+                "relkind": relkind,
+            }
+        )
+    return out
+
 
 def _mermaid_entity_id(schema_table: str) -> str:
     return schema_table.replace(".", "_").replace("-", "_").upper()
@@ -164,126 +223,116 @@ def _pct_to_bucket(pct: float) -> str:
     return "load4"
 
 
-def _fetch_pk_columns(cur, tables: List[Tuple[str, str]]) -> Dict[str, List[str]]:
-    if not tables:
+def _fetch_pk_columns(cur, resolved_tables: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    if not resolved_tables:
         return {}
 
-    values_sql = ",".join(["(%s,%s)"] * len(tables))
-    params = [x for pair in tables for x in pair]
+    relids = [r["oid"] for r in resolved_tables]
+    full_name_by_oid = {r["oid"]: r["full_name"] for r in resolved_tables}
 
-    sql = f"""
-    WITH input_tables(schema_name, table_name) AS (
-      VALUES {values_sql}
-    ),
-    tbl AS (
-      SELECT c.oid AS relid
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      JOIN input_tables it ON it.schema_name = n.nspname AND it.table_name = c.relname
-      WHERE c.relkind IN ('r','p')
-    )
+    sql = """
     SELECT
-      n.nspname AS schema_name,
-      c.relname AS table_name,
+      con.conrelid,
       a.attname AS col_name,
       u.ord     AS ord
     FROM pg_constraint con
-    JOIN pg_class c ON c.oid = con.conrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    JOIN tbl t ON t.relid = c.oid
     JOIN LATERAL unnest(con.conkey) WITH ORDINALITY u(attnum, ord) ON true
-    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = u.attnum
+    JOIN pg_attribute a
+      ON a.attrelid = con.conrelid
+     AND a.attnum = u.attnum
     WHERE con.contype = 'p'
-    ORDER BY schema_name, table_name, ord;
+      AND con.conrelid = ANY(%s)
+    ORDER BY con.conrelid, u.ord;
     """
-    cur.execute(sql, params)
+
+    cur.execute(sql, (relids,))
 
     out = defaultdict(list)
-    for schema_name, table_name, col_name, _ord in cur.fetchall():
-        out[f"{schema_name}.{table_name}"].append(col_name)
+    for conrelid, col_name, _ord in cur.fetchall():
+        full_name = full_name_by_oid.get(conrelid)
+        if full_name:
+            out[full_name].append(col_name)
+
     return dict(out)
 
 
-def _fetch_fk_edges(cur, tables: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
-    if not tables:
+def _fetch_fk_edges(cur, resolved_tables: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not resolved_tables:
         return []
 
-    values_sql = ",".join(["(%s,%s)"] * len(tables))
-    params = [x for pair in tables for x in pair]
+    relids = [r["oid"] for r in resolved_tables]
+    full_name_by_oid = {r["oid"]: r["full_name"] for r in resolved_tables}
 
-    sql = f"""
-    WITH input_tables(schema_name, table_name) AS (
-      VALUES {values_sql}
-    ),
-    tbl AS (
-      SELECT c.oid AS relid
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      JOIN input_tables it ON it.schema_name = n.nspname AND it.table_name = c.relname
-      WHERE c.relkind IN ('r','p')
-    )
+    sql = """
     SELECT
-      nsrc.nspname AS from_schema,
-      src.relname  AS from_table,
-      con.conname  AS fk_name,
+      con.conrelid,
+      con.confrelid,
+      con.conname AS fk_name,
       ARRAY_AGG(src_att.attname ORDER BY k.ord) AS from_cols,
-      ntgt.nspname AS to_schema,
-      tgt.relname  AS to_table,
       ARRAY_AGG(tgt_att.attname ORDER BY k.ord) AS to_cols
     FROM pg_constraint con
-    JOIN pg_class src      ON src.oid = con.conrelid
-    JOIN pg_namespace nsrc ON nsrc.oid = src.relnamespace
-    JOIN pg_class tgt      ON tgt.oid = con.confrelid
-    JOIN pg_namespace ntgt ON ntgt.oid = tgt.relnamespace
     JOIN LATERAL (
       SELECT u.ord, u.src_attnum, v.tgt_attnum
-      FROM unnest(con.conkey) WITH ORDINALITY u(src_attnum, ord)
+      FROM unnest(con.conkey)  WITH ORDINALITY u(src_attnum, ord)
       JOIN unnest(con.confkey) WITH ORDINALITY v(tgt_attnum, ord) USING (ord)
     ) k ON true
-    JOIN pg_attribute src_att ON src_att.attrelid = src.oid AND src_att.attnum = k.src_attnum
-    JOIN pg_attribute tgt_att ON tgt_att.attrelid = tgt.oid AND tgt_att.attnum = k.tgt_attnum
-    WHERE con.contype='f'
-      AND con.conrelid  IN (SELECT relid FROM tbl)
-      AND con.confrelid IN (SELECT relid FROM tbl)
-    GROUP BY
-      nsrc.nspname, src.relname, con.conname,
-      ntgt.nspname, tgt.relname
-    ORDER BY 1,2,3;
+    JOIN pg_attribute src_att
+      ON src_att.attrelid = con.conrelid
+     AND src_att.attnum = k.src_attnum
+    JOIN pg_attribute tgt_att
+      ON tgt_att.attrelid = con.confrelid
+     AND tgt_att.attnum = k.tgt_attnum
+    WHERE con.contype = 'f'
+      AND con.conrelid = ANY(%s)
+      AND con.confrelid = ANY(%s)
+    GROUP BY con.conrelid, con.confrelid, con.conname
+    ORDER BY con.conrelid, con.conname;
     """
-    cur.execute(sql, params)
+
+    cur.execute(sql, (relids, relids))
 
     edges = []
-    for from_schema, from_table, fk_name, from_cols, to_schema, to_table, to_cols in cur.fetchall():
-        edges.append({
-            "from_table": f"{from_schema}.{from_table}",
-            "to_table": f"{to_schema}.{to_table}",
-            "fk_name": fk_name,
-            "from_cols": list(from_cols),
-            "to_cols": list(to_cols),
-        })
+    for conrelid, confrelid, fk_name, from_cols, to_cols in cur.fetchall():
+        from_full = full_name_by_oid.get(conrelid)
+        to_full = full_name_by_oid.get(confrelid)
+        if not from_full or not to_full:
+            continue
+
+        edges.append(
+            {
+                "from_table": from_full,
+                "to_table": to_full,
+                "fk_name": fk_name,
+                "from_cols": list(from_cols),
+                "to_cols": list(to_cols),
+            }
+        )
+
     return edges
 
 
-def _fetch_est_rows(cur, tables: List[Tuple[str, str]]) -> Dict[str, float]:
-    if not tables:
+def _fetch_est_rows(cur, resolved_tables: List[Dict[str, Any]]) -> Dict[str, float]:
+    if not resolved_tables:
         return {}
 
-    values_sql = ",".join(["(%s,%s)"] * len(tables))
-    params = [x for pair in tables for x in pair]
-
-    sql = f"""
-    WITH input_tables(schema_name, table_name) AS (
-      VALUES {values_sql}
-    )
-    SELECT n.nspname, c.relname, c.reltuples
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    JOIN input_tables it ON it.schema_name = n.nspname AND it.table_name = c.relname
-    WHERE c.relkind IN ('r','p');
-    """
-    cur.execute(sql, params)
-
     out = {}
-    for schema_name, table_name, reltuples in cur.fetchall():
-        out[f"{schema_name}.{table_name}"] = float(reltuples or 0.0)
+    for r in resolved_tables:
+        out[r["full_name"]] = 0.0
+
+    sql = """
+    SELECT oid, reltuples
+    FROM pg_class
+    WHERE oid = ANY(%s);
+    """
+
+    relids = [r["oid"] for r in resolved_tables]
+    full_name_by_oid = {r["oid"]: r["full_name"] for r in resolved_tables}
+
+    cur.execute(sql, (relids,))
+
+    for oid, reltuples in cur.fetchall():
+        full_name = full_name_by_oid.get(oid)
+        if full_name:
+            out[full_name] = float(reltuples or 0.0)
+
     return out

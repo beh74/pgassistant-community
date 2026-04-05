@@ -24,6 +24,7 @@ from . import graph
 from . import graph_table
 from . import pgstat_helper
 from . import analyze_advisor
+from . import tetris
 import re
 import requests
 import json
@@ -867,9 +868,25 @@ def tetris_table(schema: str, tablename:str):
     tetris_sql = database.get_query_by_id('tetris_play')
     tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
     tetris_result = database.generic_select_with_sql(session, tetris_sql)
-    tetris_result_sql = tetris_result[0]['create_table_tetris_ddl']
-    
+    tetris_result_sql = "-- Create Tetris table DDL and copy source data\n" +tetris_result[0]['create_table_tetris_ddl']
     tetris_result_sql = tetris_result_sql.replace("\\n", "\n")
+    tetris_result_sql += "\n\n" + "-- Alter table with constraints and indexes\n" + tetris.extract_post_create_ddl(ddl_str, schema, tablename)
+    tetris_result_sql += "\n\n" + """
+-- pgAssistant notice:
+-- The final table swap (dropping the original table and renaming the _tetris table)
+-- is NOT automatically generated.
+--
+-- Renaming a table may NOT have the expected effect:
+-- dependencies such as foreign keys, views, or application references
+-- may still point to the original table (renamed), not the new one.
+--
+-- You may need to:
+--   - drop and recreate foreign keys
+--   - drop and recreate dependent views
+--   - validate application dependencies
+--
+-- Please review and execute the final migration steps manually.
+"""
     tetris_result_sql=ddl.sql_to_html(tetris_result_sql)
     
     return render_template('home/tetris.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", tetris=tetris_result_sql, title=f"Postgres column Tetris for {schema}.{tablename}")

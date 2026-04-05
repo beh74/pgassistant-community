@@ -1,5 +1,14 @@
 # Change Log
 
+## [2.6.2] - 2026-05-04
+
+## Improvements
+
+- Many UI/UX improvements : We’ve hidden a bunch of “Easter eggs” in this release… except they’re all actual features and improvements. Happy hunting!
+- Advisor code refactor
+- Play tetris is now handling numeric data types
+
+
 ## [2.6.1] - 2026-03-04
 
 ## Improvements

@@ -1,1267 +1,1187 @@
 {% extends "layouts/base.html" %}
-{% block title %} Analyze query {% endblock %}
+{% block title %}Analyze query{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
 <style>
-    /* Suggestions box styling */
+  :root {
+    --pg-blue: #336791;
+    --pg-blue-soft: #f8fbff;
+    --pg-border: rgba(17, 24, 39, 0.08);
+    --pg-muted: #6c757d;
+    --pg-text: #334155;
+  }
 
-    .advisor-card {
-      border-radius: 1rem;
-      background: #ffffff;
-    }
+  .analyze-page-header {
+    margin-bottom: 1.5rem;
+  }
 
-    .advisor-title {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #1f2a44;
-    }
+  .analyze-muted {
+    color: var(--pg-muted);
+  }
 
-    .advisor-summary {
-      font-size: 1rem;
-      line-height: 1.55;
-      color: #46566f;
-    }
+  .analyze-summary-card,
+  .analyze-section-card,
+  .advisor-card,
+  .kpi-card,
+  .insight-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+  }
 
-    .advisor-meta-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.42rem 0.72rem;
-      border-radius: 999px;
-      background: #f4f7fb;
-      border: 1px solid #dde5f0;
-    }
+  .analyze-subtle-box {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.85rem;
+    padding: 1rem;
+  }
 
-    .advisor-meta-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      color: #708198;
-    }
+  .analyze-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pg-muted);
+    margin-bottom: 1rem;
+  }
 
-    .advisor-meta-value {
-      font-size: 0.86rem;
-      font-weight: 600;
-      color: #24324a;
-    }
+  .analyze-sql-block {
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0;
+  }
 
-    .advisor-confidence-wrap {
-      text-align: right;
-      min-width: 110px;
-    }
+  .analyze-nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: none;
+  }
 
-    .advisor-confidence-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      color: #708198;
-      margin-bottom: 0.35rem;
-    }
+  .analyze-nav-tabs .nav-link {
+    display: inline-flex !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1rem;
+    color: #495057;
+    background: #f8f9fa;
+    font-weight: 500;
+  }
 
-    .advisor-confidence-badge {
-      display: inline-block;
-      padding: 0.5rem 0.9rem;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 800;
-      letter-spacing: 0.03em;
-    }
+  .analyze-nav-tabs .nav-link.active {
+    background: #ffffff;
+    color: #0d6efd;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+  }
 
-    .advisor-confidence-safe {
-      background: #1f5faa;
-      color: #ffffff;
-    }
+  .analyze-kpi {
+    border-radius: 0.85rem;
+    background: #f8f9fa;
+    padding: 1rem;
+    height: 100%;
+  }
 
-    .advisor-confidence-review {
-      background: #77a9df;
-      color: #0f2742;
-    }
+  .analyze-kpi-label,
+  .kpi-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pg-muted);
+    margin-bottom: 0.35rem;
+  }
 
-    .advisor-confidence-none {
-      background: #dbe8f6;
-      color: #335273;
-    }
+  .analyze-kpi-value,
+  .kpi-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    letter-spacing: -0.02em;
+  }
 
-    .advisor-sql-box {
-      padding-top: 0.25rem;
-    }
+  .pg-badge {
+    background: var(--pg-blue);
+    color: #fff;
+    padding: 0.55rem 0.8rem;
+    border-radius: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
-    .advisor-details {
-      margin-top: 0.75rem;
-      border-top: 1px dashed #d8e1ee;
-      padding-top: 0.85rem;
-    }
+  .pg-pill,
+  .metric-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.82rem;
+    background: #fff;
+    color: #334155;
+  }
 
-    .advisor-details-summary {
-      cursor: pointer;
-      list-style: none;
-      font-size: 0.92rem;
-      font-weight: 700;
-      color: #39557a;
-      user-select: none;
-    }
+  .chip-label {
+    color: var(--pg-muted);
+  }
 
-    .advisor-details-summary::-webkit-details-marker {
-      display: none;
-    }
+  .muted-small {
+    font-size: 0.85rem;
+    color: var(--pg-muted);
+  }
 
-    .advisor-details-summary::before {
-      content: "▸";
-      display: inline-block;
-      margin-right: 0.45rem;
-      color: #6a89ac;
-      transition: transform 0.15s ease;
-    }
+  .progress.pg-progress {
+    height: 10px;
+    border-radius: 999px;
+  }
 
-    .advisor-details[open] .advisor-details-summary::before {
-      transform: rotate(90deg);
-    }
+  .progress.pg-progress .progress-bar {
+    background: var(--pg-blue);
+  }
 
-    .advisor-section {
-      padding: 0.9rem 1rem;
-      border: 1px solid #e4ebf4;
-      border-radius: 0.85rem;
-      background: #fbfcfe;
-    }
+  .insight-callout {
+    border-left: 4px solid #0d6efd;
+    background: var(--pg-blue-soft);
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
 
-    .advisor-section-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #60738e;
-      margin-bottom: 0.45rem;
-    }
+  .insight-card-title,
+  .tune-tab-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
 
-    .advisor-text-block {
-      color: #334155;
-      line-height: 1.55;
-    }
+  .insight-card-text,
+  .tune-tab-card-text {
+    color: var(--pg-muted);
+    margin-bottom: 1rem;
+  }
 
-    .advisor-code-block {
-      background: #f6f8fc;
-      border: 1px solid #dde5f0;
-      border-radius: 0.75rem;
-      padding: 0.75rem 0.85rem;
-      overflow-x: auto;
-    }
+  .analyze-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
 
-    .advisor-code-block code {
-      color: #c72574;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+  .analyze-textarea-code {
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-size: 0.875rem;
+    white-space: pre;
+    resize: vertical;
+  }
 
-    .advisor-code-block-strong {
-      background: #f8fafc;
-      border-color: #d8e1ee;
-    }
+  .advisor-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2a44;
+  }
 
-    .advisor-code-inline code {
-      color: #334155;
-      background: #f3f6fb;
-      padding: 0.25rem 0.45rem;
-      border-radius: 0.45rem;
-    }
+  .advisor-summary {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: #46566f;
+  }
 
-    .advisor-column-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.35rem 0.75rem;
-      border-radius: 999px;
-      border: 1px solid #d8e1ee;
-      background: #ffffff;
-      color: #26364d;
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
+  .advisor-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.72rem;
+    border-radius: 999px;
+    background: #f4f7fb;
+    border: 1px solid #dde5f0;
+  }
 
-    .advisor-copy-btn {
-      border: 1px solid #d8e1ee;
-      background: #fff;
-      border-radius: 0.6rem;
-      padding: 0.3rem 0.55rem;
-    }
+  .advisor-meta-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #708198;
+  }
 
-    .advisor-copy-btn:hover {
-      background: #f4f7fb;
-    }
+  .advisor-meta-value {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #24324a;
+  }
 
-    
-    .suggestions-box {
-        display: none;
-        position: absolute;
-        z-index: 10;
-        background: #fff;
-        border: 1px solid #ccc;
-        width: 100%;
-        max-height: 200px;
-        overflow-y: auto;
-    }
-    .suggestion-item {
-        padding: 8px;
-        cursor: pointer;
-    }
-    .suggestion-item:hover {
-        background-color: #f8f9fa;
-    }
+  .advisor-confidence-wrap {
+    text-align: right;
+    min-width: 110px;
+  }
 
-    /* Search icon styling */
-    .search-icon {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        cursor: pointer;
-        color: #888;
-    }
+  .advisor-confidence-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #708198;
+    margin-bottom: 0.35rem;
+  }
 
-    .badge-soft {
-      border: 1px solid rgba(0,0,0,.1);
-      background: rgba(0,0,0,.02);
-    }
-    .insight-kpi {
-      min-height: 92px;
-    }
+  .advisor-confidence-badge {
+    display: inline-block;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
 
-    :root{
-      --pg-blue:#336791;
-    }
-    .kpi-card{ min-height: 108px; }
-    .kpi-title{ font-size:.82rem; color:#6c757d; }
-    .kpi-value{ font-size:1.55rem; font-weight:700; letter-spacing:-.02em; }
-    .pg-badge{
-      background: var(--pg-blue);
-      color:#fff;
-      padding:.55rem .8rem;
-      border-radius:.6rem;
-      display:inline-flex;
-      align-items:center;
-      gap:.5rem;
-    }
-    .pg-pill{
-      border:1px solid rgba(0,0,0,.08);
-      background:#fff;
-      border-radius:999px;
-      padding:.25rem .55rem;
-      font-size:.8rem;
-      color:#334155;
-    }
-    .progress.pg-progress{ height: 10px; border-radius: 999px; }
-    .progress.pg-progress .progress-bar{ background: var(--pg-blue); }
-    .muted-small{ font-size:.85rem; color:#6c757d; }
-    .metric-chip{
-      display:inline-flex; align-items:center; gap:.35rem;
-      border:1px solid rgba(0,0,0,.08);
-      border-radius:999px; padding:.25rem .55rem;
-      font-size:.82rem; background:#fff;
-    }
-    .chip-label{ color:#6c757d; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .advisor-confidence-safe {
+    background: #1f5faa;
+    color: #ffffff;
+  }
 
+  .advisor-confidence-review {
+    background: #77a9df;
+    color: #0f2742;
+  }
+
+  .advisor-confidence-none {
+    background: #dbe8f6;
+    color: #335273;
+  }
+
+  .advisor-details {
+    margin-top: 0.75rem;
+    border-top: 1px dashed #d8e1ee;
+    padding-top: 0.85rem;
+  }
+
+  .advisor-details-summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #39557a;
+    user-select: none;
+  }
+
+  .advisor-details-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advisor-details-summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 0.45rem;
+    color: #6a89ac;
+    transition: transform 0.15s ease;
+  }
+
+  .advisor-details[open] .advisor-details-summary::before {
+    transform: rotate(90deg);
+  }
+
+  .advisor-section {
+    padding: 0.9rem 1rem;
+    border: 1px solid #e4ebf4;
+    border-radius: 0.85rem;
+    background: #fbfcfe;
+  }
+
+  .advisor-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #60738e;
+    margin-bottom: 0.45rem;
+  }
+
+  .advisor-text-block {
+    color: #334155;
+    line-height: 1.55;
+  }
+
+  .advisor-code-block {
+    background: #f6f8fc;
+    border: 1px solid #dde5f0;
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    overflow-x: auto;
+  }
+
+  .advisor-code-block code {
+    color: #c72574;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .advisor-code-block-strong {
+    background: #f8fafc;
+    border-color: #d8e1ee;
+  }
+
+  .advisor-code-inline code {
+    color: #334155;
+    background: #f3f6fb;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.45rem;
+  }
+
+  .advisor-column-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid #d8e1ee;
+    background: #ffffff;
+    color: #26364d;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .advisor-copy-btn {
+    border: 1px solid #d8e1ee;
+    background: #fff;
+    border-radius: 0.6rem;
+    padding: 0.3rem 0.55rem;
+  }
+
+  .advisor-copy-btn:hover {
+    background: #f4f7fb;
+  }
+
+  .suggestions-box {
+    display: none;
+    position: absolute;
+    z-index: 10;
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+  }
+
+  .suggestion-item {
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+
+  .suggestion-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .search-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #888;
+  }
+
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
+<div class="container-fluid py-4">
 
-    <div class="row">
-        <div class="col-12 ">
-            <div class="card card-body border-0 shadow mb-4 w-100">
-                <h2 class="h5 mb-1">{{ description }}</h2>
-                <div>
-                    <!-- <code>{{ query }}</code>-->
-                    <pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-family: monospace;">{{ query }}</pre>
-                </div>
-                <br>
-                <form method="POST" id="form_analyse">
-                    <input class="form-control" value="" id="action" name="action" type="hidden" >
+  <div class="analyze-page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">{{ description }}</h1>
+        <p class="analyze-muted mb-0">Review the query text, provide parameter values, and inspect execution plan insights.</p>
+      </div>
+    </div>
+  </div>
 
-                    {% for param in parameters %}
-                    {% set param_key = param.lstrip('$') %}  {# Supprime le `$` devant le numéro #}
-                
-                    <div class="row">
-                      <div class="col-md-6 mb-3">
-                          <label for="param">Parameter {{ param }}</label>
-                          <div class="position-relative">
-                              <input 
-                                  class="form-control suggestion-field" 
-                                  value="" 
-                                  id="{{ param }}" 
-                                  name="{{ param }}" 
-                                  type="text" 
-                                  placeholder="Enter parameter value"
-                                  autocomplete="off"
-                                  data-table="{{ genius_parameters[param_key][0] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
-                                  data-column="{{ genius_parameters[param_key][1] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
-                                  data-type="{{ genius_parameters[param_key][2] if param_key in genius_parameters else '' }}"
-                              >
+  <div class="card analyze-summary-card mb-4">
+    <div class="card-body p-4">
+      <div class="analyze-section-title">Query</div>
+      <pre class="analyze-sql-block">{{ query }}</pre>
 
-                              {% if param_key in genius_parameters and genius_parameters[param_key][0] is not none %}
-                              <span class="search-icon" onclick="showSuggestions('{{ param }}')">
-                                  🔍
-                              </span>
-                              {% endif %}
+      <form method="POST" id="form_analyse" class="mt-4">
+        <input class="form-control" value="" id="action" name="action" type="hidden">
 
-                              <div class="suggestions-box" id="suggestions-{{ param }}">
-                                  <!-- Suggestions will be dynamically inserted here -->
-                              </div>
+        {% if parameters %}
+        <div class="analyze-section-title">Parameters</div>
+        <div class="analyze-subtle-box">
+          <div class="row g-3">
+            {% for param in parameters %}
+              {% set param_key = param.lstrip('$') %}
+              <div class="col-12 col-xl-6">
+                <div class="card border-0 shadow-sm h-100">
+                  <div class="card-body p-3">
+                    <label for="{{ param }}" class="form-label fw-semibold">Parameter {{ param }}</label>
+
+                    <div class="position-relative mb-3">
+                      <input
+                        class="form-control suggestion-field"
+                        value=""
+                        id="{{ param }}"
+                        name="{{ param }}"
+                        type="text"
+                        placeholder="Enter parameter value"
+                        autocomplete="off"
+                        data-table="{{ genius_parameters[param_key][0] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
+                        data-column="{{ genius_parameters[param_key][1] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
+                        data-type="{{ genius_parameters[param_key][2] if param_key in genius_parameters else '' }}"
+                      >
+
+                      {% if param_key in genius_parameters and genius_parameters[param_key][0] is not none %}
+                      <span class="search-icon" onclick="showSuggestions('{{ param }}')">🔍</span>
+                      {% endif %}
+
+                      <div class="suggestions-box" id="suggestions-{{ param }}"></div>
+                    </div>
+
+                    {% if param_key in genius_parameters %}
+                      {% set guess = genius_parameters[param_key] %}
+                      <div class="alert alert-info mb-0 py-2">
+                        <div class="fw-semibold mb-1">Potential match</div>
+                        {% if guess[0] is none or guess[1] is none %}
+                          <div class="small mb-0">Type: <strong>{{ guess[2] }}</strong></div>
+                        {% else %}
+                          <div class="small mb-0">
+                            Table: <strong>{{ guess[0] }}</strong>,
+                            Column: <strong>{{ guess[1] }}</strong>,
+                            Type: <strong>{{ guess[2] }}</strong>
                           </div>
+                        {% endif %}
                       </div>
-                
-                        <!-- genius_parameters -->
-                        <div class="col-md-6 mb-3">
-                          {% if param_key in genius_parameters %}
-                          {% set param = genius_parameters[param_key] %}
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
 
-                          <div class="alert alert-info">
-                              <p>Potential match for parameter</p>
-
-                              {% if param[0] is none or param[1] is none %}
-                                  Type: <strong>{{ param[2] }}</strong>
-                              {% else %}
-                                  Table: <strong>{{ param[0] }}</strong>, 
-                                  Column: <strong>{{ param[1] }}</strong>, 
-                                  Type: <strong>{{ param[2] }}</strong>
-                              {% endif %}
-
-                          </div>
-                          {% endif %}
-                        </div>
-                    </div>
-                {% endfor %}
-
-                    <div class="mt-3">
-                        {% if not rows %}
-                        <button id="analyze" type="submit" class="btn btn-primary" name="submit_analyze" value="analyze" onclick="myButtonAnalyze(this)">
-                            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"></path>
-                            </svg>
-                            Analyze
-                        </button>
-
-                        {% endif %} 
-
-                    </div>
-
-                    <div class="mt-3"></div> 
-                </form>
-            </div>
-
+        {% if not rows %}
+        <div class="mt-4">
+          <button id="analyze" type="submit" class="btn btn-primary" name="submit_analyze" value="analyze" onclick="myButtonAnalyze(this)">
+            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"></path>
+            </svg>
+            Analyze
+          </button>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
 
 {% if rows %}
 
-  <!-- Tabs -->
-  <ul class="nav nav-tabs mt-3" id="analyzeTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active"
-              id="insights-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#insights"
-              type="button"
-              role="tab"
-              aria-controls="insights"
-              aria-selected="true">
-        Query Plan Insights
-      </button>
-    </li>
-
-    <li class="nav-item" role="presentation">
-      <button class="nav-link"
-              id="graph-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#graph"
-              type="button"
-              role="tab"
-              aria-controls="graph"
-              aria-selected="false">
-        Relational View
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link"
-              id="stats-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#stats"
-              type="button"
-              role="tab"
-              aria-controls="stats"
-              aria-selected="false">
-        Statistics
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="advisor-tab" data-bs-toggle="tab" data-bs-target="#advisor" type="button" role="tab">
-      Advisor
-      </button>
-    </li>    
-  </ul>
+  <nav class="mb-4">
+    <div class="nav nav-tabs analyze-nav-tabs" id="analyzeTabs" role="tablist">
+      <button class="nav-link active" id="insights-tab" data-bs-toggle="tab" data-bs-target="#insights" type="button" role="tab" aria-controls="insights" aria-selected="true">Query Plan Insights</button>
+      <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph" type="button" role="tab" aria-controls="graph" aria-selected="false">Relational View</button>
+      <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">Statistics</button>
+      <button class="nav-link" id="advisor-tab" data-bs-toggle="tab" data-bs-target="#advisor" type="button" role="tab" aria-controls="advisor" aria-selected="false">Advisor</button>
+    </div>
+  </nav>
 
   <div class="tab-content" id="analyzeTabsContent">
 
-    <!-- Tab 1: Insights -->
     <div class="tab-pane fade show active" id="insights" role="tabpanel" aria-labelledby="insights-tab">
+      <div class="row g-4">
 
-      <div class="container-fluid py-4 ps-3 pe-3">
+        {% set dom = result.summary.dominant_factor|default('execution_dominated') %}
+        {% set dom_labels = {
+          'planner_dominated': 'Planner dominated',
+          'execution_dominated': 'Execution dominated',
+          'io_dominated': 'I/O dominated',
+          'cpu_dominated': 'CPU dominated'
+        } %}
+        {% set dom_icons = {
+          'planner_dominated': '⚙️',
+          'execution_dominated': '⏱️',
+          'io_dominated': '💾',
+          'cpu_dominated': '🧠'
+        } %}
 
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h1 class="h4 mb-0">Query Plan Insights</h1>
-        </div>
+        {% set exec_ratio = result.summary.execution_ratio|default(0) %}
+        {% set plan_ratio = result.summary.planning_ratio|default(0) %}
+        {% set total_ms = result.summary.total_time_ms | default(result.summary.planning_time_ms + result.summary.execution_time_ms) %}
 
-{% set dom = result.summary.dominant_factor|default('execution_dominated') %}
-{% set dom_labels = {
-  'planner_dominated': 'Planner dominated',
-  'execution_dominated': 'Execution dominated',
-  'io_dominated': 'I/O dominated',
-  'cpu_dominated': 'CPU dominated'
-} %}
-{% set dom_icons = {
-  'planner_dominated': '⚙️',
-  'execution_dominated': '⏱️',
-  'io_dominated': '💾',
-  'cpu_dominated': '🧠'
-} %}
+        <div class="col-12">
+          <div class="card analyze-section-card">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+                <div>
+                  <h2 class="h4 mb-1">Query Plan Insights</h2>
+                  <p class="analyze-muted mb-0">A concise view of timing distribution, dominant execution factors, and buffer activity.</p>
+                </div>
+                <div class="analyze-actions">
+                  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSubscribe">Give me an LLM prompt</button>
+                  <button type="button" class="btn btn-info" onclick="window.open('https://www.postgresql.org/docs/current/sql-explain.html','_blank')">Help</button>
+                  <button id="analyzeopenai" type="submit" class="btn btn-tertiary" onclick="myButtonAnalyzeOpenAI(this)">Analyze with LLM</button>
+                  <button id="ddl" type="submit" class="btn btn-primary" onclick="myButtonDDL(this)">DDL</button>
+                </div>
+              </div>
 
-{% set exec_ratio = result.summary.execution_ratio|default(0) %}
-{% set plan_ratio = result.summary.planning_ratio|default(0) %}
-{% set total_ms = result.summary.total_time_ms
-    |default(result.summary.planning_time_ms + result.summary.execution_time_ms) %}
+              <div class="row g-3">
+                <div class="col-12 col-xl-5">
+                  <div class="card insight-card h-100">
+                    <div class="card-body p-4">
+                      <div class="d-flex align-items-start justify-content-between gap-3">
+                        <div>
+                          <div class="analyze-kpi-label">Dominant factor</div>
+                          <div class="mt-2">
+                            <span class="pg-badge">
+                              <span aria-hidden="true">{{ dom_icons.get(dom, '⏱️') }}</span>
+                              <span class="fs-5 fw-semibold">{{ dom_labels.get(dom, 'Execution dominated') }}</span>
+                            </span>
+                            {% if result.summary.low_confidence %}
+                              <span class="ms-2 pg-pill" title="Timings are sub-millisecond, classification may be noisy.">low confidence</span>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="text-end">
+                          <div class="analyze-kpi-label">Total time</div>
+                          <div class="analyze-kpi-value">{{ fmt_ms(total_ms) }}</div>
+                        </div>
+                      </div>
 
+                      {% if result.summary.dominant_explain %}
+                      <div class="insight-callout mt-4">
+                        <div class="fw-semibold mb-1">Insight</div>
+                        <div class="mb-0">{{ result.summary.dominant_explain }}</div>
+                      </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
 
-<!-- Summary -->
-<div class="row g-3">
+                <div class="col-12 col-md-6 col-xl-2">
+                  <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                      <div class="kpi-title">Execution time</div>
+                      <div class="kpi-value">{{ fmt_ms(result.summary.execution_time_ms) }}</div>
+                      <div class="muted-small mt-2">{{ fmt_pct(100 * exec_ratio) }} of total</div>
+                      <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100 * exec_ratio }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: {{ 100 * exec_ratio }}%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-  <!-- Dominant factor (hero) -->
-  <div class="col-12 col-xl-5">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
+                <div class="col-12 col-md-6 col-xl-2">
+                  <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                      <div class="kpi-title">Planning time</div>
+                      <div class="kpi-value">{{ fmt_ms(result.summary.planning_time_ms) }}</div>
+                      <div class="muted-small mt-2">{{ fmt_pct(100 * plan_ratio) }} of total</div>
+                      <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100 * plan_ratio }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: {{ 100 * plan_ratio }}%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-        <div class="d-flex align-items-start justify-content-between">
-          <div>
-            <div class="kpi-title">Dominant factor</div>
+                <div class="col-12 col-md-6 col-xl-3">
+                  <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                      <div class="kpi-title">Plan nodes</div>
+                      <div class="kpi-value">{{ fmt_int(result.summary.node_count) }}</div>
+                      <div class="muted-small mt-2">Nodes parsed from the execution plan</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div class="mt-2">
-              <span class="pg-badge">
-                <span aria-hidden="true">{{ dom_icons.get(dom,'⏱️') }}</span>
-                <span class="fs-5 fw-semibold">{{ dom_labels.get(dom,'Execution dominated') }}</span>
-              </span>
+              {% if result.summary.buffers_total is defined %}
+                {% set bt = result.summary.buffers_total %}
+                {% set rr = result.summary.buffers_read_ratio|default(0) %}
+                {% set rr_pct = 100 * rr %}
+                {% set sh = bt.shared_hit|default(0) %}
+                {% set sr = bt.shared_read|default(0) %}
+                {% set denom = sh + sr %}
+                {% set hit_ratio = (100 * sh / denom) if denom > 0 else 0 %}
 
-              {% if result.summary.low_confidence %}
-                <span class="ms-2 pg-pill" title="Timings are sub-millisecond, classification may be noisy.">
-                  low confidence
-                </span>
+                <div class="card insight-card mt-4">
+                  <div class="card-body p-4">
+                    <div class="insight-card-title">Buffers overview</div>
+                    <div class="insight-card-text">This section highlights how much the plan relied on reads versus cached pages.</div>
+
+                    <div class="row g-4">
+                      <div class="col-12 col-lg-6">
+                        <div class="analyze-subtle-box h-100">
+                          <div class="d-flex justify-content-between align-items-center">
+                            <div class="fw-semibold">Read ratio</div>
+                            <div class="fw-semibold">{{ fmt_pct(rr_pct) }}</div>
+                          </div>
+                          <div class="progress pg-progress mt-3" role="progressbar" aria-valuenow="{{ rr_pct }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width: {{ rr_pct }}%"></div>
+                          </div>
+                          <div class="muted-small mt-2">Higher values usually indicate more physical reads.</div>
+                        </div>
+                      </div>
+
+                      <div class="col-12 col-lg-6">
+                        <div class="analyze-subtle-box h-100">
+                          <div class="d-flex justify-content-between align-items-center">
+                            <div class="fw-semibold">Shared cache hit ratio</div>
+                            <div class="fw-semibold">{{ fmt_pct(hit_ratio) }}</div>
+                          </div>
+                          <div class="progress pg-progress mt-3" role="progressbar" aria-valuenow="{{ hit_ratio }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width: {{ hit_ratio }}%"></div>
+                          </div>
+                          <div class="muted-small mt-2">shared_hit / (shared_hit + shared_read)</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                      <span class="metric-chip"><span class="chip-label">shared_hit</span><span class="fw-semibold">{{ fmt_int(bt.shared_hit) }}</span></span>
+                      <span class="metric-chip"><span class="chip-label">shared_read</span><span class="fw-semibold">{{ fmt_int(bt.shared_read) }}</span></span>
+                      <span class="metric-chip"><span class="chip-label">temp_read</span><span class="fw-semibold">{{ fmt_int(bt.temp_read) }}</span></span>
+                      <span class="metric-chip"><span class="chip-label">temp_written</span><span class="fw-semibold">{{ fmt_int(bt.temp_written) }}</span></span>
+                      <span class="metric-chip"><span class="chip-label">shared_written</span><span class="fw-semibold">{{ fmt_int(bt.shared_written) }}</span></span>
+                    </div>
+
+                    {% if result.summary.dominant_scores is defined %}
+                    <details class="mt-4">
+                      <summary class="muted-small">Show classification details</summary>
+                      <pre class="mono small mb-0 mt-2">{{ result.summary.dominant_scores | tojson(indent=2) }}</pre>
+                    </details>
+                    {% endif %}
+                  </div>
+                </div>
               {% endif %}
+
+              <div class="mt-4">
+                <form id="daliboForm" method="POST" action="https://explain.dalibo.com/new" target="_blank">
+                  <input type="hidden" name="title" value="pgAssistant plan">
+                  <textarea name="plan" style="display:none;">{{ queryplan |safe }}</textarea>
+                  <textarea name="query" style="display:none;">{{ query |safe }}</textarea>
+                  <button type="submit" class="btn btn-secondary" form="daliboForm">Open in explain.dalibo.com</button>
+                </form>
+              </div>
+
             </div>
-
-          </div>
-
-          <div class="text-end">
-            <div class="kpi-title">Total</div>
-            <div class="kpi-value">{{ fmt_ms(total_ms) }}</div>
           </div>
         </div>
 
-        <div class="mt-3">
-          {% if result.summary.dominant_explain %}
-            <div class="alert alert-info mb-0 py-2">
-              <span class="fw-semibold">Insight:</span>
-              {{ result.summary.dominant_explain }}
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="graph" role="tabpanel" aria-labelledby="graph-tab">
+      <div class="card analyze-section-card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h2 class="h4 mb-1">Relational View</h2>
+              <p class="analyze-muted mb-0">Visual representation of the tables involved in the plan.</p>
             </div>
+            {% if tables is defined and tables %}
+              <span class="badge text-bg-secondary">{{ tables|length }} tables</span>
+            {% endif %}
+          </div>
+
+          {% if mermaid_code %}
+            <div class="mermaid-wrap" style="overflow:auto; max-height:70vh;">
+              <pre class="mermaid" id="mermaidGraph">{{ mermaid_code }}</pre>
+            </div>
+            <div class="small text-muted mt-2">
+              Tip: the table color intensity reflects self-time percentage (hotter = higher self-time).
+            </div>
+          {% else %}
+            <div class="alert alert-secondary mb-0">No graph available.</div>
           {% endif %}
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Execution -->
-  <div class="col-12 col-md-6 col-xl-2">
-    <div class="card shadow-sm kpi-card">
-      <div class="card-body">
-        <div class="kpi-title">Execution time</div>
-        <div class="kpi-value">{{ fmt_ms(result.summary.execution_time_ms) }}</div>
-
-        <div class="mt-2 muted-small">{{ fmt_pct(100 * exec_ratio) }} of total</div>
-        <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100*exec_ratio }}" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar" style="width: {{ 100*exec_ratio }}%"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Planning -->
-  <div class="col-12 col-md-6 col-xl-2">
-    <div class="card shadow-sm kpi-card">
-      <div class="card-body">
-        <div class="kpi-title">Planning time</div>
-        <div class="kpi-value">{{ fmt_ms(result.summary.planning_time_ms) }}</div>
-
-        <div class="mt-2 muted-small">{{ fmt_pct(100 * plan_ratio) }} of total</div>
-        <div class="progress pg-progress mt-2" role="progressbar" aria-valuenow="{{ 100*plan_ratio }}" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar" style="width: {{ 100*plan_ratio }}%"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Nodes -->
-  <div class="col-12 col-md-6 col-xl-2">
-    <div class="card shadow-sm kpi-card">
-      <div class="card-body">
-        <div class="d-flex align-items-start justify-content-between">
-          <div>
-            <div class="kpi-title">Nodes</div>
-            <div class="kpi-value">{{ fmt_int(result.summary.node_count) }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-{# Buffers overview (new) #}
-{% if result.summary.buffers_total is defined %}
-  {% set bt = result.summary.buffers_total %}
-  {% set rr = result.summary.buffers_read_ratio|default(0) %}
-  {% set rr_pct = (100 * rr) %}
-
-<div class="row g-3 mt-2">
-  <div class="col-12">
-    <div class="card shadow-sm">
-      <div class="card-body">
-
-        <div class="kpi-title mb-3">Buffers overview</div>
-
-        {# Values #}
-        {% set sh = bt.shared_hit|default(0) %}
-        {% set sr = bt.shared_read|default(0) %}
-        {% set denom = (sh + sr) %}
-        {% set hit_ratio = (100 * sh / denom) if denom > 0 else 0 %}
-
-        {# --- READ RATIO --- #}
-        <div class="mb-4">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="fs-5 fw-semibold">Read ratio</div>
-            <div class="fs-5 fw-semibold">{{ fmt_pct(rr_pct) }}</div>
+    <div class="tab-pane fade" id="advisor" role="tabpanel" aria-labelledby="advisor-tab">
+      <div class="card analyze-section-card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h2 class="h4 mb-1">Index Advisor</h2>
+              <p class="analyze-muted mb-0">Suggestions derived from the plan, with confidence and technical context.</p>
+            </div>
+            {% if advisor_result and advisor_result.recommendations %}
+              <span class="badge text-bg-secondary">{{ advisor_result.recommendations | length }} recommendations</span>
+            {% endif %}
           </div>
 
-          <div class="progress pg-progress mt-2" role="progressbar"
-               aria-valuenow="{{ rr_pct }}" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar" style="width: {{ rr_pct }}%"></div>
-          </div>
-        </div>
-
-        {# --- SHARED CACHE HIT RATIO --- #}
-        <div class="mb-4">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="fs-5 fw-semibold">Shared cache hit ratio</div>
-            <div class="fs-5 fw-semibold">{{ fmt_pct(hit_ratio) }}</div>
-          </div>
-
-          <div class="progress pg-progress mt-2" role="progressbar"
-               aria-valuenow="{{ hit_ratio }}" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar" style="width: {{ hit_ratio }}%"></div>
-          </div>
-
-          <div class="muted-small mt-1">
-            shared_hit / (shared_hit + shared_read)
-          </div>
-        </div>
-
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          <span class="metric-chip"><span class="chip-label">shared_hit</span> <span class="fw-semibold">{{ fmt_int(bt.shared_hit) }}</span></span>
-          <span class="metric-chip"><span class="chip-label">shared_read</span> <span class="fw-semibold">{{ fmt_int(bt.shared_read) }}</span></span>
-          <span class="metric-chip"><span class="chip-label">temp_read</span> <span class="fw-semibold">{{ fmt_int(bt.temp_read) }}</span></span>
-          <span class="metric-chip"><span class="chip-label">temp_written</span> <span class="fw-semibold">{{ fmt_int(bt.temp_written) }}</span></span>
-          <span class="metric-chip"><span class="chip-label">shared_written</span> <span class="fw-semibold">{{ fmt_int(bt.shared_written) }}</span></span>
-        </div>
-
-        {% if result.summary.dominant_scores is defined %}
-          <details class="mt-3">
-            <summary class="muted-small">Show classification details</summary>
-            <pre class="mono small mb-0">{{ result.summary.dominant_scores | tojson(indent=2) }}</pre>
-          </details>
-        {% endif %}
-
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-        {% macro buffers_block(r) %}
+          {% if advisor_result and advisor_result.recommendations %}
           <div class="row g-3">
-            <div class="col-12">
-              <div class="small text-muted mb-1">Buffers</div>
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <tbody>
-                    <tr>
-                      <th class="text-muted" style="width: 180px;">Shared</th>
-                      <td>hit: <strong>{{ fmt_int(r.shared_hit) }}</strong></td>
-                      <td>read: <strong>{{ fmt_int(r.shared_read) }}</strong></td>
-                      <td>dirtied: <strong>{{ fmt_int(r.shared_dirtied) }}</strong></td>
-                      <td>written: <strong>{{ fmt_int(r.shared_written) }}</strong></td>
-                    </tr>
-                    <tr>
-                      <th class="text-muted">Local</th>
-                      <td>hit: <strong>{{ fmt_int(r.local_hit) }}</strong></td>
-                      <td>read: <strong>{{ fmt_int(r.local_read) }}</strong></td>
-                      <td>dirtied: <strong>{{ fmt_int(r.local_dirtied) }}</strong></td>
-                      <td>written: <strong>{{ fmt_int(r.local_written) }}</strong></td>
-                    </tr>
-                    <tr>
-                      <th class="text-muted">Temp</th>
-                      <td>read: <strong>{{ fmt_int(r.temp_read) }}</strong></td>
-                      <td>written: <strong>{{ fmt_int(r.temp_written) }}</strong></td>
-                      <td colspan="2"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {% for rec in advisor_result.recommendations %}
+            <div class="col-12 col-xxl-6">
+              <div class="card shadow-sm border-0 h-100 advisor-card">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                    <div class="flex-grow-1">
+                      <h5 class="mb-2 advisor-title">{{ rec.schema }}.{{ rec.table }}</h5>
+                      <div class="d-flex flex-wrap gap-2">
+                        {% if rec.node_type %}
+                          <span class="advisor-meta-pill">
+                            <span class="advisor-meta-label">Access path</span>
+                            <span class="advisor-meta-value">{{ rec.node_type }}</span>
+                          </span>
+                        {% endif %}
+                        {% if rec.used_index_name %}
+                          <span class="advisor-meta-pill">
+                            <span class="advisor-meta-label">Index used</span>
+                            <span class="advisor-meta-value">{{ rec.used_index_name }}</span>
+                          </span>
+                        {% endif %}
+                        {% if rec.candidate_columns %}
+                          <span class="advisor-meta-pill">
+                            <span class="advisor-meta-label">Columns</span>
+                            <span class="advisor-meta-value">{{ rec.candidate_columns | join(', ') }}</span>
+                          </span>
+                        {% endif %}
+                      </div>
+                    </div>
 
-            <div class="col-12">
-              <div class="small text-muted mb-1">Node details</div>
-              <div class="d-flex flex-wrap gap-2">
-                {% if r.table is defined and r.table %}
-                  <span class="badge text-bg-light border">
-                    <span class="text-muted">table:</span> <code>{{ r.table }}</code>
-                  </span>
-                {% endif %}
-                {% if r.index is defined and r.index %}
-                  <span class="badge text-bg-light border">
-                    <span class="text-muted">index:</span> <code>{{ r.index }}</code>
-                  </span>
-                {% endif %}
-                {% if r.count is defined %}
-                  <span class="badge text-bg-light border">
-                    <span class="text-muted">count:</span> {{ fmt_int(r.count) }}
-                  </span>
-                {% endif %}
-                <span class="badge text-bg-light border">
-                  <span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}
-                </span>
-                <span class="badge text-bg-light border">
-                  <span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}
-                </span>
-                <span class="badge text-bg-light border">
-                  <span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}
-                </span>
+                    <div class="advisor-confidence-wrap">
+                      <div class="advisor-confidence-label">Confidence</div>
+                      <span class="advisor-confidence-badge {% if rec.confidence == 'safe' %}advisor-confidence-safe{% elif rec.confidence == 'review' %}advisor-confidence-review{% else %}advisor-confidence-none{% endif %}">
+                        {{ rec.confidence | upper }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="advisor-summary mb-3">{{ rec.reason }}</div>
+
+                  {% if rec.create_index_sql %}
+                  <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <div class="advisor-section-title mb-0">Suggested index</div>
+                      <button class="btn btn-sm copy-btn advisor-copy-btn" data-sql="{{ rec.create_index_sql }}" title="Copy SQL" type="button">Copy</button>
+                    </div>
+                    <div class="advisor-code-block advisor-code-block-strong">
+                      <code class="small d-block">{{ rec.create_index_sql }}</code>
+                    </div>
+                  </div>
+                  {% endif %}
+
+                  <details class="advisor-details">
+                    <summary class="advisor-details-summary">Technical details</summary>
+                    <div class="vstack gap-3 mt-3">
+
+                      {% if rec.filter_expr %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Filter</div>
+                        <div class="advisor-code-block"><code class="small">{{ rec.filter_expr }}</code></div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.index_cond %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Index condition</div>
+                        <div class="advisor-code-block"><code class="small">{{ rec.index_cond }}</code></div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.recheck_cond %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Recheck condition</div>
+                        <div class="advisor-code-block"><code class="small">{{ rec.recheck_cond }}</code></div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.used_index_def %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Index definition</div>
+                        <div class="advisor-code-block"><code class="small">{{ rec.used_index_def }}</code></div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.candidate_columns %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Candidate columns</div>
+                        <div class="d-flex flex-wrap gap-2">
+                          {% for col in rec.candidate_columns %}
+                            <span class="advisor-column-pill">{{ col }}</span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.stats_reason %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Column statistics</div>
+                        <div class="advisor-text-block small">{{ rec.stats_reason }}</div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.row_estimation_reason %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Planner row estimation</div>
+                        <div class="advisor-text-block small">{{ rec.row_estimation_reason }}</div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.existing_index_match %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Existing matching index</div>
+                        <div class="advisor-code-inline"><code class="small">{{ rec.existing_index_match }}</code></div>
+                      </div>
+                      {% endif %}
+
+                    </div>
+                  </details>
+                </div>
               </div>
             </div>
+            {% endfor %}
           </div>
-        {% endmacro %}
+          {% else %}
+            <div class="alert alert-secondary mb-0">No recommendations available.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
 
-        {% macro render_compact_table(title, rows, id_prefix, show_table=true, show_index=true) %}
-          <div class="mt-4">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <h2 class="h6 text-uppercase text-muted mb-0">{{ title }}</h2>
-              <span class="badge text-bg-secondary">{{ rows|length if rows else 0 }}</span>
+    <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+      <div class="card analyze-section-card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h2 class="h4 mb-1">Statistics</h2>
+              <p class="analyze-muted mb-0">Breakdown by node type, table, index, and top contributors.</p>
             </div>
+            <span class="badge text-bg-secondary">{{ fmt_int(result.summary.node_count) }} nodes</span>
+          </div>
 
-            {% if rows and rows|length > 0 %}
-              <div class="card shadow-sm">
+          {% macro buffers_block(r) %}
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="small text-muted mb-1">Buffers</div>
                 <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th style="width: 56px;"></th>
-                        <th>Node</th>
-                        {% if show_table %}<th>Table</th>{% endif %}
-                        {% if show_index %}<th>Index</th>{% endif %}
-                        <th class="text-end">Self time</th>
-                        <th class="text-end">Self time %</th>
-                        <th class="text-end">Rows</th>
-                      </tr>
-                    </thead>
+                  <table class="table table-sm mb-0">
                     <tbody>
-                      {% for r in rows %}
-                        {% set collapse_id = id_prefix ~ "-" ~ loop.index %}
-                        <tr>
-                          <td>
-                            <button class="btn btn-sm btn-outline-secondary"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#{{ collapse_id }}"
-                                    aria-expanded="false"
-                                    aria-controls="{{ collapse_id }}">
-                              Details
-                            </button>
-                          </td>
-
-                          <td><span class="text-end">{{ r.node_type|default("—") }}</span></td>
-
-                          {% if show_table %}
-                            <td><code>{{ r.table|default("—") }}</code></td>
-                          {% endif %}
-
-                          {% if show_index %}
-                            <td><code>{{ r.index|default("—") }}</code></td>
-                          {% endif %}
-
-                          <td class="text-end">{{ fmt_ms(r.self_time_ms) }}</td>
-                          <td class="text-end">{{ fmt_pct(r.self_time_pct) }}</td>
-                          <td class="text-end">{{ fmt_int(r.self_rows) }}</td>
-                        </tr>
-
-                        <tr class="collapse" id="{{ collapse_id }}">
-                          <td colspan="{{ 5 + (1 if show_table else 0) + (1 if show_index else 0) }}">
-                            <div class="p-3 border-top bg-body-tertiary">
-                              {{ buffers_block(r) }}
-                            </div>
-                          </td>
-                        </tr>
-                      {% endfor %}
+                      <tr>
+                        <th class="text-muted" style="width: 180px;">Shared</th>
+                        <td>hit: <strong>{{ fmt_int(r.shared_hit) }}</strong></td>
+                        <td>read: <strong>{{ fmt_int(r.shared_read) }}</strong></td>
+                        <td>dirtied: <strong>{{ fmt_int(r.shared_dirtied) }}</strong></td>
+                        <td>written: <strong>{{ fmt_int(r.shared_written) }}</strong></td>
+                      </tr>
+                      <tr>
+                        <th class="text-muted">Local</th>
+                        <td>hit: <strong>{{ fmt_int(r.local_hit) }}</strong></td>
+                        <td>read: <strong>{{ fmt_int(r.local_read) }}</strong></td>
+                        <td>dirtied: <strong>{{ fmt_int(r.local_dirtied) }}</strong></td>
+                        <td>written: <strong>{{ fmt_int(r.local_written) }}</strong></td>
+                      </tr>
+                      <tr>
+                        <th class="text-muted">Temp</th>
+                        <td>read: <strong>{{ fmt_int(r.temp_read) }}</strong></td>
+                        <td>written: <strong>{{ fmt_int(r.temp_written) }}</strong></td>
+                        <td colspan="2"></td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
-            {% else %}
-              <div class="alert alert-secondary mb-0" role="alert">
-                No data.
-              </div>
-            {% endif %}
-          </div>
-        {% endmacro %}
 
-
-      </div>
-
-      {# --- modal LLM  --- #}
-      <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
-
-        <!-- LLM Prompt -->
-        <button type="button"
-                class="btn btn-primary d-inline-flex align-items-center"
-                data-bs-toggle="modal"
-                data-bs-target="#modalSubscribe">
-
-          Give me an LLM prompt
-        </button>
-
-        <!-- Help -->
-        <button type="button"
-                class="btn btn-info d-inline-flex align-items-center"
-                onclick="window.open('https://www.postgresql.org/docs/current/sql-explain.html','_blank')">
-          Help
-        </button>
-
-        <!-- Analyze with LLM -->
-        <button id="analyzeopenai"
-                type="submit"
-                class="btn btn-tertiary d-inline-flex align-items-center"
-                onclick="myButtonAnalyzeOpenAI(this)">
-          Analyze with LLM
-        </button>
-
-        <!-- DDL -->
-        <button id="ddl"
-                type="submit"
-                class="btn btn-primary d-inline-flex align-items-center"
-                onclick="myButtonDDL(this)">
-          DDL
-        </button>
-
-      </div>
-      
-    </div>
-
-    <!-- Tab 2: Graph -->
-    <div class="tab-pane fade" id="graph" role="tabpanel" aria-labelledby="graph-tab">
-      <div class="container-fluid py-4 ps-3 pe-3">
-
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h1 class="h4 mb-0">Relational View</h1>
-          {% if tables is defined and tables %}
-            <span class="badge text-bg-secondary">{{ tables|length }} tables</span>
-          {% endif %}
-        </div>
-
-        <div class="card shadow-sm">
-          <div class="card-body">
-            {% if mermaid_code %}
-              <div class="mermaid-wrap" style="overflow:auto; max-height:70vh;">
-                <pre class="mermaid" id="mermaidGraph">{{ mermaid_code }}</pre>
-              </div>
-              <div class="small text-muted mt-2">
-                Tip: the table color intensity reflects self-time percentage (hotter = higher self-time).
-              </div>
-            {% else %}
-              <div class="alert alert-secondary mb-0">No graph available.</div>
-            {% endif %}
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Tab: Advisor -->
-    <div class="tab-pane fade" id="advisor" role="tabpanel" aria-labelledby="advisor-tab">
-      <div class="container-fluid py-4 ps-3 pe-3">
-
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h1 class="h4 mb-0">Index Advisor</h1>
-          {% if advisor_result and advisor_result.recommendations %}
-            <span class="badge text-bg-secondary">
-              {{ advisor_result.recommendations | length }} recommendations
-            </span>
-          {% endif %}
-        </div>
-
-        {% if advisor_result and advisor_result.recommendations %}
-        <div class="row g-3">
-
-          {% for rec in advisor_result.recommendations %}
-          <div class="col-12 col-xxl-6">
-            <div class="card shadow-sm border-0 h-100 advisor-card">
-              <div class="card-body p-4">
-
-                <!-- Header -->
-                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-                  <div class="flex-grow-1">
-                    <h5 class="mb-2 advisor-title">{{ rec.schema }}.{{ rec.table }}</h5>
-
-                    <div class="d-flex flex-wrap gap-2">
-                      {% if rec.node_type %}
-                        <span class="advisor-meta-pill">
-                          <span class="advisor-meta-label">Access path</span>
-                          <span class="advisor-meta-value">{{ rec.node_type }}</span>
-                        </span>
-                      {% endif %}
-
-                      {% if rec.used_index_name %}
-                        <span class="advisor-meta-pill">
-                          <span class="advisor-meta-label">Index used</span>
-                          <span class="advisor-meta-value">{{ rec.used_index_name }}</span>
-                        </span>
-                      {% endif %}
-
-                      {% if rec.candidate_columns %}
-                        <span class="advisor-meta-pill">
-                          <span class="advisor-meta-label">Columns</span>
-                          <span class="advisor-meta-value">{{ rec.candidate_columns | join(', ') }}</span>
-                        </span>
-                      {% endif %}
-                    </div>
-                  </div>
-
-                  <!-- Confidence -->
-                  <div class="advisor-confidence-wrap">
-                    <div class="advisor-confidence-label">Confidence</div>
-                    <span class="
-                      advisor-confidence-badge
-                      {% if rec.confidence == 'safe' %}
-                        advisor-confidence-safe
-                      {% elif rec.confidence == 'review' %}
-                        advisor-confidence-review
-                      {% else %}
-                        advisor-confidence-none
-                      {% endif %}
-                    ">
-                      {{ rec.confidence | upper }}
-                    </span>
-                  </div>
+              <div class="col-12">
+                <div class="small text-muted mb-1">Node details</div>
+                <div class="d-flex flex-wrap gap-2">
+                  {% if r.table is defined and r.table %}
+                    <span class="badge text-bg-light border"><span class="text-muted">table:</span> <code>{{ r.table }}</code></span>
+                  {% endif %}
+                  {% if r.index is defined and r.index %}
+                    <span class="badge text-bg-light border"><span class="text-muted">index:</span> <code>{{ r.index }}</code></span>
+                  {% endif %}
+                  {% if r.count is defined %}
+                    <span class="badge text-bg-light border"><span class="text-muted">count:</span> {{ fmt_int(r.count) }}</span>
+                  {% endif %}
+                  <span class="badge text-bg-light border"><span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}</span>
+                  <span class="badge text-bg-light border"><span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}</span>
+                  <span class="badge text-bg-light border"><span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}</span>
                 </div>
+              </div>
+            </div>
+          {% endmacro %}
 
-                <!-- Main reason -->
-                <div class="advisor-summary mb-3">
-                  {{ rec.reason }}
-                </div>
+          {% macro render_compact_table(title, rows, id_prefix, show_table=true, show_index=true) %}
+            <div class="mt-4">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h3 class="h6 text-uppercase text-muted mb-0">{{ title }}</h3>
+                <span class="badge text-bg-secondary">{{ rows|length if rows else 0 }}</span>
+              </div>
 
-                <!-- Optional SQL action right away -->
-                {% if rec.create_index_sql %}
-                <div class="advisor-sql-box mb-3">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="advisor-section-title mb-0">Suggested index</div>
-                    <button
-                      class="btn btn-sm copy-btn advisor-copy-btn"
-                      data-sql="{{ rec.create_index_sql }}"
-                      title="Copy SQL"
-                      type="button"
-                    >
-                      📋
-                    </button>
-                  </div>
+              {% if rows and rows|length > 0 %}
+                <div class="card shadow-sm">
+                  <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 56px;"></th>
+                          <th>Node</th>
+                          {% if show_table %}<th>Table</th>{% endif %}
+                          {% if show_index %}<th>Index</th>{% endif %}
+                          <th class="text-end">Self time</th>
+                          <th class="text-end">Self time %</th>
+                          <th class="text-end">Rows</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for r in rows %}
+                          {% set collapse_id = id_prefix ~ "-" ~ loop.index %}
+                          <tr>
+                            <td>
+                              <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ collapse_id }}" aria-expanded="false" aria-controls="{{ collapse_id }}">
+                                Details
+                              </button>
+                            </td>
+                            <td>{{ r.node_type|default("—") }}</td>
+                            {% if show_table %}<td><code>{{ r.table|default("—") }}</code></td>{% endif %}
+                            {% if show_index %}<td><code>{{ r.index|default("—") }}</code></td>{% endif %}
+                            <td class="text-end">{{ fmt_ms(r.self_time_ms) }}</td>
+                            <td class="text-end">{{ fmt_pct(r.self_time_pct) }}</td>
+                            <td class="text-end">{{ fmt_int(r.self_rows) }}</td>
+                          </tr>
 
-                  <div class="advisor-code-block advisor-code-block-strong">
-                    <code class="small d-block">{{ rec.create_index_sql }}</code>
-                  </div>
-                </div>
-                {% endif %}
-
-                <!-- Foldable technical details -->
-                <details class="advisor-details">
-                  <summary class="advisor-details-summary">Technical details</summary>
-
-                  <div class="vstack gap-3 mt-3">
-
-                    {% if rec.filter_expr %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Filter</div>
-                      <div class="advisor-code-block">
-                        <code class="small">{{ rec.filter_expr }}</code>
-                      </div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.index_cond %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Index condition</div>
-                      <div class="advisor-code-block">
-                        <code class="small">{{ rec.index_cond }}</code>
-                      </div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.recheck_cond %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Recheck condition</div>
-                      <div class="advisor-code-block">
-                        <code class="small">{{ rec.recheck_cond }}</code>
-                      </div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.used_index_def %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Index definition</div>
-                      <div class="advisor-code-block">
-                        <code class="small">{{ rec.used_index_def }}</code>
-                      </div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.candidate_columns %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Candidate columns</div>
-                      <div class="d-flex flex-wrap gap-2">
-                        {% for col in rec.candidate_columns %}
-                          <span class="advisor-column-pill">{{ col }}</span>
+                          <tr class="collapse" id="{{ collapse_id }}">
+                            <td colspan="{{ 5 + (1 if show_table else 0) + (1 if show_index else 0) }}">
+                              <div class="p-3 border-top bg-body-tertiary">
+                                {{ buffers_block(r) }}
+                              </div>
+                            </td>
+                          </tr>
                         {% endfor %}
-                      </div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.stats_reason %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Column statistics</div>
-                      <div class="advisor-text-block small">{{ rec.stats_reason }}</div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.row_estimation_reason %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Planner row estimation</div>
-                      <div class="advisor-text-block small">{{ rec.row_estimation_reason }}</div>
-                    </div>
-                    {% endif %}
-
-                    {% if rec.existing_index_match %}
-                    <div class="advisor-section">
-                      <div class="advisor-section-title">Existing matching index</div>
-                      <div class="advisor-code-inline">
-                        <code class="small">{{ rec.existing_index_match }}</code>
-                      </div>
-                    </div>
-                    {% endif %}
-
+                      </tbody>
+                    </table>
                   </div>
-                </details>
+                </div>
+              {% else %}
+                <div class="alert alert-secondary mb-0">No data.</div>
+              {% endif %}
+            </div>
+          {% endmacro %}
 
+          {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
+          {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
+          {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
+          {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+      <div class="modal-content py-xl-4">
+        <div class="modal-body text-center py-3">
+          <svg class="icon icon-xl text-primary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
+          </svg>
+          <p class="mb-4 lead">You can try this formulation with an LLM</p>
+          <div class="form-group px-lg-5">
+            <div class="d-flex mb-3 justify-content-center">
+              <textarea class="form-control analyze-textarea-code" name="chatgpt" id="chatgpt" rows="10">{{ chatgpt }}</textarea>
+              <div class="ms-2">
+                <button onclick="copy()" type="button" class="btn btn-info d-inline-flex align-items-center">
+                  Copy
+                  <svg class="icon icon-xs ms-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" clip-rule="evenodd" /></svg>
+                </button>
               </div>
             </div>
           </div>
-          {% endfor %}
-
         </div>
-      {% else %}
-        <div class="alert alert-secondary">
-          No recommendations available.
-        </div>
-      {% endif %}
-      
+        <div class="modal-footer z-2 mx-auto text-center"></div>
       </div>
     </div>
+  </div>
 
+{% endif %}
+</div>
 
-    <!-- Tab 4: Statistics -->
-    <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
-      <div class="container-fluid py-4 ps-3 pe-3">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h1 class="h4 mb-0">Statistics</h1>
-          <span class="badge text-bg-secondary">{{ fmt_int(result.summary.node_count) }} nodes</span>
-        </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const suggestionFields = document.querySelectorAll('.suggestion-field');
 
-        {# Reuse the same macros already defined above (buffers_block / render_compact_table) #}
+  document.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", async function () {
+      const sql = this.getAttribute("data-sql");
+      if (!sql) return;
 
-        {{ render_compact_table("By node type", result.by_node_type, "bytype", show_table=false, show_index=false) }}
-        {{ render_compact_table("By table", result.by_table, "bytable", show_table=true, show_index=false) }}
-        {{ render_compact_table("By index", result.by_index, "byindex", show_table=false, show_index=true) }}
-        {{ render_compact_table("Top nodes", result.top_nodes, "topnodes", show_table=true, show_index=true) }}
+      try {
+        await navigator.clipboard.writeText(sql);
+        const original = this.innerText;
+        this.innerText = "✅";
+        setTimeout(() => {
+          this.innerText = original;
+        }, 1000);
+      } catch (err) {
+        console.error("Clipboard error:", err);
+      }
+    });
+  });
 
-      </div>
-    </div>
-  </div> <!-- /tab-content -->
+  suggestionFields.forEach(field => {
+    field.addEventListener('input', function () {
+      const table = field.getAttribute('data-table');
+      const column = field.getAttribute('data-column');
+      const type = field.getAttribute('data-type');
+      const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
 
-                  <div>
+      if (table && column && type) {
+        fetch('/api/v1/fetch_column_data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ table, column, data_type: type })
+        }).then(response => response.json())
+          .then(data => {
+            if (data.data && data.data.length > 0) {
+              suggestionsBox.innerHTML = "";
+              data.data.slice(0, 20).forEach(value => {
+                let suggestionItem = document.createElement("div");
+                suggestionItem.classList.add("suggestion-item");
+                suggestionItem.textContent = value;
 
-                    <!-- Open in Dalibo (POST /new) -->
-                    <form id="daliboForm" method="POST" action="https://explain.dalibo.com/new" target="_blank">
-                      <input type="hidden" name="title" value="pgAssistant plan">
-                      <textarea name="plan" style="display:none;">{{ queryplan |safe }}</textarea>
-                      <textarea name="query" style="display:none;">{{ query |safe }}</textarea>
-                      <button type="submit" class="btn btn-secondary" form="daliboForm">
-                       Open in explain.dalibo.com
-                      </button>
-                    </form>
+                suggestionItem.addEventListener('click', function () {
+                  if (['character varying', 'text', 'date', 'timestamp', 'timestamp without time zone'].includes(type)) {
+                    field.value = `'${value}'`;
+                  } else {
+                    field.value = value;
+                  }
+                  suggestionsBox.style.display = 'none';
+                });
 
+                suggestionsBox.appendChild(suggestionItem);
+              });
 
-                    <!-- Modal Content -->
-                    <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-                            <div class="modal-content py-xl-4">
-                                <div class="modal-body text-center py-3">
-                                    <svg class="icon icon-xl text-primary mb-4" fill="none" stroke="currentColor" 
-                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                    d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path>
-                                    </svg>
-                                    <p class="mb-4 lead">You can try this formulation with an LLM</p>
-                                    <div class="form-group px-lg-5">
-                                        <div class="d-flex mb-3 justify-content-center">
-                                            <textarea class="form-control" name="chatgpt" id="chatgpt" rows="10">{{ chatgpt }}</textarea>
-                                            <div>
-                                                <button onclick="copy()" type="button" class="btn btn-info d-inline-flex align-items-center">
-                                                    Copy
-                                                    <svg class="icon icon-xs ms-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" clip-rule="evenodd" /></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="modal-footer z-2 mx-auto text-center"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- End of Modal Content -->                    
-                  </div>
-                  {% endif %}  
-            </div>        
-        </div>
-    </div>
-
-    <script>
-
-      
-    document.addEventListener('DOMContentLoaded', function () {
-        console.log("JavaScript loaded and ready to handle events.");
-
-        const suggestionFields = document.querySelectorAll('.suggestion-field');
-
-        suggestionFields.forEach(field => {
-            field.addEventListener('input', function () {
-                const table = field.getAttribute('data-table');
-                const column = field.getAttribute('data-column');
-                const type = field.getAttribute('data-type');
-                const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
-
-                console.log(`Input detected on field: ${field.id}. Table: ${table}, Column: ${column}, Type: ${type}`);
-
-                if (table && column && type) {
-                    fetch('/api/v1/fetch_column_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            table,
-                            column,
-                            data_type: type
-                        })
-                    }).then(response => {
-                        console.log("Fetch executed. Response status:", response.status);
-                        return response.json();
-                    }).then(data => {
-                        console.log("Fetch succeeded. Data received:", data);
-
-                        if (data.data && data.data.length > 0) {
-                            suggestionsBox.innerHTML = "";
-                            data.data.slice(0, 20).forEach(value => {
-                                let suggestionItem = document.createElement("div");
-                                suggestionItem.classList.add("suggestion-item");
-                                suggestionItem.textContent = value;
-
-                                suggestionItem.addEventListener('click', function () {
-                                    if (['character varying', 'text', 'date', 'timestamp', 'timestamp without time zone'].includes(type)) {
-                                        field.value = `'${value}'`;
-                                    } else {
-                                        field.value = value;
-                                    }
-                                    suggestionsBox.style.display = 'none';
-                                });
-
-                                suggestionsBox.appendChild(suggestionItem);
-                            });
-
-                            suggestionsBox.style.display = "block";
-                        } else {
-                            suggestionsBox.style.display = "none";
-                        }
-                    }).catch(error => {
-                        console.error("Fetch failed. Error:", error);
-                    });
-                } else {
-                    console.warn("Field attributes (table, column, type) are missing.");
-                }
-            });
-
-            // Masquer la boîte si on clique ailleurs
-            field.addEventListener('blur', function () {
-                setTimeout(() => {
-                    const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
-                    if (suggestionsBox) {
-                        suggestionsBox.style.display = 'none';
-                    }
-                }, 200);
-            });
-        });
+              suggestionsBox.style.display = "block";
+            } else {
+              suggestionsBox.style.display = "none";
+            }
+          }).catch(error => {
+            console.error("Fetch failed. Error:", error);
+          });
+      }
     });
 
-    function showSuggestions(paramId) {
-        const field = document.getElementById(paramId);
-        const table = field.getAttribute('data-table');
-        const column = field.getAttribute('data-column');
-        const type = field.getAttribute('data-type');
+    field.addEventListener('blur', function () {
+      setTimeout(() => {
         const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
-
-        // List of PostgreSQL types that should be quoted in SQL literals
-        const stringTypes = [
-            'char', 'varchar', 'text',
-            'date', 'timestamp', 'timestamptz', 'time', 'timetz', 'interval',
-            'uuid',
-            'json', 'jsonb',
-            'inet', 'cidr', 'macaddr', 'macaddr8',
-            'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle',
-            'bit', 'bit varying',
-            'xml',
-            'money'
-        ];
-
-        // Helper to decide if the value should be quoted
-        function shouldBeQuoted(sqlType) {
-            if (!sqlType) return false;
-            const t = sqlType.toLowerCase();
-            return stringTypes.some(st => t.includes(st));
+        if (suggestionsBox) {
+          suggestionsBox.style.display = 'none';
         }
+      }, 200);
+    });
+  });
+});
 
-        if (table && column && type) {
-            fetch('/api/v1/fetch_column_data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    table,
-                    column,
-                    data_type: type
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.data && data.data.length > 0) {
-                    suggestionsBox.innerHTML = '';
-                    data.data.slice(0, 20).forEach(value => {
-                        let suggestionItem = document.createElement("div");
-                        suggestionItem.classList.add("suggestion-item");
-                        suggestionItem.textContent = value;
+function showSuggestions(paramId) {
+  const field = document.getElementById(paramId);
+  const table = field.getAttribute('data-table');
+  const column = field.getAttribute('data-column');
+  const type = field.getAttribute('data-type');
+  const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
 
-                        suggestionItem.addEventListener('click', function () {
-                            field.value = shouldBeQuoted(type)
-                                ? `'${value}'`
-                                : value;
+  const stringTypes = [
+    'char', 'varchar', 'text',
+    'date', 'timestamp', 'timestamptz', 'time', 'timetz', 'interval',
+    'uuid', 'json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8',
+    'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle',
+    'bit', 'bit varying', 'xml', 'money'
+  ];
 
-                            suggestionsBox.style.display = 'none';
-                        });
+  function shouldBeQuoted(sqlType) {
+    if (!sqlType) return false;
+    const t = sqlType.toLowerCase();
+    return stringTypes.some(st => t.includes(st));
+  }
 
-                        suggestionsBox.appendChild(suggestionItem);
-                    });
-                    suggestionsBox.style.display = 'block';
-                } else {
-                    suggestionsBox.style.display = 'none';
-                }
-            });
-        }
-    }
+  if (table && column && type) {
+    fetch('/api/v1/fetch_column_data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table, column, data_type: type })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.data && data.data.length > 0) {
+        suggestionsBox.innerHTML = '';
+        data.data.slice(0, 20).forEach(value => {
+          let suggestionItem = document.createElement("div");
+          suggestionItem.classList.add("suggestion-item");
+          suggestionItem.textContent = value;
 
-    function copy() {
-        let textarea = document.getElementById("chatgpt");
-        textarea.select();
-        document.execCommand("copy");
-    }
+          suggestionItem.addEventListener('click', function () {
+            field.value = shouldBeQuoted(type) ? `'${value}'` : value;
+            suggestionsBox.style.display = 'none';
+          });
 
-    function myButtonAnalyze(el) {
-        const form = document.getElementById("form_analyse")
-        if(form.checkValidity()) {
-            document.getElementById("analyze").disabled=true;
-            document.getElementById("analyze").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing  ...';
-            but = document.getElementById("action")
-            but.setAttribute('value','analyze')
-            form.submit();
-        } else {
-            form.reportValidity()
-        }
-    }
+          suggestionsBox.appendChild(suggestionItem);
+        });
+        suggestionsBox.style.display = 'block';
+      } else {
+        suggestionsBox.style.display = 'none';
+      }
+    });
+  }
+}
 
-    function myButtonAnalyzeOpenAI(el) {
-        const form = document.getElementById("form_analyse")
-        if(form.checkValidity()) {
-            document.getElementById("analyzeopenai").disabled=true;
-            document.getElementById("analyzeopenai").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing  ...';
-            
-            but = document.getElementById("action")
-            but.setAttribute('value','chatgpt')
-            form.submit();
-        } else {
-            form.reportValidity()
-        }
-    }
+function copy() {
+  let textarea = document.getElementById("chatgpt");
+  textarea.select();
+  document.execCommand("copy");
+}
 
-    function myButtonAnalyzeOptimizeAI(el) {
-        const form = document.getElementById("form_analyse")
-        if(form.checkValidity()) {
-            document.getElementById("optimizeopenai").disabled=true;
-            document.getElementById("optimizeopenai").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing  ...';
-            
-            but = document.getElementById("action")
-            but.setAttribute('value','optimize')
-            form.submit();
-        } else {
-            form.reportValidity()
-        }
-    }
+function myButtonAnalyze(el) {
+  const form = document.getElementById("form_analyse");
+  if (form.checkValidity()) {
+    document.getElementById("analyze").disabled = true;
+    document.getElementById("analyze").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
+    document.getElementById("action").setAttribute('value', 'analyze');
+    form.submit();
+  } else {
+    form.reportValidity();
+  }
+}
 
-    function myButtonDDL(el) {
-        const form = document.getElementById("form_analyse")
-        if(form.checkValidity()) {
-            document.getElementById("ddl").disabled=true;
-            document.getElementById("ddl").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing  ...';
-            
-            but = document.getElementById("action")
-            but.setAttribute('value','ddl')
-            form.submit();
-        } else {
-            form.reportValidity()
-        }
-    }
-    </script>
+function myButtonAnalyzeOpenAI(el) {
+  const form = document.getElementById("form_analyse");
+  if (form.checkValidity()) {
+    document.getElementById("analyzeopenai").disabled = true;
+    document.getElementById("analyzeopenai").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
+    document.getElementById("action").setAttribute('value', 'chatgpt');
+    form.submit();
+  } else {
+    form.reportValidity();
+  }
+}
 
+function myButtonDDL(el) {
+  const form = document.getElementById("form_analyse");
+  if (form.checkValidity()) {
+    document.getElementById("ddl").disabled = true;
+    document.getElementById("ddl").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
+    document.getElementById("action").setAttribute('value', 'ddl');
+    form.submit();
+  } else {
+    form.reportValidity();
+  }
+}
+</script>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
 {% block javascripts %}
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -1278,7 +1198,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-
     const graphTab = document.getElementById('graph-tab');
 
     if (graphTab) {
@@ -1287,11 +1206,9 @@
       });
     }
 
-    // si visible par défaut
     if (document.querySelector('#graph.show')) {
       renderMermaid();
     }
-
   });
 </script>
 {% endblock javascripts %}

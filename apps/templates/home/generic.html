@@ -1,267 +1,408 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Query {% endblock %}
+{% block title %}Query{% endblock %}
 
 {% block stylesheets %}
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css" rel="stylesheet">
+
+<style>
+  .query-page-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .query-muted {
+    color: #6c757d;
+  }
+
+  .query-summary-card,
+  .query-section-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+  }
+
+  .query-kpi {
+    border-radius: 0.85rem;
+    background: #f8f9fa;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .query-kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+  }
+
+  .query-kpi-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0;
+  }
+
+  .query-code-block {
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0;
+  }
+
+  .query-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .query-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+
+  .query-table-wrap table.dataTable tbody td {
+    vertical-align: top;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 360px;
+  }
+
+  .query-modal-code {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 0.75rem;
+    border: 1px solid #ddd;
+    margin-bottom: 0;
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  }
+
+  .query-suggestion-block {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 0.75rem;
+    border: 1px solid #ddd;
+    margin-bottom: 0;
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  }
+
+  .query-exec-result {
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 0.75rem;
+    border: 1px solid #ddd;
+  }
+
+  .query-copy-btn-success {
+    transition: all 0.15s ease-in-out;
+  }
+</style>
 {% endblock stylesheets %}
 
 {% block content %}
- 
-  <div class="py-4">
-    <div class="mb-3 mb-lg-0">
-        <h1 class="h4">{{ description['description'] }}</h1>
-    </div>
+<div class="container-fluid py-4">
 
-    <div class="d-flex justify-content-end">
-        
-    {%if description['reference'] %}
-        <a href="{{ description['reference'] }}" target="_blank" class="btn btn-primary me-2 align-items-center d-inline-flex">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
+  <div class="query-page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">{{ description['description'] }}</h1>
+        <p class="query-muted mb-0">
+          Inspect query results, review the executed SQL, and apply generated suggestions when available.
+        </p>
+      </div>
+
+      <div class="query-actions">
+        {% if description['reference'] %}
+        <a href="{{ description['reference'] }}" target="_blank" class="btn btn-primary d-inline-flex align-items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
             <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
             <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
-            </svg> Reference
+          </svg>
+          Reference
         </a>
-    {% endif %}
-        <button type="button" class="btn btn-primary me-2 align-items-center d-inline-flex" data-bs-toggle="modal" data-bs-target="#modal-default">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
-                <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/></svg>
-            Show query</button>
-        <button id="refresh" type="submit" class="btn btn-primary align-items-center d-inline-flex" name="submit_refresh" value="refresh"
-            onclick="refreshPage()">
-            <svg class="icon icon-20 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
-                </path>
-            </svg>
-            Refresh
+        {% endif %}
+
+        <button type="button" class="btn btn-outline-primary d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#modal-default">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
+            <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/>
+          </svg>
+          Show query
         </button>
-    </div>
-</div>
 
-<div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="h6 modal-title">Executed query</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <code>{{ description['sql'] }}</code>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
-            </div>
+        <button id="refresh" type="button" class="btn btn-primary d-inline-flex align-items-center" onclick="refreshPage()">
+          <svg class="icon icon-20 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="h6 modal-title" id="modal-default-label">Executed query</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body">
+          <pre class="query-modal-code">{{ description['sql'] }}</pre>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-{# Modal for SQL execution #}
-<div class="modal fade" id="executeSqlModal" tabindex="-1" aria-labelledby="executeSqlModalLabel" aria-hidden="true">
+  <div class="modal fade" id="executeSqlModal" tabindex="-1" aria-labelledby="executeSqlModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="h6 modal-title" id="executeSqlModalLabel">SQL execution</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">Query</div>
-                    <pre id="modal-current-sql" class="mb-0"
-                         style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;"></pre>
-                </div>
-
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">Execution time</div>
-                    <div id="modal-execution-time" class="fw-semibold">Pending...</div>
-                </div>
-
-                <div>
-                    <div class="small text-muted mb-1">Result</div>
-                    <div id="modal-results"
-                         style="white-space: pre-wrap; font-size: 0.95rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
-                        Waiting...
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
-            </div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="h6 modal-title" id="executeSqlModalLabel">SQL execution</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-    </div>
-</div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="small text-muted mb-1">Query</div>
+            <pre id="modal-current-sql" class="query-modal-code"></pre>
+          </div>
 
-<div class="card border-0 shadow mb-4">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table id="generic" class="table table-striped" style="width:100%">
-                <thead class="thead-light">
-                    <tr>
-                        {%for row in rows[0]: %}
-                        <th>{{ row }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows: %}
-                    <tr>
-                        {% for key, value in row.items() %}
-                        <td style="word-wrap: break-word; min-width: 10px; max-width: 360px; white-space: normal;">
-                            {{ value }}
-                            {% if key == 'pga_suggestion' and value and not value.lstrip().startswith('--') %}
-                            <button type="button" class="btn btn-sm btn-primary ms-2" onclick='executeSQL({{ value|tojson }})'>Run</button>
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+          <div class="mb-3">
+            <div class="small text-muted mb-1">Execution time</div>
+            <div id="modal-execution-time" class="fw-semibold">Pending...</div>
+          </div>
+
+          <div>
+            <div class="small text-muted mb-1">Result</div>
+            <div id="modal-results" class="query-exec-result">Waiting...</div>
+          </div>
         </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-{% if rows and rows|length > 0 %}
-{% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
+  <div class="card query-section-card mb-4">
+    <div class="card-body p-4">
+      <div class="query-section-title">Results</div>
 
-{% for key in rows[0].keys() %}
-{% if key.startswith('pga_suggestion') %}
-{% set _ = ns.suggestion_keys.append(key) %}
-{% endif %}
-{% endfor %}
+      {% if rows and rows|length > 0 %}
+      <div class="table-responsive query-table-wrap">
+        <table id="generic" class="table table-striped align-middle" style="width:100%">
+          <thead class="thead-light">
+            <tr>
+              {% for row in rows[0] %}
+              <th>{{ row }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              {% for key, value in row.items() %}
+              <td>
+                {{ value }}
+                {% if key == 'pga_suggestion' and value and not value.lstrip().startswith('--') %}
+                <button type="button" class="btn btn-sm btn-primary ms-2 mt-2" onclick='executeSQL({{ value|tojson }})'>
+                  Run
+                </button>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-secondary mb-0">
+        No rows returned by this query.
+      </div>
+      {% endif %}
+    </div>
+  </div>
 
-{% for row in rows %}
-{% for key in ns.suggestion_keys %}
-{% if key in row and row[key] and not row[key].lstrip().startswith('--') %}
-{% set _ = ns.suggestions.append(row[key]) %}
-{% endif %}
-{% endfor %}
-{% endfor %}
+  {% if rows and rows|length > 0 %}
+    {% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
 
-{% if ns.suggestions %}
-<div class="card border-0 shadow mb-4">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="card-title mb-0">Code suggestions</h5>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copySuggestionsToClipboard()">
-                Copy
+    {% for key in rows[0].keys() %}
+      {% if key.startswith('pga_suggestion') %}
+        {% set _ = ns.suggestion_keys.append(key) %}
+      {% endif %}
+    {% endfor %}
+
+    {% for row in rows %}
+      {% for key in ns.suggestion_keys %}
+        {% if key in row and row[key] and not row[key].lstrip().startswith('--') %}
+          {% set _ = ns.suggestions.append(row[key]) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    {% if ns.suggestions %}
+    <div class="card query-section-card mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <div class="query-section-title mb-1">Code suggestions</div>
+            <div class="query-muted">Collected executable suggestions from the result set.</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge text-bg-secondary">{{ ns.suggestions|length }} suggestions</span>
+            <button type="button" id="copySuggestionsBtn" class="btn btn-sm btn-outline-secondary query-copy-btn-success" onclick="copySuggestionsToClipboard()">
+              Copy
             </button>
+          </div>
         </div>
-        <pre id="pgaSuggestions"
-            style="white-space: pre-wrap; font-size: 0.9rem; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
-{{ ns.suggestions | join('\n') }}
-      </pre>
-    </div>
-</div>
-{% endif %}
-{% endif %}
 
+        <pre id="pgaSuggestions" class="query-suggestion-block">{{ ns.suggestions | join('\n') }}</pre>
+      </div>
+    </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock content %}
+
+{% block javascripts %}
 <script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
+<script id="dt2" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
 <script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js"></script>
 
 <script>
-    function copySuggestionsToClipboard() {
-        const el = document.getElementById('pgaSuggestions');
-        if (!el) return;
-        const text = el.innerText || el.textContent || "";
+  function copySuggestionsToClipboard() {
+    const el = document.getElementById('pgaSuggestions');
+    const btn = document.getElementById('copySuggestionsBtn');
+    if (!el || !btn) return;
 
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    console.log('Suggestions copied to clipboard');
-                })
-                .catch(err => {
-                    console.error('Clipboard copy failed', err);
-                    fallbackCopyText(text);
-                });
-        } else {
-            fallbackCopyText(text);
-        }
+    const text = el.innerText || el.textContent || "";
+    const original = btn.innerText;
+
+    function successFeedback() {
+      btn.innerText = "Copied";
+      btn.classList.remove("btn-outline-secondary");
+      btn.classList.add("btn-success");
+      setTimeout(() => {
+        btn.innerText = original;
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-secondary");
+      }, 1200);
     }
 
-    function fallbackCopyText(text) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-            document.execCommand('copy');
-            console.log('Suggestions copied to clipboard (fallback)');
-        } catch (err) {
-            console.error('Fallback copy failed', err);
-        }
-        document.body.removeChild(textarea);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(successFeedback)
+        .catch(err => {
+          console.error('Clipboard copy failed', err);
+          fallbackCopyText(text);
+          successFeedback();
+        });
+    } else {
+      fallbackCopyText(text);
+      successFeedback();
     }
+  }
 
-    function refreshPage() {
-        location.reload();
+  function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed', err);
     }
+    document.body.removeChild(textarea);
+  }
 
-    async function executeSQL(sql) {
-        const modalEl = document.getElementById("executeSqlModal");
-        const modalSql = document.getElementById("modal-current-sql");
-        const modalTime = document.getElementById("modal-execution-time");
-        const modalResults = document.getElementById("modal-results");
+  function refreshPage() {
+    location.reload();
+  }
 
-        modalSql.textContent = sql;
-        modalTime.textContent = "Running...";
-        modalResults.innerHTML = "Running...";
+  async function executeSQL(sql) {
+    const modalEl = document.getElementById("executeSqlModal");
+    const modalSql = document.getElementById("modal-current-sql");
+    const modalTime = document.getElementById("modal-execution-time");
+    const modalResults = document.getElementById("modal-results");
 
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+    modalSql.textContent = sql;
+    modalTime.textContent = "Running...";
+    modalResults.innerHTML = "Running...";
 
-        const start = performance.now();
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
 
-        try {
-            const response = await fetch("/execute", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ sql })
-            });
+    const start = performance.now();
 
-            const end = performance.now();
-            const elapsedMs = Math.round(end - start);
-            modalTime.textContent = `${elapsedMs} ms`;
+    try {
+      const response = await fetch("/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sql })
+      });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+      const end = performance.now();
+      const elapsedMs = Math.round(end - start);
+      modalTime.textContent = `${elapsedMs} ms`;
 
-            const result = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-            if (result.success) {
-                modalResults.innerHTML = `<div class="text-success"><strong>Success</strong></div><div class="mt-2">${escapeHtml(result.message || "Query executed successfully.")}</div>`;
-            } else {
-                modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(result.error || "Unknown error.")}</div>`;
-            }
-        } catch (error) {
-            const end = performance.now();
-            const elapsedMs = Math.round(end - start);
-            modalTime.textContent = `${elapsedMs} ms`;
-            modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(error.message)}</div>`;
-        }
+      const result = await response.json();
+
+      if (result.success) {
+        modalResults.innerHTML = `<div class="text-success"><strong>Success</strong></div><div class="mt-2">${escapeHtml(result.message || "Query executed successfully.")}</div>`;
+      } else {
+        modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(result.error || "Unknown error.")}</div>`;
+      }
+    } catch (error) {
+      const end = performance.now();
+      const elapsedMs = Math.round(end - start);
+      modalTime.textContent = `${elapsedMs} ms`;
+      modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(error.message)}</div>`;
     }
+  }
 
-    function escapeHtml(value) {
-        const div = document.createElement("div");
-        div.textContent = value == null ? "" : String(value);
-        return div.innerHTML;
-    }
-</script>
+  function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
 
-<script>
-    new DataTable('#generic', {
+  document.addEventListener("DOMContentLoaded", function () {
+    const table = document.getElementById("generic");
+    if (table) {
+      new DataTable('#generic', {
         order: [],
-        scrollX: true 
-    });
+        scrollX: true
+      });
+    }
+  });
 </script>
-
-{% endblock content %}
-
-{% block javascripts %}{% endblock javascripts %}
+{% endblock javascripts %}

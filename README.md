@@ -39,7 +39,7 @@ It combines:
 - Full schema inspection (DDL) with automatic relational graph visualization to reveal table dependencies and structural issues  
 - Structural issue detection (missing indexes, redundant indexes, missing foreign keys, datatype inconsistencies)  
 - Naming convention and RFC(s) validation  
-- Real `EXPLAIN ANALYZE` execution plans  
+- Real `EXPLAIN ANALYZE` execution plans with index advisor  
 - Database parameters & statistics  
 - Optional AI-assisted reasoning
 
