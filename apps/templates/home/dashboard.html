@@ -212,6 +212,28 @@
 
 {% block content %}
 
+{% macro humanize_ms(value) %}
+  {% set ms = (value | float) if value is not none and value != '' else 0 %}
+  {% set seconds = ms / 1000 %}
+  {% set minutes = seconds / 60 %}
+  {% set hours = minutes / 60 %}
+  {% set days = hours / 24 %}
+
+  {% if ms < 1000 %}
+    {{ '%.0f ms'|format(ms) }}
+  {% elif seconds < 10 %}
+    {{ '%.2f s'|format(seconds) }}
+  {% elif seconds < 60 %}
+    {{ '%.1f s'|format(seconds) }}
+  {% elif minutes < 60 %}
+    {{ '%.1f min'|format(minutes) }}
+  {% elif hours < 24 %}
+    {{ '%.1f h'|format(hours) }}
+  {% else %}
+    {{ '%.1f d'|format(days) }}
+  {% endif %}
+{% endmacro %}
+
 {% macro query_type_icon(query_type) %}
   {% if query_type == 'select' %}
     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
@@ -510,7 +532,11 @@
                   <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
                   <div class="dashboard-progress-meta">
                     <span>{{ table['percentage_exec_time'] }} %</span>
-                    <span>{{ table['total_exec_time'] if table['total_exec_time'] is defined else '' }}</span>
+                    <span>
+                      {% if table['total_exec_time'] is defined %}
+                        {{ humanize_ms(table['total_exec_time']) }}
+                      {% endif %}
+                    </span>
                   </div>
                   <div class="progress dashboard-progress">
                     <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>

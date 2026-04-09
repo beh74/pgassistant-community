@@ -1,35 +1,68 @@
 {% extends "layouts/base-fullscreen.html" %}
 
-{% block title %} Error 403 {% endblock %} 
-
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block title %} 403 Forbidden {% endblock %}
 
 {% block content %}
 
-    <main>
-        <section class="vh-100 d-flex align-items-center justify-content-center">
-            <div class="container">
-                <div class="row">
-                    <div class="col-12 text-center d-flex align-items-center justify-content-center">
-                        <div>
-                            <img class="img-fluid w-75" src="{{ config.ASSETS_ROOT }}/img/illustrations/404.svg" alt="404 not found">
-                            <h1 class="mt-5">
-                                Access <span class="fw-bolder text-primary">denied</span>
-                            </h1>
-                            <p class="lead my-4">
-                                Please contact support or authenticate
-                            </p>
-                            <a class="btn btn-dark animate-hover" href="{{ url_for('authentication_blueprint.login') }}">
-                               <i class="fas fa-chevron-left me-3 ps-2 animate-left-3"></i>LOGIN</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
+<main>
+  <section class="vh-100 d-flex align-items-center justify-content-center">
+    <div class="container text-center">
+
+      <div class="card border-0 shadow p-5 mx-auto" style="max-width: 600px;">
+        
+        <!-- Icon -->
+        <div class="mb-4">
+          <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5"
+               viewBox="0 0 24 24" style="color: #fd7e14;">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M16.5 10.5V7.5a4.5 4.5 0 10-9 0v3m-1.5 0h12a1.5 1.5 0 011.5 1.5v6a1.5 1.5 0 01-1.5 1.5h-12A1.5 1.5 0 014.5 18v-6a1.5 1.5 0 011.5-1.5z"/>
+          </svg>
+        </div>
+
+        <!-- Title -->
+        <h1 class="h3 mb-2">Access denied</h1>
+
+        <!-- Message -->
+        <p class="text-muted mb-4">
+          You do not have permission to access this resource.
+        </p>
+
+        <!-- Actions -->
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+
+          <button onclick="goBack()"
+                  class="btn btn-outline-secondary d-inline-flex align-items-center">
+            <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd"
+                    d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z"
+                    clip-rule="evenodd"></path>
+            </svg>
+            Go back
+          </button>
+
+          <a href="/database.html"
+             class="btn btn-primary d-inline-flex align-items-center">
+            Home
+          </a>
+
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+</main>
 
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+function goBack() {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = "/database.html";
+  }
+}
+</script>
+{% endblock javascripts %}

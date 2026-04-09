@@ -6,247 +6,393 @@
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-  .tbl-card .card { transition: transform .12s ease, box-shadow .12s ease; }
-  .tbl-card .card:hover { transform: translateY(-2px); box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.10) !important; }
+.tables-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
 
-  .tbl-meta { font-variant-numeric: tabular-nums; }
-  .tbl-name { word-break: break-word; }
+.tables-search-group {
+  flex: 0 1 420px;
+  min-width: 250px;
+}
 
-  .pill {
-    display: inline-flex; align-items: center; gap: .4rem;
-    padding: .25rem .6rem;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.7);
-    font-size: .85rem;
-    color: #495057;
+.tables-toolbar-right {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tables-pages-group {
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+.tables-search-group .form-control,
+.tables-pages-group .form-select {
+  height: 38px;
+}
+
+@media (max-width: 992px) {
+  .tables-toolbar {
+    align-items: stretch;
   }
 
-  .btn-soft {
-    background: rgba(51,103,145,.10);
-    border: 1px solid rgba(51,103,145,.25);
-    color: #2b5a7a;
+  .tables-search-group,
+  .tables-toolbar-right {
+    width: 100%;
   }
-  .btn-soft:hover { background: rgba(51,103,145,.16); color: #244d6a; }
 
-  .muted-kpi { color: #6c757d; font-size: .85rem; }
-
-  @media (max-width: 576px) {
-    .tbl-actions .btn { width: 100%; }
+  .tables-toolbar-right {
+    justify-content: space-between;
   }
+}
+
+@media (max-width: 768px) {
+  .tables-toolbar-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tables-pages-group {
+    width: 100%;
+  }
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 992px) {
+  .tables-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.table-card-item.d-none {
+  display: none !important;
+}
+
+.table-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.05);
+  height: 100%;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.table-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.10) !important;
+}
+
+.table-card .card-body {
+  padding: 1rem;
+}
+
+.table-schema-badge {
+  display: inline-block;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: #eef2f7 !important;
+  color: #1f2937 !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.table-status-badge {
+  display: inline-block;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tables-name {
+  word-break: break-word;
+}
+
+.tables-name code {
+  font-size: 0.8rem;
+}
+
+.metrics-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.metric-inline-item {
+  background: #fbfcfd;
+  border: 1px solid #edf0f2;
+  border-radius: 999px;
+  padding: 0.28rem 0.58rem;
+  font-size: 0.80rem;
+}
+
+.metric-inline-label {
+  color: #6c757d;
+  margin-right: 0.3rem;
+}
+
+.metric-inline-value {
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.tables-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tables-actions .btn {
+  flex: 1 1 auto;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.pagination-info {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.page-number {
+  min-width: 42px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
 
-  {# Expected context:
-     tables: full list of dict rows with keys: schemaname, table_name, row_count, size, size_bytes, dead_pct, bloat_indicator...
-     page: int, per_page: int, total: int (optional, defaults to tables|length)
-     q: current search string (optional)
-  #}
-  {% set q = request.args.get('q', q|default('')) %}
+  {% set q = request.args.get('q', q|default(''))|trim %}
+  {% set q_lower = q|lower %}
   {% set page = request.args.get('page', page|default(1))|int %}
   {% set per_page = request.args.get('per_page', per_page|default(24))|int %}
-  {% set total = total|default(tables|length)|int %}
+
+  {# Filter first, then paginate #}
+  {% if q %}
+    {% set filtered = [] %}
+    {% for r in tables %}
+      {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+      {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
+      {% set hay = (schema ~ '.' ~ table ~ ' ' ~ schema ~ ' ' ~ table)|lower %}
+      {% if q_lower in hay %}
+        {% set _ = filtered.append(r) %}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    {% set filtered = tables %}
+  {% endif %}
+
+  {% set total = filtered|length %}
   {% set total_pages = ((total + per_page - 1) // per_page) if per_page else 1 %}
 
-  {% if page < 1 %}
-    {% set page = 1 %}
-  {% endif %}
-  {% if total_pages > 0 and page > total_pages %}
-    {% set page = total_pages %}
-  {% endif %}
+  {% if page < 1 %}{% set page = 1 %}{% endif %}
+  {% if total_pages > 0 and page > total_pages %}{% set page = total_pages %}{% endif %}
 
   {% set start_idx = (page - 1) * per_page %}
   {% set end_idx = start_idx + per_page %}
-  {% set paged_tables = tables[start_idx:end_idx] %}
-  <!-- Header -->
-  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
-    <div>
-      <h1 class="h4 mb-1">Table definition helper</h1>
-      <div class="text-muted small">
-        Showing {{ paged_tables|length }} table(s){% if total %} out of {{ total }}{% endif %}.
-      </div>
+  {% set paged_tables = filtered[start_idx:end_idx] %}
+
+  <div class="py-4">
+    <div class="mb-3 mb-lg-0">
+      <h1 class="h4">Table definition helper</h1>
+      <p class="mb-0">Explore your tables and launch RFC checks, convention checks, or Tetris reordering suggestions.</p>
     </div>
-
-    <!-- Search + per_page -->
-    <form class="d-flex flex-column flex-sm-row gap-2" method="get" action="" role="search">
-      <div class="input-group">
-        <span class="input-group-text"><i class="bi bi-search"></i></span>
-        <input id="tableSearch"
-               name="q"
-               class="form-control"
-               type="search"
-               value="{{ q }}"
-               placeholder="table"
-               aria-label="Search tables">
-        <button class="btn btn-outline-secondary" type="submit">Search</button>
-      </div>
-
-      <select name="per_page" class="form-select" style="min-width: 160px;" onchange="this.form.submit()">
-        {% for n in [12,24,36,48,72,96] %}
-          <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }} / page</option>
-        {% endfor %}
-      </select>
-
-      <input type="hidden" name="page" value="1">
-    </form>
   </div>
 
-  <!-- Grid -->
-  <div class="row g-3" id="tablesGrid">
+  <div class="card border-0 shadow mb-4">
+    <div class="card-body">
 
-    {% for r in paged_tables %}
-      {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
-      {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
-      {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
-      {% set size = r.size if r.size is defined else r['size'] %}
-      {% set size_bytes = r.size_bytes if r.size_bytes is defined else r['size_bytes'] %}
-
-      <div class="col-12 col-md-6 col-xl-4 tbl-card"
-           data-hay="{{ (schema ~ '.' ~ table ~ ' ' ~ schema ~ ' ' ~ table)|lower|e }}">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body d-flex flex-column">
-
-            <div class="d-flex align-items-start justify-content-between gap-3">
-              <div class="flex-grow-1">
-
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span class="pill"><i class="bi bi-diagram-3"></i>{{ schema }}</span>
-
-                  {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
-
-                  {% if b == 'HIGH' %}
-                    <span class="pill text-danger border-danger">
-                      <i class="bi bi-exclamation-triangle-fill"></i>
-                      High bloat
-                    </span>
-                  {% elif b == 'MEDIUM' %}
-                    <span class="pill text-warning border-warning">
-                      <i class="bi bi-exclamation-circle-fill"></i>
-                      Medium bloat
-                    </span>
-                  {% elif b == 'LOW' %}
-                    <span class="pill text-success border-success">
-                      <i class="bi bi-check-circle-fill"></i>
-                      Low bloat
-                    </span>
-                  {% elif b == 'SMALL_TABLE' %}
-                    <span class="pill text-muted">
-                      <i class="bi bi-box-seam"></i>
-                      Small table
-                    </span>
-                  {% elif b == 'NO_STATS' %}
-                    <span class="pill text-secondary">
-                      <i class="bi bi-question-circle"></i>
-                      No stats
-                    </span>
-                  {% endif %}
-                </div>
-
-                <div class="tbl-name mt-2">
-                  <code class="text-muted small">{{ schema }}</code>.
-                  <strong>{{ table }}</strong>
-                </div>
-
-                <div class="tbl-meta mt-2 d-flex flex-wrap gap-3">
-                  <div>
-                    <div class="muted-kpi">Rows</div>
-                    <div class="fw-semibold">{{ row_count }}</div>
-                  </div>
-                  <div>
-                    <div class="muted-kpi">Size</div>
-                    <div class="fw-semibold">{{ size }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-auto pt-3 tbl-actions d-flex flex-column flex-sm-row gap-2">
-              <a class="btn btn-sm btn-primary"
-                 href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}">
-                <i class="bi bi-check2-circle me-1"></i> Check RFC
-              </a>
-              <a class="btn btn-sm btn-soft"
-                 href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}">
-                <i class="bi bi-list-check me-1"></i> Check conventions
-              </a>
-              <a class="btn btn-sm btn-warning"
-                 href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}">
-                <i class="bi bi-grid-3x3-gap me-1"></i> Play Tetris
-              </a>
-            </div>
-
+      <form class="tables-toolbar" method="get" action="" role="search">
+        <div class="tables-search-group">
+          <label for="tableSearch" class="form-label mb-1">Search</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input id="tableSearch"
+                   name="q"
+                   class="form-control"
+                   type="search"
+                   value="{{ q }}"
+                   placeholder="Schema, table name..."
+                   aria-label="Search tables">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
           </div>
         </div>
+
+        <div class="tables-toolbar-right">
+          <div class="tables-pages-group">
+            <label for="perPageSelect" class="form-label mb-1">Cards per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select" onchange="this.form.submit()">
+              {% for n in [12,24,36,48,72,96] %}
+                <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <input type="hidden" name="page" value="1">
+      </form>
+
+      <div id="tablesGrid" class="tables-grid">
+        {% for r in paged_tables %}
+          {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+          {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
+          {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
+          {% set size = r.size if r.size is defined else r['size'] %}
+          {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
+
+          <div class="table-card-item">
+            <div class="card table-card">
+              <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="table-schema-badge">
+                      <i class="bi bi-diagram-3 me-1"></i>{{ schema }}
+                    </span>
+
+                    {% if b == 'HIGH' %}
+                      <span class="table-status-badge bg-danger-subtle text-danger border border-danger-subtle">High bloat</span>
+                    {% elif b == 'MEDIUM' %}
+                      <span class="table-status-badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Medium bloat</span>
+                    {% elif b == 'LOW' %}
+                      <span class="table-status-badge bg-success-subtle text-success border border-success-subtle">Low bloat</span>
+                    {% elif b == 'SMALL_TABLE' %}
+                      <span class="table-status-badge bg-light text-muted border">Small table</span>
+                    {% elif b == 'NO_STATS' %}
+                      <span class="table-status-badge bg-secondary-subtle text-secondary border border-secondary-subtle">No stats</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="tables-name mb-3">
+                  <code class="text-muted">{{ schema }}</code>.<strong>{{ table }}</strong>
+                </div>
+
+                <div class="metrics-inline mb-3">
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Rows</span>
+                    <span class="metric-inline-value">{{ row_count }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Size</span>
+                    <span class="metric-inline-value">{{ size }}</span>
+                  </div>
+                </div>
+
+                <div class="tables-actions">
+                  <a class="btn btn-sm btn-primary"
+                     href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-check2-circle me-1"></i> Check RFC
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-list-check me-1"></i> Check conventions
+                  </a>
+                  <a class="btn btn-sm btn-warning"
+                     href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-grid-3x3-gap me-1"></i> Play Tetris
+                  </a>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        {% endfor %}
       </div>
-    {% endfor %}
 
+      {% if paged_tables|length == 0 %}
+        <div class="no-results">
+          No table found{% if q %} for <strong>{{ q }}</strong>{% endif %}.
+        </div>
+      {% endif %}
+
+      {% if total_pages > 1 %}
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          Showing {{ start_idx + 1 if total > 0 else 0 }}-{{ end_idx if end_idx < total else total }} of {{ total }} tables
+        </div>
+
+        <div class="pagination-controls">
+          {% set prev_page = page - 1 %}
+          {% set next_page = page + 1 %}
+
+          <a class="btn btn-outline-primary btn-sm {% if page <= 1 %}disabled{% endif %}"
+             href="?page={{ prev_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+            Previous
+          </a>
+
+          {% set start = page - 2 %}
+          {% if start < 1 %}{% set start = 1 %}{% endif %}
+          {% set end = page + 2 %}
+          {% if end > total_pages %}{% set end = total_pages %}{% endif %}
+
+          {% if start > 1 %}
+            <a class="btn btn-outline-primary btn-sm page-number" href="?page=1&per_page={{ per_page }}&q={{ q|urlencode }}">1</a>
+            {% if start > 2 %}
+              <span class="btn btn-sm btn-light disabled">…</span>
+            {% endif %}
+          {% endif %}
+
+          {% for p in range(start, end + 1) %}
+            <a class="btn btn-sm page-number {% if p == page %}btn-primary{% else %}btn-outline-primary{% endif %}"
+               href="?page={{ p }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+              {{ p }}
+            </a>
+          {% endfor %}
+
+          {% if end < total_pages %}
+            {% if end < total_pages - 1 %}
+              <span class="btn btn-sm btn-light disabled">…</span>
+            {% endif %}
+            <a class="btn btn-outline-primary btn-sm page-number"
+               href="?page={{ total_pages }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+              {{ total_pages }}
+            </a>
+          {% endif %}
+
+          <a class="btn btn-outline-primary btn-sm {% if page >= total_pages %}disabled{% endif %}"
+             href="?page={{ next_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+            Next
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
   </div>
-
-  <!-- Pagination -->
-  {% if total_pages > 1 %}
-  <nav class="mt-4" aria-label="Tables pagination">
-    <ul class="pagination justify-content-center flex-wrap">
-
-      {% set prev_page = page - 1 %}
-      {% set next_page = page + 1 %}
-
-      <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-        <a class="page-link"
-           href="?page={{ prev_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">Previous</a>
-      </li>
-
-      {% set start = page - 2 %}
-      {% if start < 1 %}{% set start = 1 %}{% endif %}
-      {% set end = page + 2 %}
-      {% if end > total_pages %}{% set end = total_pages %}{% endif %}
-
-      {% if start > 1 %}
-        <li class="page-item"><a class="page-link" href="?page=1&per_page={{ per_page }}&q={{ q|urlencode }}">1</a></li>
-        {% if start > 2 %}
-          <li class="page-item disabled"><span class="page-link">…</span></li>
-        {% endif %}
-      {% endif %}
-
-      {% for p in range(start, end + 1) %}
-        <li class="page-item {% if p == page %}active{% endif %}">
-          <a class="page-link" href="?page={{ p }}&per_page={{ per_page }}&q={{ q|urlencode }}">{{ p }}</a>
-        </li>
-      {% endfor %}
-
-      {% if end < total_pages %}
-        {% if end < total_pages - 1 %}
-          <li class="page-item disabled"><span class="page-link">…</span></li>
-        {% endif %}
-        <li class="page-item"><a class="page-link" href="?page={{ total_pages }}&per_page={{ per_page }}&q={{ q|urlencode }}">{{ total_pages }}</a></li>
-      {% endif %}
-
-      <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-        <a class="page-link"
-           href="?page={{ next_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">Next</a>
-      </li>
-    </ul>
-  </nav>
-  {% endif %}
-
 </div>
-
-<script>
-  (function () {
-    const input = document.getElementById("tableSearch");
-    const cards = Array.from(document.querySelectorAll(".tbl-card"));
-
-    if (!input) return;
-
-    input.addEventListener("input", function () {
-      const q = (input.value || "").toLowerCase().trim();
-      cards.forEach(card => {
-        const hay = (card.getAttribute("data-hay") || "");
-        card.style.display = (!q || hay.includes(q)) ? "" : "none";
-      });
-    });
-  })();
-</script>
 {% endblock %}

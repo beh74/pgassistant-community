@@ -221,7 +221,7 @@ def handle_lint_post():
     original_sql = request.form.get('sqlo')
     
     return render_template("home/lint.html", segment="lint.html",
-                           sqlo=original_sql, linted=sqlhelper.format_sql(original_sql))
+                           sqlo=original_sql, linted=sqlhelper.get_formated_sql(original_sql)) 
 
 def handle_search_post():
     searchkey = request.form.get('searchkey')

@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.7.1] - 2026-09-04
+
+## Improvements
+
+- Continued UI/UX refinements across the application.
+
+## Bug Fixes
+
+- Fixed a search issue in the Table Definition Helper that prevented some tables from being found correctly.
+
 ## [2.7] - 2026-05-04
 
 ## Improvements

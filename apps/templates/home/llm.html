@@ -1,164 +1,305 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} LLM {% endblock %}
+{% block title %}LLM{% endblock %}
 
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .llm-settings-page-header { margin-bottom: 1.5rem; }
+  .llm-settings-muted { color: #6c757d; }
+
+  .llm-settings-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+  }
+
+  .llm-settings-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .llm-settings-box {
+    background: #f8f9fa;
+    border-radius: 0.85rem;
+    padding: 1rem;
+  }
+
+  .help-icon {
+    font-size: 0.7rem;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    cursor: help;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
-<div class="row">
+<div class="container-fluid py-4">
+
+  <!-- Header -->
+  <div class="llm-settings-page-header">
+    <h1 class="h4 mb-1">LLM Settings</h1>
+    <p class="llm-settings-muted mb-0">
+      Configure your LLM provider, model and behavior.
+    </p>
+  </div>
+
+  <div class="row">
     <div class="col-12 col-xl-8">
-        <div class="card card-body border-0 shadow mb-4">
-            <h2 class="h5 mb-4">LLM Settings</h2>
 
-            <form method="POST">
-                <div class="row">
-                    <div class="col-sm-6 mb-3">
-                        <label for="local_llm_uri">On premise LLM URI</label>
-                        <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
-                        <small class="form-text text-muted">e.g., http://localhost:11434/v1 or http://host.docker.internal:11434/v1/ for Ollama or Infomaniak uri; leave empty to use OpenAI.</small>
-                    </div>
+      <div class="card llm-settings-card">
+        <div class="card-body p-4">
+
+          <form method="POST">
+
+            <!-- CONNECTION -->
+            <div class="mb-4">
+              <div class="llm-settings-section-title">Connection</div>
+
+              <div class="llm-settings-box">
+                <div class="mb-3">
+                  <label class="form-label">
+                    LLM URI
+                    <span class="help-icon" data-bs-toggle="tooltip" title="URI of the LLM endpoint (OpenAI compatible or Ollama)">?</span>
+                  </label>
+                  <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
+                  <div class="form-text">
+                    Example: http://host.docker.internal:11434/v1/ when running Ollama locally alongside the pgAssistant Docker image. Make sure to set OLLAMA_HOST=0.0.0.0:11434.
+                  </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-sm-6 mb-3">
-                        <label for="api_key">API Key (if needed)</label>
-                        <div class="input-group">
-                            <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
-                            <button type="button" class="btn btn-outline-secondary" id="toggleApiKey" title="Show/hide API key">
-                                👁
-                            </button>
-                        </div>
-                        <small class="form-text text-muted">Leave empty if your local LLM server does not require authentication.</small>
-                    </div>
+                <div class="mb-3">
+                  <label class="form-label">API Key</label>
+                  <div class="input-group">
+                    <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleApiKey">👁</button>
+                  </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-sm-6 mb-3">
-                        <label for="llm_model">API Model name</label>
-                        <div class="input-group">
-                            <input class="form-control" list="llm_models" value="{{ llm_model }}" id="llm_model" name="llm_model" type="text">
-                            <button type="button" class="btn btn-outline-secondary" id="fetchModelsBtn" title="Fetch available models">
-                                <span id="fetch-icon">🔍</span>
-                                <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                            </button>
-                        </div>
-                        <datalist id="llm_models"></datalist>
-                        <small class="form-text text-muted">Save your changes before to query the model list.</small>
-                        <small id="model-fetch-status" class="form-text mt-1 text-success d-none">✅ Models successfully loaded</small>
-                        <div id="model-list" class="text-muted small mt-1"></div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-sm-6 mb-3">
-                        <label for="api_key">SQL Guidelines</label>
-                        <div class="input-group">
-                            <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
-                        </div>
-                        <small class="form-text text-muted">Provide here a valid URL for SQL guidelines. By default, the system will use its internal guidelines.</small>
-                    </div>
-                </div>
-
+                <!-- TEST CONNECTION -->
                 <div class="mt-3">
-                    <button class="btn btn-primary" type="submit">Save
-                        <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z">
-                            </path>
-                        </svg>
-                    </button>
+                  <button type="button" class="btn btn-outline-primary" id="testConnectionBtn">
+                    Test connection
+                    <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                  </button>
+
+                  <div id="test-status" class="small mt-2"></div>
                 </div>
-            </form>
+
+              </div>
+            </div>
+
+            <!-- MODEL -->
+            <div class="mb-4">
+              <div class="llm-settings-section-title">Model</div>
+
+              <div class="llm-settings-box">
+                <div class="mb-3">
+                  <label class="form-label">Model</label>
+
+                  <div class="input-group">
+                    <select class="form-select" id="llm_model" name="llm_model">
+                      {% if llm_model %}
+                        <option selected value="{{ llm_model }}">{{ llm_model }}</option>
+                      {% else %}
+                        <option selected disabled>-- Select a model --</option>
+                      {% endif %}
+                    </select>
+
+                    <button type="button" class="btn btn-outline-secondary" id="fetchModelsBtn">
+                      <span id="fetch-icon">🔍</span>
+                      <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none"></span>
+                    </button>
+                  </div>
+
+                  <div id="model-status" class="small mt-2"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SQL GUIDELINES -->
+            <div class="mb-4">
+              <div class="llm-settings-section-title">SQL behavior</div>
+
+              <div class="llm-settings-box">
+                <label class="form-label">SQL conventions URL</label>
+                <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
+                  <div class="form-text">
+                    This guidelines will be used to instruct the LLM on Table defintion helper menu - Check conventions
+                  </div>              
+              </div>
+            </div>
+
+            <button class="btn btn-primary" type="submit">
+              Save
+            </button>
+
+          </form>
+
         </div>
+      </div>
+
     </div>
+  </div>
+
 </div>
 {% endblock content %}
 
 {% block javascripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // 👁 Show/hide API key
-    const toggleBtn = document.getElementById("toggleApiKey");
-    const apiKeyInput = document.getElementById("llm_api_key");
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
 
-    if (toggleBtn && apiKeyInput) {
-        toggleBtn.addEventListener("click", () => {
-            const isHidden = apiKeyInput.type === "password";
-            apiKeyInput.type = isHidden ? "text" : "password";
-            toggleBtn.textContent = isHidden ? "🙈" : "👁";
-        });
-    }
+  const toggleBtn = document.getElementById("toggleApiKey");
+  const apiKeyInput = document.getElementById("llm_api_key");
 
-    // 🔍 Fetch models
-    const fetchBtn = document.getElementById("fetchModelsBtn");
-    const datalist = document.getElementById("llm_models");
-    const status = document.getElementById("model-fetch-status");
-    const icon = document.getElementById("fetch-icon");
-    const spinner = document.getElementById("fetch-spinner");
-    const modelList = document.getElementById("model-list");
+  if (toggleBtn && apiKeyInput) {
+    toggleBtn.addEventListener("click", () => {
+      const isHidden = apiKeyInput.type === "password";
+      apiKeyInput.type = isHidden ? "text" : "password";
+      toggleBtn.textContent = isHidden ? "🙈" : "👁";
+    });
+  }
 
-    const uriField = document.getElementById("llm_uri");
-    const apiKeyField = document.getElementById("llm_api_key");
-    const modelInput = document.getElementById("llm_model");
+  const fetchBtn = document.getElementById("fetchModelsBtn");
+  const select = document.getElementById("llm_model");
+  const spinner = document.getElementById("fetch-spinner");
+  const icon = document.getElementById("fetch-icon");
+  const modelStatus = document.getElementById("model-status");
 
-    if (!fetchBtn || !datalist || !modelInput) return;
+  const testBtn = document.getElementById("testConnectionBtn");
+  const testSpinner = document.getElementById("test-spinner");
+  const testStatus = document.getElementById("test-status");
 
-    fetchBtn.addEventListener("click", async function () {
-        status.classList.add("d-none");
-        modelList.innerHTML = "";
-        icon.style.display = "none";
-        spinner.classList.remove("d-none");
-        datalist.innerHTML = "";
-        modelInput.value = "";  // 🧹 Reset model field on fetch
+  const uriField = document.getElementById("llm_uri");
+  const apiKeyField = document.getElementById("llm_api_key");
 
-        const llm_uri = uriField.value.trim();
-        const llm_api_key = apiKeyField.value.trim();
-
-        try {
-            const response = await fetch("/api/v1/llm_get_models", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ llm_uri, llm_api_key })
-            });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-
-            if (data.models && Array.isArray(data.models)) {
-                const modelNames = data.models;
-
-                modelNames.forEach(model => {
-                    const option = document.createElement("option");
-                    option.value = model;
-                    datalist.appendChild(option);
-                });
-
-                status.textContent = "✅ Models successfully loaded";
-                status.classList.remove("text-danger");
-                status.classList.add("text-success", "d-block");
-
-                modelList.textContent = `Available models: ${modelNames.join(', ')}`;
-                setTimeout(() => { status.classList.add("d-none"); }, 5000);
-            } else {
-                showError("No models found.");
-            }
-        } catch (error) {
-            console.error("Error fetching models:", error);
-            showError("Error fetching models.");
-        } finally {
-            spinner.classList.add("d-none");
-            icon.style.display = "inline";
-        }
+  async function callGetModels() {
+    const res = await fetch("/api/v1/llm_get_models", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        llm_uri: uriField.value.trim(),
+        llm_api_key: apiKeyField.value.trim()
+      })
     });
 
-    function showError(message) {
-        status.textContent = `❌ ${message}`;
-        status.classList.remove("text-success");
-        status.classList.add("text-danger", "d-block");
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = null;
     }
+
+    return { res, data };
+  }
+
+  function extractErrorMessage(res, data, fallbackMessage) {
+    if (data && typeof data === "object") {
+      if (typeof data.error === "string" && data.error.trim()) {
+        return data.error;
+      }
+      if (typeof data.message === "string" && data.message.trim()) {
+        return data.message;
+      }
+      if (Array.isArray(data.errors) && data.errors.length > 0) {
+        return String(data.errors[0]);
+      }
+    }
+
+    if (res && !res.ok) {
+      return `HTTP ${res.status}`;
+    }
+
+    return fallbackMessage;
+  }
+
+  if (fetchBtn && select) {
+    fetchBtn.addEventListener("click", async function () {
+      modelStatus.className = "small mt-2 text-muted";
+      modelStatus.textContent = "Loading models...";
+      spinner.classList.remove("d-none");
+      icon.style.display = "none";
+      select.innerHTML = '<option selected disabled>Loading models...</option>';
+
+      try {
+        const { res, data } = await callGetModels();
+
+        if (!res.ok) {
+          throw new Error(extractErrorMessage(res, data, "Error loading models"));
+        }
+
+        const models = Array.isArray(data?.models) ? data.models : [];
+
+        if (models.length === 0) {
+          select.innerHTML = '<option selected disabled>No models available</option>';
+          modelStatus.className = "small mt-2 text-danger";
+          modelStatus.textContent = "No models found.";
+          return;
+        }
+
+        select.innerHTML = "";
+        models.forEach((model, index) => {
+          const option = document.createElement("option");
+          option.value = model;
+          option.textContent = model;
+          if (index === 0) option.selected = true;
+          select.appendChild(option);
+        });
+
+        modelStatus.className = "small mt-2 text-success";
+        modelStatus.textContent = "✅ Models loaded successfully";
+      } catch (error) {
+        select.innerHTML = '<option selected disabled>No models available</option>';
+        modelStatus.className = "small mt-2 text-danger";
+        modelStatus.textContent = `❌ ${error.message || "Error loading models"}`;
+      } finally {
+        spinner.classList.add("d-none");
+        icon.style.display = "inline";
+      }
+    });
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener("click", async function () {
+      testStatus.className = "small mt-2 text-muted";
+      testStatus.textContent = "Testing connection...";
+      testSpinner.classList.remove("d-none");
+
+      try {
+        const { res, data } = await callGetModels();
+
+        if (!res.ok) {
+          throw new Error(extractErrorMessage(res, data, "Connection failed"));
+        }
+
+        const models = Array.isArray(data?.models) ? data.models : null;
+
+        if (models === null) {
+          throw new Error(extractErrorMessage(res, data, "Unexpected response from server"));
+        }
+
+        testStatus.className = "small mt-2 text-success";
+        testStatus.textContent = "✅ Connection successful";
+      } catch (error) {
+        testStatus.className = "small mt-2 text-danger";
+        testStatus.textContent = `❌ ${error.message || "Connection failed"}`;
+      } finally {
+        testSpinner.classList.add("d-none");
+      }
+    });
+  }
 });
 </script>
 {% endblock javascripts %}
