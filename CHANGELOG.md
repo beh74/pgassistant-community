@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.7.2] - 2026-09-04
+
+## Improvements
+
+- Refactored Rank Queries
+- Improved query parameter detection, including better type inference from PostgreSQL
+- Enhanced SQL Advisor: Automatically orders multi-column index candidates using pg_stats (cardinality-aware) ; Displays column statistics systematically when candidate columns are detected
+- Continued UI/UX refinements across the application.
+
+
 ## [2.7.1] - 2026-09-04
 
 ## Improvements

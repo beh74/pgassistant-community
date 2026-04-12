@@ -427,6 +427,8 @@
                     <label for="{{ param }}" class="form-label fw-semibold">Parameter {{ param }}</label>
 
                     <div class="position-relative mb-3">
+                      {% set gp = genius_parameters or {} %}
+
                       <input
                         class="form-control suggestion-field"
                         value=""
@@ -435,33 +437,33 @@
                         type="text"
                         placeholder="Enter parameter value"
                         autocomplete="off"
-                        data-table="{{ genius_parameters[param_key][0] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
-                        data-column="{{ genius_parameters[param_key][1] if param_key in genius_parameters and genius_parameters[param_key][0] is not none else '' }}"
-                        data-type="{{ genius_parameters[param_key][2] if param_key in genius_parameters else '' }}"
+                        data-table="{{ gp[param_key][0] if param_key in gp and gp[param_key][0] is not none else '' }}"
+                        data-column="{{ gp[param_key][1] if param_key in gp and gp[param_key][0] is not none else '' }}"
+                        data-type="{{ gp[param_key][2] if param_key in gp else '' }}"
                       >
 
-                      {% if param_key in genius_parameters and genius_parameters[param_key][0] is not none %}
+                      {% if param_key in gp and gp[param_key][0] is not none %}
                       <span class="search-icon" onclick="showSuggestions('{{ param }}')">🔍</span>
                       {% endif %}
 
                       <div class="suggestions-box" id="suggestions-{{ param }}"></div>
-                    </div>
-
-                    {% if param_key in genius_parameters %}
-                      {% set guess = genius_parameters[param_key] %}
-                      <div class="alert alert-info mb-0 py-2">
-                        <div class="fw-semibold mb-1">Potential match</div>
-                        {% if guess[0] is none or guess[1] is none %}
-                          <div class="small mb-0">Type: <strong>{{ guess[2] }}</strong></div>
-                        {% else %}
-                          <div class="small mb-0">
-                            Table: <strong>{{ guess[0] }}</strong>,
-                            Column: <strong>{{ guess[1] }}</strong>,
-                            Type: <strong>{{ guess[2] }}</strong>
-                          </div>
-                        {% endif %}
                       </div>
-                    {% endif %}
+
+                      {% if param_key in gp %}
+                        {% set guess = gp[param_key] %}
+                        <div class="alert alert-info mb-0 py-2">
+                          <div class="fw-semibold mb-1">Potential match</div>
+                          {% if guess[0] is none or guess[1] is none %}
+                            <div class="small mb-0">Type: <strong>{{ guess[2] }}</strong></div>
+                          {% else %}
+                            <div class="small mb-0">
+                              Table: <strong>{{ guess[0] }}</strong>,
+                              Column: <strong>{{ guess[1] }}</strong>,
+                              Type: <strong>{{ guess[2] }}</strong>
+                            </div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
                   </div>
                 </div>
               </div>

@@ -1,94 +1,865 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Rank queries {% endblock %} 
+{% block title %} Rank Queries {% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
 {% block stylesheets %}
-<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css">
+<!-- Bootstrap Icons CDN for help icons and other UI elements 
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"> 
+-->
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+
+/* ---------------------------------- */
+/* Helpers / misc */
+/* ---------------------------------- */
+.topquery-sql {
+  font-family: monospace;
+  font-size: 0.83rem;
+  line-height: 1.32;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  background: #f8f9fa;
+  border-radius: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid #edf0f2;
+  min-height: 6.2rem;
+}
+
+.topquery-sql:hover {
+  -webkit-line-clamp: unset;
+  overflow: auto;
+  max-height: 320px;
+}
+
+.rank-query-metric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.rank-query-metric-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.rank-query-metric-chip .label {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.rank-query-metric-chip .value {
+  color: #212529;
+  font-weight: 700;
+}
+
+.summary-help-icon {
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+  cursor: help;
+  opacity: 0.85;
+}
+
+.summary-help-icon:hover {
+  opacity: 1;
+}
+
+/* ---------------------------------- */
+/* Filters card */
+/* ---------------------------------- */
+
+.rankqueries-filters-card .card-body {
+  padding: 1.25rem;
+}
+
+.rankqueries-toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem 1.25rem;
+  align-items: end;
+}
+
+.rankqueries-field {
+  min-width: 0;
+}
+
+.rankqueries-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.rankqueries-field .form-control,
+.rankqueries-field .form-select {
+  min-height: 44px;
+  border-radius: 0.75rem;
+}
+
+/* Actions (Apply / Reset) */
+
+.rankqueries-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.rankqueries-actions .btn {
+  min-height: 44px;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  padding: 0 1rem;
+}
+
+.rankqueries-actions .btn-primary {
+  min-width: 100px;
+}
+
+.rankqueries-actions .btn-outline-secondary {
+  min-width: 90px;
+}
+
+/* Responsive */
+
+@media (max-width: 1199.98px) {
+  .rankqueries-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .rankqueries-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .rankqueries-actions {
+    justify-content: stretch;
+  }
+
+  .rankqueries-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ---------------------------------- */
+/* Header */
+/* ---------------------------------- */
+
+.rankqueries-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.rankqueries-subtitle {
+  color: var(--bs-secondary-color);
+  margin-bottom: 0;
+}
+
+/* ---------------------------------- */
+/* Summary cards */
+/* ---------------------------------- */
+
+.rankqueries-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.rankqueries-summary-card {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  min-width: 180px;
+  box-shadow: 0 .125rem .25rem rgba(0,0,0,.04);
+}
+
+.rankqueries-summary-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.15rem;
+}
+
+.rankqueries-summary-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--bs-body-color);
+}
+
+/* ---------------------------------- */
+/* Query cards */
+/* ---------------------------------- */
+
+.rank-query-card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.rank-query-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .5rem 1rem rgba(0,0,0,.08);
+}
+
+.rank-query-card .card-header {
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 0.8rem 1rem;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+.rank-query-card .card-body {
+  padding: 1rem;
+}
+
+/* Priority badge */
+
+.rank-priority-badge {
+  font-size: 0.72rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* Score */
+
+.rank-query-score {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--bs-body-color);
+}
+
+/* SQL block */
+
+.rank-query-sql {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.83rem;
+  line-height: 1.4;
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 0.7rem;
+  padding: 0.7rem;
+  margin-bottom: 0.75rem;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Reason */
+
+.rank-query-reason {
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.85rem;
+}
+
+/* Metrics */
+
+.rank-query-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  margin-bottom: 0.9rem;
+  align-items: flex-start;
+}
+
+.metric-inline-item {
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.metric-inline-label {
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  line-height: 1.1;
+}
+
+.metric-inline-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--bs-body-color);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+/* Signals */
+
+.rank-query-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.rank-signal-badge {
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+}
+
+/* Signal colors */
+
+.rank-signal-high-load {
+  background: rgba(220, 53, 69, .10);
+  color: #dc3545;
+}
+
+.rank-signal-slow {
+  background: rgba(255, 193, 7, .16);
+  color: #9a6b00;
+}
+
+.rank-signal-poor-cache {
+  background: rgba(13, 110, 253, .10);
+  color: #0d6efd;
+}
+
+.rank-signal-temp {
+  background: rgba(111, 66, 193, .10);
+  color: #6f42c1;
+}
+
+.rank-signal-unstable {
+  background: rgba(108, 117, 125, .12);
+  color: #495057;
+}
+
+.rank-signal-high-calls {
+  background: rgba(25, 135, 84, .10);
+  color: #198754;
+}
+
+/* Footer */
+
+.rank-query-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Empty state */
+
+.rank-empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 1rem;
+}
+
+.rank-empty-state .empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.rank-empty-state .empty-text {
+  color: var(--bs-secondary-color);
+}
+
+/* Cache colors */
+
+.text-cache-danger {
+  color: #dc3545 !important;
+}
+
+.text-cache-warning {
+  color: #9a6b00 !important;
+}
+
+</style>
 {% endblock stylesheets %}
 
 {% block content %}
+<div class="container-fluid py-4 ps-3 pe-3">
 
-  <div class="py-4">
-    <div class="mb-3 mb-lg-0">
-        <h1 class="h4">Rank queries</h1>
-        <p class="mb-0">optimization_score_percentage is calculated with execution_time_percentage (60% weight) and cache_ratio_percentage (40% weight)</p>
+  <div class="rankqueries-header-row">
+    <div>
+      <h1 class="h4 mb-1">Rank Queries</h1>
+      <p class="rankqueries-subtitle">
+        Quickly identify the queries that deserve investigation first.
+        Scores and priority levels are computed relative to workload intensity and may be less relevant on low-activity systems.
+      </p>
     </div>
-</div>
 
-  <div class="card border-0 shadow mb-4">
-    <div class="card-body">
-      <div class="table-responsive">
-          <table class="table table-striped" style="width:100%" id="topqueries" >
-              <thead class="thead-light">
-                  <tr>
-                    <th>Analyze</th>
-                      {%for row in rows[0]: %}
-                      <th>{{ row }}</th>                     
-                      {% endfor %}
-                  </tr>
-              </thead>
-              <tbody>
-                  <!-- Item -->
-                  {%for row in rows: %}
-                  <tr>
-                  {% set x = namespace(value=0) %}     
-                    
-                  {%for value in row %}
-                  {% set x.value = x.value + 1 %}                              
-                        {% if x.value == 1 %}
-                        
-                        {% if 'EXPLAIN ANALYZE' not in row[value] %}
-                        <td style="word-wrap: break-word;min-width: 10px;max-width: 360px; white-space: normal; text-align: center;">
-                            <button onclick="location.href='/analyze/{{ row['queryid'] }}'" type="button" class="btn btn-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
-                                </svg>
-                            </button>
-                            {% if row['optimization_score_percentage']|int <30 %}
-                            <span class="badge bg-success">OK</span>
-                            {% elif row['optimization_score_percentage']|int <40 %}
-                            <span class="badge bg-secondary">OK</span>
-                            {% elif row['mean_exec_time']|int <50 %}
-                            <span class="badge bg-warning text-dark">Warning</span>
-                            {% else %}
-                            <span class="badge bg-danger">Perf</span>
-                            {% endif %}
-                        </td>
-                        
-                        {% else %}
-                        <td style="word-wrap: break-word;min-width: 10px;max-width: 360px; white-space: normal"></td>
-                        {% endif %}
-                       
-                        {% endif %}
-                        <td style="word-wrap: break-word;min-width: 10px;max-width: 360px; white-space: normal">      
-                        {{ row[value] }}
-
-                        </td>              
-                   {% endfor %}                     
-                  </tr>
-                  {% endfor %}  
-              </tbody>
-          </table>
-      </div>
-    </div>
+    <span class="badge text-bg-secondary" id="rank-count-badge">
+      {{ ranked_queries|length if ranked_queries is defined else 0 }} ranked queries
+    </span>
   </div>
 
+{% if ranked_queries is defined and ranked_queries %}
+  <div class="rankqueries-summary">
+    <div class="rankqueries-summary-card">
+      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+        Queries ranked
+        <i
+          class="bi bi-question-circle summary-help-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="Number of queries currently included in this ranking view."
+        ></i>
+      </span>
+      <span class="rankqueries-summary-value">{{ ranked_queries|length }}</span>
+    </div>
 
+    <div class="rankqueries-summary-card">
+      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+        Critical
+        <i
+          class="bi bi-question-circle summary-help-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="Queries with the highest priority score based on execution time, cost, I/O pressure, cache efficiency, and other ranking signals."
+        ></i>
+      </span>
+      <span class="rankqueries-summary-value">
+        {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
+      </span>
+    </div>
 
-<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js"></script>
+    <div class="rankqueries-summary-card">
+      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+        High priority
+        <i
+          class="bi bi-question-circle summary-help-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="Queries considered important to review, but below the Critical threshold."
+        ></i>
+      </span>
+      <span class="rankqueries-summary-value">
+        {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
+      </span>
+    </div>
 
+    <div class="rankqueries-summary-card">
+      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+        Top 10 workload share
+        <i
+          class="bi bi-question-circle summary-help-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="Percentage of total execution time represented by the first 10 ranked queries."
+        ></i>
+      </span>
+      <span class="rankqueries-summary-value">
+        {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
+        {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
+        {% if total_all > 0 %}
+          {{ "%.1f"|format((total_top10 / total_all) * 100) }}%
+        {% else %}
+          0.0%
+        {% endif %}
+      </span>
+    </div>
+  </div>
+{% endif %}
 
-<script>
-new DataTable('#topqueries', {
-    order: [[10, 'desc']], // Tri sur la 2e colonne (index 1) en ordre décroissant
-    scrollX: true
-  });
-</script>
+  <div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 rankqueries-filters-card">
+  <div class="card-body">
+    <div class="rankqueries-toolbar">
 
+      <div class="rankqueries-field">
+        <label for="rank-search" class="form-label">Search</label>
+        <input
+          type="text"
+          class="form-control"
+          id="rank-search"
+          placeholder="Search SQL text..."
+        >
+      </div>
+
+      <div class="rankqueries-field">
+        <label for="rank-priority" class="form-label">Priority</label>
+        <select class="form-select" id="rank-priority">
+          <option value="">All</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+
+      <div class="rankqueries-field">
+        <label for="rank-sort" class="form-label">Sort by</label>
+        <select class="form-select" id="rank-sort">
+          <option value="priority">Priority score</option>
+          <option value="total_exec_time">Total time</option>
+          <option value="mean_exec_time">Mean time</option>
+          <option value="calls">Calls</option>
+          <option value="cache_hit_ratio">Cache ratio</option>
+        </select>
+      </div>
+
+      <div class="rankqueries-field">
+        <label for="rank-signal" class="form-label d-inline-flex align-items-center gap-1">
+        Signal
+        <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-html="true"
+            title="
+            <strong>Signals:</strong><br>
+            High load: High total execution time<br>
+            Slow: High latency per call<br>
+            Poor cache: Low cache hit ratio<br>
+            Temp usage: Disk spill (temp files)<br>
+            Unstable: High latency variance<br>
+            High calls: Frequently executed query
+            "
+        ></i>
+        </label>
+        <select class="form-select" id="rank-signal">
+          <option value="">All</option>
+          <option value="high_load">High load</option>
+          <option value="slow">Slow</option>
+          <option value="poor_cache">Poor cache</option>
+          <option value="temp_usage">Temp usage</option>
+          <option value="unstable">Unstable</option>
+          <option value="high_calls">High calls</option>
+        </select>
+      </div>
+
+      <div class="rankqueries-field">
+        <label for="rank-per-page" class="form-label">Cards per page</label>
+        <select class="form-select" id="rank-per-page">
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+
+      <div class="rankqueries-field">
+        <label class="form-label d-block">&nbsp;</label>
+        <div class="rankqueries-actions">
+          <button type="button" id="rank-apply-btn" class="btn btn-primary">Apply</button>
+          <button type="button" id="rank-reset-btn" class="btn btn-outline-secondary">Reset</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+  </div>
+
+  {% if ranked_queries is defined and ranked_queries %}
+    <div class="row" id="rank-cards-container">
+      {% for row in ranked_queries %}
+        <div
+          class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4 rank-query-col"
+          data-query="{{ (row.query or '') | lower | e }}"
+          data-priority="{{ row.priority_level | e }}"
+          data-signals="{{ (row.signals | join(' ')) | e }}"
+          data-priority-score="{{ row.priority_score }}"
+          data-total-exec-time="{{ row.total_exec_time }}"
+          data-mean-exec-time="{{ row.mean_exec_time }}"
+          data-calls="{{ row.calls }}"
+          data-cache-hit-ratio="{{ row.cache_hit_ratio }}"
+        >
+          <div class="card shadow-sm h-100 rank-query-card">
+
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center gap-2">
+                <span class="rank-priority-badge badge
+                  {% if row.priority_level == 'Critical' %}bg-danger text-white
+                  {% elif row.priority_level == 'High' %}bg-warning text-dark
+                  {% elif row.priority_level == 'Medium' %}bg-info text-dark
+                  {% else %}bg-secondary text-white
+                  {% endif %}">
+                  {{ row.priority_level }}
+                </span>
+
+                <span class="rank-query-score">{{ row.priority_score }}</span>
+              </div>
+
+              <span class="text-muted small rank-card-index">#{{ loop.index }}</span>
+            </div>
+
+            <div class="card-body">
+              <div class="topquery-sql">{{ row.query }}</div>
+
+              <div class="rank-query-reason">
+                
+              </div>
+
+              <div class="rank-query-metrics">
+                <div class="metric-inline-item">
+                  <span class="metric-inline-label">Total Time</span>
+                  <span class="metric-inline-value">
+                    {{ row.total_exec_time_formatted if row.total_exec_time_formatted else row.total_exec_time ~ " ms" }}
+                  </span>
+                </div>
+
+                <div class="metric-inline-item">
+                  <span class="metric-inline-label">Mean Time</span>
+                  <span class="metric-inline-value">
+                    {{ "%.2f"|format((row.mean_exec_time | float) if row.mean_exec_time else 0) }} ms
+                  </span>
+                </div>
+
+                <div class="metric-inline-item">
+                  <span class="metric-inline-label">Calls</span>
+                  <span class="metric-inline-value">
+                    {% set calls = (row.calls | int) if row.calls else 0 %}
+                    {% if calls >= 1000000 %}
+                      {{ "%.1f"|format(calls / 1000000) }}M
+                    {% elif calls >= 1000 %}
+                      {{ "%.1f"|format(calls / 1000) }}k
+                    {% else %}
+                      {{ calls }}
+                    {% endif %}
+                  </span>
+                </div>
+
+                <div class="metric-inline-item">
+                  <span class="metric-inline-label">Cache Ratio</span>
+                  <span class="metric-inline-value
+                    {% if row.cache_hit_ratio is defined and row.cache_hit_ratio is not none %}
+                      {% if row.cache_hit_ratio < 80 %} text-cache-danger
+                      {% elif row.cache_hit_ratio < 95 %} text-cache-warning
+                      {% endif %}
+                    {% endif %}
+                  ">
+                    {{ "%.1f"|format((row.cache_hit_ratio | float) if row.cache_hit_ratio is defined and row.cache_hit_ratio is not none else 100) }}%
+                  </span>
+                </div>
+              </div>
+
+            {% if row.signals %}
+            <div class="rank-query-signals">
+                {% for signal in row.signals %}
+
+                {% if signal == 'high_load' %}
+                    <span class="rank-signal-badge rank-signal-high-load">
+                    <i class="bi bi-fire me-1"></i>High load
+                    </span>
+
+                {% elif signal == 'slow' %}
+                    <span class="rank-signal-badge rank-signal-slow">
+                    <i class="bi bi-hourglass-split me-1"></i>Slow
+                    </span>
+
+                {% elif signal == 'poor_cache' %}
+                    <span class="rank-signal-badge rank-signal-poor-cache">
+                    <i class="bi bi-hdd me-1"></i>Poor cache
+                    </span>
+
+                {% elif signal == 'temp_usage' %}
+                    <span class="rank-signal-badge rank-signal-temp">
+                    <i class="bi bi-box-seam me-1"></i>Temp usage
+                    </span>
+
+                {% elif signal == 'unstable' %}
+                    <span class="rank-signal-badge rank-signal-unstable">
+                    <i class="bi bi-graph-up-arrow me-1"></i>Unstable
+                    </span>
+
+                {% elif signal == 'high_calls' %}
+                    <span class="rank-signal-badge rank-signal-high-calls">
+                    <i class="bi bi-lightning me-1"></i>High calls
+                    </span>
+
+                {% endif %}
+
+                {% endfor %}
+            </div>
+            {% endif %}
+
+              <div class="rank-query-footer">
+                <div class="rank-query-meta">
+                <span class="metric-inline-label">
+                  {% if row.rows_per_call is defined %}
+                    Rows/call: {{ "%.2f"|format((row.rows_per_call | float) if row.rows_per_call else 0) }}
+                  {% elif row.rows is defined and row.calls %}
+                    Rows/call: {{ "%.2f"|format((row.rows | float) / (row.calls | float)) if row.calls else "0.00" }}
+                  {% endif %}
+                </span>  
+                </div>
+
+                <div class="rank-query-actions">
+                  {% if row.queryid is defined and row.queryid %}
+                    <a href="/analyze/{{ row['queryid'] }}" class="btn btn-sm btn-primary">
+                      Analyze
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="rank-empty-state">
+      <div class="empty-title">No ranked queries available</div>
+      <p class="empty-text">
+        No query matched the current filters, or no pg_stat_statements data is available.
+      </p>
+    </div>
+  {% endif %}
+
+</div>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const searchInput = document.getElementById("rank-search");
+  const prioritySelect = document.getElementById("rank-priority");
+  const signalSelect = document.getElementById("rank-signal");
+  const sortSelect = document.getElementById("rank-sort");
+  const perPageSelect = document.getElementById("rank-per-page");
+  const applyBtn = document.getElementById("rank-apply-btn");
+  const resetBtn = document.getElementById("rank-reset-btn");
+  const countBadge = document.getElementById("rank-count-badge");
+  const container = document.getElementById("rank-cards-container");
+
+  if (!container) {
+    return;
+  }
+
+  const cards = Array.from(container.querySelectorAll(".rank-query-col"));
+
+  function getNumeric(el, attrName) {
+    const value = el.getAttribute(attrName);
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function updateVisibleIndexes(visibleCards) {
+    visibleCards.forEach((card, idx) => {
+      const indexEl = card.querySelector(".rank-card-index");
+      if (indexEl) {
+        indexEl.textContent = "#" + (idx + 1);
+      }
+    });
+  }
+
+  function applyFilters() {
+    const search = (searchInput?.value || "").trim().toLowerCase();
+    const priority = prioritySelect?.value || "";
+    const signal = signalSelect?.value || "";
+    const sort = sortSelect?.value || "priority";
+    const perPage = Number(perPageSelect?.value || 20);
+
+    let filtered = cards.filter((card) => {
+      const query = card.dataset.query || "";
+      const cardPriority = card.dataset.priority || "";
+      const signals = card.dataset.signals || "";
+
+      const matchesSearch = !search || query.includes(search);
+      const matchesPriority = !priority || cardPriority === priority;
+      const matchesSignal = !signal || signals.split(/\s+/).includes(signal);
+
+      return matchesSearch && matchesPriority && matchesSignal;
+    });
+
+    filtered.sort((a, b) => {
+      if (sort === "priority") {
+        return getNumeric(b, "data-priority-score") - getNumeric(a, "data-priority-score");
+      }
+      if (sort === "total_exec_time") {
+        return getNumeric(b, "data-total-exec-time") - getNumeric(a, "data-total-exec-time");
+      }
+      if (sort === "mean_exec_time") {
+        return getNumeric(b, "data-mean-exec-time") - getNumeric(a, "data-mean-exec-time");
+      }
+      if (sort === "calls") {
+        return getNumeric(b, "data-calls") - getNumeric(a, "data-calls");
+      }
+      if (sort === "cache_hit_ratio") {
+        return getNumeric(a, "data-cache-hit-ratio") - getNumeric(b, "data-cache-hit-ratio");
+      }
+      return 0;
+    });
+
+    cards.forEach((card) => {
+      card.style.display = "none";
+    });
+
+    filtered.forEach((card) => {
+      container.appendChild(card);
+    });
+
+    const visibleCards = filtered.slice(0, perPage);
+
+    visibleCards.forEach((card) => {
+      card.style.display = "";
+    });
+
+    updateVisibleIndexes(visibleCards);
+
+    if (countBadge) {
+      const count = filtered.length;
+      countBadge.textContent = count + (count > 1 ? " ranked queries" : " ranked query");
+    }
+  }
+
+  function resetFilters() {
+    if (searchInput) searchInput.value = "";
+    if (prioritySelect) prioritySelect.value = "";
+    if (signalSelect) signalSelect.value = "";
+    if (sortSelect) sortSelect.value = "priority";
+    if (perPageSelect) perPageSelect.value = "20";
+    applyFilters();
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener("click", applyFilters);
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", resetFilters);
+  }
+
+  [prioritySelect, signalSelect, sortSelect, perPageSelect].forEach((el) => {
+    if (el) {
+      el.addEventListener("change", applyFilters);
+    }
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener("input", applyFilters);
+  }
+
+  applyFilters();
+});
+</script>
+{% endblock javascripts %}

@@ -4,6 +4,22 @@
 
 {% block stylesheets %}
 <style>
+  .error-traceback-box {
+    background: #f8f9fa;
+  }
+
+  .error-traceback {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #374151;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow: auto;
+    font-family: var(--bs-font-monospace, monospace);
+  }
+  
   .error-page-shell {
     min-height: 100vh;
     display: flex;
@@ -142,20 +158,29 @@
                   <p class="error-box-message">{{ err }}</p>
                 </div>
 
+                {% if traceback_text %}
+                <div class="error-box error-traceback-box mb-4">
+                  <div class="error-box-label">Traceback</div>
+                  <pre class="error-traceback">{{ traceback_text }}</pre>
+                </div>
+                {% endif %}
+
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button"
-                            class="btn btn-primary d-inline-flex align-items-center justify-content-center"
-                            onclick="goBack()">
+                  <button type="button"
+                          class="btn btn-primary d-inline-flex align-items-center justify-content-center"
+                          onclick="goBack()">
                     <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd"
+                      <path fill-rule="evenodd"
                             d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z"
                             clip-rule="evenodd">
-                        </path>
+                      </path>
                     </svg>
                     Go back
-                    </button>
-
-                  <a href="https://github.com/beh74/pgassistant-community/issues" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center" target="_blank" rel="noopener">
+                  </button>
+                  <a href="https://github.com/beh74/pgassistant-community/issues/new?title={{ ('Bug report: ' ~ err)|urlencode }}&body={{ ('## Error message%0A' ~ err ~ '%0A%0A## Traceback%0A```%0A' ~ (traceback_text or 'No traceback available') ~ '%0A```')|urlencode }}"
+                    class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                    target="_blank"
+                    rel="noopener">
                     <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <path fill-rule="evenodd" d="M10 1.5a8.5 8.5 0 0 0-2.688 16.564c.425.078.58-.185.58-.41 0-.203-.008-.87-.012-1.577-2.36.513-2.858-1-2.858-1-.385-.98-.94-1.24-.94-1.24-.768-.525.058-.514.058-.514.85.06 1.297.873 1.297.873.755 1.294 1.98.92 2.462.704.076-.547.295-.92.536-1.132-1.884-.214-3.866-.942-3.866-4.192 0-.926.331-1.684.872-2.278-.088-.214-.378-1.076.083-2.244 0 0 .711-.228 2.33.87A8.1 8.1 0 0 1 10 5.588c.723.003 1.452.098 2.134.288 1.618-1.098 2.328-.87 2.328-.87.462 1.168.172 2.03.084 2.244.542.594.87 1.352.87 2.278 0 3.258-1.985 3.975-3.874 4.185.303.262.574.776.574 1.564 0 1.129-.01 2.039-.01 2.317 0 .227.153.492.584.408A8.5 8.5 0 0 0 10 1.5Z" clip-rule="evenodd"></path>
                     </svg>

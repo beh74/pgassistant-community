@@ -83,6 +83,18 @@ def analyze_plan_for_safe_indexes(
                 evaluate_join_candidate(con, join, alias_map, query_stats)
             )
 
+        # ------------------------------------------------------------
+        # Safety pass: if candidate columns exist, always try to attach stats
+        # ------------------------------------------------------------
+        for rec in recommendations:
+            if rec.candidate_columns and not rec.stats_reason:
+                rec.stats_reason = load_candidate_stats_reason(
+                    con,
+                    rec.schema,
+                    rec.table,
+                    rec.candidate_columns,
+                )
+
         return {
             "ok": True,
             "message": "Plan analyzed successfully.",
@@ -102,6 +114,23 @@ def analyze_plan_for_safe_indexes(
 # --------------------------------------------------------------------
 # Recommendation engine
 # --------------------------------------------------------------------
+
+def load_candidate_stats_reason(
+    con,
+    schema: str,
+    table: str,
+    candidate_columns: Optional[List[str]],
+) -> Optional[str]:
+    if not candidate_columns:
+        return None
+
+    return helpers.build_candidate_columns_stats_reason(
+        con,
+        schema,
+        table,
+        candidate_columns,
+    )
+
 
 def evaluate_scan_candidate(
     con,
@@ -136,21 +165,33 @@ def evaluate_indexed_scan_candidate(
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
     candidate_columns: List[str] = []
-    stats_reason: Optional[str] = None
+    predicates: List[Dict[str, str]] = []
 
     if finding.filter_expr:
-        candidate_columns = helpers.extract_simple_filter_columns(
+        predicates = helpers.extract_simple_filter_predicates(
             finding.filter_expr,
             alias=finding.alias,
             table=finding.table,
         )
-        if candidate_columns:
-            stats_reason = helpers.build_candidate_columns_stats_reason(
+
+        if predicates:
+            candidate_columns = helpers.reorder_index_candidate_columns(
                 con,
                 finding.schema,
                 finding.table,
-                candidate_columns,
+                predicates,
             )
+
+    stats_reason = (
+        helpers.build_candidate_predicates_stats_reason(
+            con,
+            finding.schema,
+            finding.table,
+            predicates,
+        )
+        if predicates
+        else None
+    )
 
     used_index_def = helpers.find_index_definition(meta.indexes, finding.index_name)
 
@@ -200,21 +241,34 @@ def evaluate_seq_scan_candidate(
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
     candidate_columns: List[str] = []
-    stats_reason: Optional[str] = None
+    predicates: List[Dict[str, str]] = []
 
     if finding.filter_expr:
-        candidate_columns = helpers.extract_simple_filter_columns(
+        predicates = helpers.extract_simple_filter_predicates(
             finding.filter_expr,
             alias=finding.alias,
             table=finding.table,
         )
-        if candidate_columns:
-            stats_reason = helpers.build_candidate_columns_stats_reason(
+
+        if predicates:
+            candidate_columns = helpers.reorder_index_candidate_columns(
                 con,
                 finding.schema,
                 finding.table,
-                candidate_columns,
+                predicates,
             )
+
+    stats_reason = (
+        helpers.build_candidate_predicates_stats_reason(
+            con,
+            finding.schema,
+            finding.table,
+            predicates,
+        )
+        if predicates
+        else None
+    )
+
     row_gap_flag, row_gap_reason = helpers.has_large_row_estimation_gap(
         finding.actual_rows,
         finding.plan_rows,
@@ -364,7 +418,11 @@ def evaluate_seq_scan_candidate(
             recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
-            create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+            create_index_sql=helpers.build_create_index_sql(
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            ),
             stats_reason=stats_reason,
             row_estimation_reason=row_gap_reason,
         )
@@ -385,7 +443,11 @@ def evaluate_seq_scan_candidate(
             recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
-            create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+            create_index_sql=helpers.build_create_index_sql(
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            ),
             stats_reason=stats_reason,
             row_estimation_reason=row_gap_reason,
         )
@@ -409,7 +471,11 @@ def evaluate_seq_scan_candidate(
                 recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
-                create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+                create_index_sql=helpers.build_create_index_sql(
+                    finding.schema,
+                    finding.table,
+                    candidate_columns,
+                ),
                 stats_reason=stats_reason,
                 row_estimation_reason=row_gap_reason,
             )
@@ -432,7 +498,11 @@ def evaluate_seq_scan_candidate(
                 recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
-                create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+                create_index_sql=helpers.build_create_index_sql(
+                    finding.schema,
+                    finding.table,
+                    candidate_columns,
+                ),
                 stats_reason=stats_reason,
                 row_estimation_reason=row_gap_reason,
             )
@@ -453,7 +523,11 @@ def evaluate_seq_scan_candidate(
                 recheck_cond=finding.recheck_cond,
                 filter_expr=finding.filter_expr,
                 candidate_columns=candidate_columns,
-                create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+                create_index_sql=helpers.build_create_index_sql(
+                    finding.schema,
+                    finding.table,
+                    candidate_columns,
+                ),
                 stats_reason=(
                     f"{stats_reason} | estimated_selectivity={estimated_selectivity:.1%}"
                     if stats_reason
@@ -477,7 +551,11 @@ def evaluate_seq_scan_candidate(
             recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
             candidate_columns=candidate_columns,
-            create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+            create_index_sql=helpers.build_create_index_sql(
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            ),
             stats_reason=(
                 f"{stats_reason} | estimated_selectivity={estimated_selectivity:.1%}"
                 if stats_reason
@@ -498,7 +576,11 @@ def evaluate_seq_scan_candidate(
         recheck_cond=finding.recheck_cond,
         filter_expr=finding.filter_expr,
         candidate_columns=candidate_columns,
-        create_index_sql=helpers.build_create_index_sql(finding.schema, finding.table, candidate_columns),
+        create_index_sql=helpers.build_create_index_sql(
+            finding.schema,
+            finding.table,
+            candidate_columns,
+        ),
         stats_reason=stats_reason,
         row_estimation_reason=row_gap_reason,
     )
@@ -530,6 +612,13 @@ def evaluate_join_candidate(
     if not helpers.is_small_table(left_meta):
         existing_left = helpers.find_equivalent_index(left_meta.indexes, [join.left_column])
         if not existing_left:
+            left_stats_reason = load_candidate_stats_reason(
+                con,
+                left_meta.schema,
+                left_meta.table,
+                [join.left_column],
+            )
+
             recommendations.append(
                 helpers.Recommendation(
                     schema=left_meta.schema,
@@ -550,12 +639,20 @@ def evaluate_join_candidate(
                         left_meta.table,
                         [join.left_column],
                     ),
+                    stats_reason=left_stats_reason,
                 )
             )
 
     if not helpers.is_small_table(right_meta):
         existing_right = helpers.find_equivalent_index(right_meta.indexes, [join.right_column])
         if not existing_right:
+            right_stats_reason = load_candidate_stats_reason(
+                con,
+                right_meta.schema,
+                right_meta.table,
+                [join.right_column],
+            )
+
             recommendations.append(
                 helpers.Recommendation(
                     schema=right_meta.schema,
@@ -576,11 +673,11 @@ def evaluate_join_candidate(
                         right_meta.table,
                         [join.right_column],
                     ),
+                    stats_reason=right_stats_reason,
                 )
             )
 
     return recommendations
-
 
 
 # --------------------------------------------------------------------

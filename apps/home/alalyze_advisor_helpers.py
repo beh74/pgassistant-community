@@ -107,7 +107,6 @@ class Recommendation:
     row_estimation_reason: Optional[str] = None
 
 
-
 # --------------------------------------------------------------------
 # Session / connection helpers
 # --------------------------------------------------------------------
@@ -504,6 +503,26 @@ def build_candidate_columns_stats_reason(
     return " | ".join(parts)
 
 
+def build_candidate_predicates_stats_reason(
+    con,
+    schema: str,
+    table: str,
+    predicates: List[Dict[str, str]],
+) -> str:
+    """
+    Version enrichie qui montre aussi l'opérateur détecté pour chaque colonne.
+    """
+    parts: List[str] = []
+
+    for pred in predicates:
+        col = pred["column"]
+        op = pred["operator"]
+        stats = load_column_stats(con, schema, table, col)
+        parts.append(f"{col} [{op}]: {build_column_stats_summary(stats)}")
+
+    return " | ".join(parts)
+
+
 def try_extract_constant_text(filter_expr: str) -> Optional[str]:
     m = re.search(
         r"""(=|>=|<=|>|<)\s*(?:
@@ -666,6 +685,7 @@ def estimate_selectivity_from_stats(
 # --------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------
+
 def has_large_row_estimation_gap(
     actual_rows: float,
     plan_rows: float,
@@ -701,6 +721,7 @@ def has_large_row_estimation_gap(
 
     return False, None
 
+
 def find_index_definition(indexes: List[Dict[str, Any]], index_name: Optional[str]) -> Optional[str]:
     if not index_name:
         return None
@@ -709,6 +730,7 @@ def find_index_definition(indexes: List[Dict[str, Any]], index_name: Optional[st
         if idx.get("index_name") == index_name:
             return idx.get("indexdef")
     return None
+
 
 def compute_row_estimation_ratio(plan_rows: float, actual_rows: float) -> Optional[float]:
     """
@@ -722,11 +744,11 @@ def compute_row_estimation_ratio(plan_rows: float, actual_rows: float) -> Option
     if plan_rows < 0 or actual_rows < 0:
         return None
 
-    # éviter division par zéro tout en restant interprétable
     p = max(plan_rows, 1.0)
     a = max(actual_rows, 1.0)
 
     return max(a / p, p / a)
+
 
 def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
     ratio = compute_row_estimation_ratio(plan_rows, actual_rows)
@@ -749,8 +771,6 @@ def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
         f"plan_rows={plan_rows:.0f}, actual_rows={actual_rows:.0f}, "
         f"absolute_diff={abs_diff:.0f}, mismatch_ratio={ratio:.2f}x."
     )
-
-
 
 
 def is_small_table(meta: TableMeta) -> bool:
@@ -906,6 +926,160 @@ def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table:
             deduped.append(c)
 
     return deduped
+
+
+def extract_simple_filter_predicates(
+    filter_expr: str,
+    alias: Optional[str],
+    table: str,
+) -> List[Dict[str, str]]:
+    """
+    Extrait des prédicats simples de type:
+      col = ...
+      col > ...
+      col >= ...
+      col < ...
+      col <= ...
+      col LIKE ...
+      col ~~ ...
+
+    Retourne une liste ordonnée:
+      [{"column": "a", "operator": "="}, {"column": "b", "operator": ">"}]
+    """
+    expr = strip_outer_parentheses(filter_expr.strip())
+    clauses = split_top_level_and(expr)
+
+    predicates: List[Dict[str, str]] = []
+    op_pattern = re.compile(r"\s*(=|>=|<=|>|<|~~|LIKE|ILIKE)\s*", flags=re.IGNORECASE)
+
+    for clause in clauses:
+        clause = strip_outer_parentheses(clause)
+
+        m = op_pattern.search(clause)
+        if not m:
+            return []
+
+        lhs = clause[:m.start()].strip()
+        op = m.group(1).upper()
+
+        lhs = strip_trivial_lhs_casts(lhs)
+
+        lhs_match = re.match(
+            r'^(?:(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\.)?(?P<col>[A-Za-z_][A-Za-z0-9_]*)$',
+            lhs,
+            flags=re.IGNORECASE,
+        )
+        if not lhs_match:
+            return []
+
+        found_prefix = lhs_match.group("prefix")
+        col = lhs_match.group("col")
+
+        if alias and found_prefix and found_prefix != alias:
+            return []
+
+        if not alias and found_prefix and found_prefix != table:
+            return []
+
+        if op == "ILIKE":
+            return []
+
+        predicates.append(
+            {
+                "column": col,
+                "operator": op,
+            }
+        )
+
+    deduped: List[Dict[str, str]] = []
+    seen = set()
+
+    for pred in predicates:
+        col = pred["column"]
+        if col not in seen:
+            deduped.append(pred)
+            seen.add(col)
+
+    return deduped
+
+
+def _operator_rank_for_btree(op: str) -> int:
+    """
+    Heuristique simple d'ordre dans un index B-tree composite:
+    0 -> égalité
+    1 -> prefix LIKE / ~~ (conditionnelle)
+    2 -> range
+    9 -> fallback
+    """
+    op = (op or "").upper()
+
+    if op == "=":
+        return 0
+    if op in {"LIKE", "~~"}:
+        return 1
+    if op in {">", ">=", "<", "<="}:
+        return 2
+    return 9
+
+
+def _column_cardinality_score(stats: Optional[ColumnStats]) -> float:
+    """
+    Score plus grand = colonne plus discriminante.
+    Heuristique:
+    - n_distinct > 0 : cardinalité absolue estimée
+    - n_distinct < 0 : fraction de lignes distinctes (pg_stats convention)
+    """
+    if stats is None:
+        return 0.0
+
+    nd = stats.n_distinct
+
+    if nd > 0:
+        return float(nd)
+
+    if nd < 0:
+        return abs(float(nd))
+
+    return 0.0
+
+
+def reorder_index_candidate_columns(
+    con,
+    schema: str,
+    table: str,
+    predicates: List[Dict[str, str]],
+) -> List[str]:
+    """
+    Réordonne les colonnes candidates pour un index composite:
+    - colonnes avec '=' d'abord
+    - puis LIKE / ~~ prefix
+    - puis ranges
+    - à l'intérieur d'un groupe: cardinalité décroissante
+    """
+    if not predicates:
+        return []
+
+    scored: List[tuple[int, float, int, str]] = []
+
+    for pos, pred in enumerate(predicates):
+        col = pred["column"]
+        op = pred["operator"]
+        stats = load_column_stats(con, schema, table, col)
+
+        op_rank = _operator_rank_for_btree(op)
+        cardinality = _column_cardinality_score(stats)
+
+        # tri: operator asc, cardinality desc, original position asc
+        scored.append((op_rank, -cardinality, pos, col))
+
+    scored.sort()
+
+    ordered: List[str] = []
+    for _, _, _, col in scored:
+        if col not in ordered:
+            ordered.append(col)
+
+    return ordered
 
 
 def extract_simple_join_columns(

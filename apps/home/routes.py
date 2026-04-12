@@ -25,6 +25,7 @@ from . import graph_table
 from . import pgstat_helper
 from . import analyze_advisor
 from . import tetris
+from . import ranking
 import re
 import requests
 import json
@@ -91,35 +92,8 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
 def handle_rank_queries_get(template: str, segment: str):
     if session.get("db_name"):
         rows = database.get_rank_queries(session)
-        
-        i=0
-        table_stats=[]
-        for query in rows:            
-            tables = sqlhelper.get_tables(query['query'])
-            for table  in tables:
-                stats.add_or_update_table_info(table_stats,
-                                               table, 
-                                               query['calls'], 
-                                               query['mean_exec_time'],
-                                               query['rows'],
-                                               'select',
-                                               []
-                                               )
-            rows[i]['tables']=tables
-            i = i + 1   
-        pga_tables=database.get_pga_tables()
-        rows_filtered=[]
-        for row in rows:
-            filtered=False
-            for table in row ['tables']:
-                if table in pga_tables:
-                    filtered=True
-            if not row ['tables']:
-                filtered=True    
-            if not filtered:
-                rows_filtered.append(row)
-        
-        return render_template(f"home/{template}", segment=segment, rows=rows_filtered)
+        ranked_queries = ranking.rank_queries(rows)
+        return render_template(f"home/{template}", segment=segment, ranked_queries=ranked_queries)
     else:
         return redirect("/database.html")    
 
@@ -268,8 +242,9 @@ def generic(genericid):
         else:
             return redirect("/database.html")
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route('/generic_param/<genericid>', methods=['GET', 'POST'])
 def generic_param(genericid):
@@ -293,8 +268,9 @@ def generic_param(genericid):
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route('/analyze/<querid>', methods=['GET', 'POST'])
 def analyze_query(querid):
@@ -445,8 +421,9 @@ def analyze_query(querid):
                             chatgpt_query=llm.render_markdown(chatgpt)
                         )
                     except Exception as e1:
-                        traceback.print_exc()
-                        return render_template('home/page-500.html', err=e1), 500
+                        tb = traceback.format_exc()
+                        print(tb)
+                        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
                 elif request.form.get('action') == 'ddl':
                     # ✅ Use the same table list as the LLM (derived from ANALYZE if available)
@@ -469,7 +446,7 @@ def analyze_query(querid):
                 # try to extract parameters from query
                 try:
                     genius_parameters = sqlhelper.get_genius_parameters(sql_query, session)
-                    print("Genius parameters extracted:", genius_parameters)
+                    #print("Genius parameters extracted:", genius_parameters)
                 except Exception:
                     genius_parameters = []
 
@@ -515,8 +492,9 @@ def analyze_query(querid):
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route("/execute", methods=["POST"])
 def execute_sql():
@@ -630,7 +608,9 @@ def dba_database_report():
         return render_template('home/report.html', report=html_report, segment='dba_report')
 
     except Exception as e1:
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
     
 @blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
 def api_reset_stats():
@@ -800,9 +780,10 @@ def route_template(template: str):
         return render_template(f"home/{template}", segment=segment, dbinfo={})
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
-    except Exception as e:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=str(e)), 500
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route("/tools")
 def tools():
@@ -820,9 +801,10 @@ def llm_primary_key(schema: str, tablename:str):
     else:
         try:
             chatgpt_response=llm.query_chatgpt(llm_prompt)
-        except Exception as e:
-            traceback.print_exc()
-            return render_template('home/page-500.html', err=e), 500
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt))        
 
 @blueprint.route('/table_llm/<schema>/<tablename>', methods=['GET','POST'])
@@ -837,9 +819,10 @@ def llm_table(schema: str, tablename:str):
     else:
         try:
             chatgpt_response=llm.query_chatgpt(llm_prompt)
-        except Exception as e:
-            traceback.print_exc()
-            return render_template('home/page-500.html', err=e), 500
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt), title=f"Analyze table definition for {schema}.{tablename}") 
 
 @blueprint.route('/table_llm_guidelines/<schema>/<tablename>', methods=['GET','POST'])
@@ -854,45 +837,49 @@ def llm_table_guidelines(schema: str, tablename:str):
     else:
         try:
             chatgpt_response=llm.query_chatgpt(llm_prompt)
-        except Exception as e:
-            traceback.print_exc()
-            return render_template('home/page-500.html', err=e), 500
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
         return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt), title=f"Analyze SQL conventions for {schema}.{tablename}")        
 
 @blueprint.route('/table_tetris/<schema>/<tablename>', methods=['GET'])
 def tetris_table(schema: str, tablename:str):
-    tables = []
-    tables.append (f"{schema}.{tablename}")
-    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
-    
-    tetris_sql = database.get_query_by_id('tetris_play')
-    tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
-    tetris_result = database.generic_select_with_sql(session, tetris_sql)
-    tetris_result_sql = "-- Create Tetris table DDL and copy source data\n" +tetris_result[0]['create_table_tetris_ddl']
-    tetris_result_sql = tetris_result_sql.replace("\\n", "\n")
-    tetris_result_sql += "\n\n" + "-- Alter table with constraints and indexes\n" + tetris.extract_post_create_ddl(ddl_str, schema, tablename)
-    tetris_result_sql += "\n\n" + """
--- pgAssistant notice:
--- The final table swap (dropping the original table and renaming the _tetris table)
--- is NOT automatically generated.
---
--- Renaming a table may NOT have the expected effect:
--- dependencies such as foreign keys, views, or application references
--- may still point to the original table (renamed), not the new one.
---
--- You may need to:
---   - drop and recreate foreign keys
---   - drop and recreate dependent views
---   - validate application dependencies
---
--- Please review and execute the final migration steps manually.
-"""
-    tetris_result_sql=ddl.sql_to_html(tetris_result_sql)
-    
-    return render_template('home/tetris.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", tetris=tetris_result_sql, title=f"Postgres column Tetris for {schema}.{tablename}")
-      
-
-
+    try:
+        tables = []
+        tables.append (f"{schema}.{tablename}")
+        ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+        
+        tetris_sql = database.get_query_by_id('tetris_play')
+        tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
+        tetris_result = database.generic_select_with_sql(session, tetris_sql)
+        tetris_result_sql = "-- Create Tetris table DDL and copy source data\n" +tetris_result[0]['create_table_tetris_ddl']
+        tetris_result_sql = tetris_result_sql.replace("\\n", "\n")
+        tetris_result_sql += "\n\n" + "-- Alter table with constraints and indexes\n" + tetris.extract_post_create_ddl(ddl_str, schema, tablename)
+        tetris_result_sql += "\n\n" + """
+    -- pgAssistant notice:
+    -- The final table swap (dropping the original table and renaming the _tetris table)
+    -- is NOT automatically generated.
+    --
+    -- Renaming a table may NOT have the expected effect:
+    -- dependencies such as foreign keys, views, or application references
+    -- may still point to the original table (renamed), not the new one.
+    --
+    -- You may need to:
+    --   - drop and recreate foreign keys
+    --   - drop and recreate dependent views
+    --   - validate application dependencies
+    --
+    -- Please review and execute the final migration steps manually.
+    """
+        tetris_result_sql=ddl.sql_to_html(tetris_result_sql)
+        
+        return render_template('home/tetris.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", tetris=tetris_result_sql, title=f"Postgres column Tetris for {schema}.{tablename}")
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+        
 # Helper - Extract current page name from request
 def get_segment(request):
     try:

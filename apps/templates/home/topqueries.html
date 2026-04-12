@@ -112,6 +112,12 @@
   min-height: 6.2rem;
 }
 
+.topquery-sql:hover {
+  -webkit-line-clamp: unset;
+  overflow: auto;
+  max-height: 320px;
+}
+
 .table-badge {
   display: inline-block;
   padding: 0.28rem 0.6rem;
@@ -351,7 +357,7 @@
                   {% elif row['mean_exec_time'] | float < 5 %}
                     <span class="badge bg-warning text-dark perf-badge">Perf</span>
                   {% else %}
-                    <span class="badge bg-danger perf-badge">Perf</span>
+                    <span class="badge bg-danger perf-badge">Slow</span>
                   {% endif %}
                 </div>
               </div>
@@ -408,7 +414,24 @@
               </div>
               <div class="metric-inline-item">
                 <span class="metric-inline-label">Total Time</span>
-                <span class="metric-inline-value">{{ "%.3f"|format((row['total_exec_time'] | float)) if row['total_exec_time'] else "0.000" }} ms</span>
+                <span class="metric-inline-value">
+                  {% set t = (row['total_exec_time'] | float) if row['total_exec_time'] else 0 %}
+                  {% set seconds = t / 1000 %}
+                  {% set h = (seconds // 3600) | int %}
+                  {% set m = ((seconds % 3600) // 60) | int %}
+                  {% set s = (seconds % 60) | int %}
+                  {% set ms = (t % 1000) | int %}
+
+                  {% if h > 0 %}
+                    {{ h }}h {{ m }}m {{ s }}s
+                  {% elif m > 0 %}
+                    {{ m }}m {{ s }}s
+                  {% elif s > 0 %}
+                    {{ s }}s {{ ms }}ms
+                  {% else %}
+                    {{ ms }}ms
+                  {% endif %}
+                </span>
               </div>
               <div class="metric-inline-item">
                 <span class="metric-inline-label">Mean</span>

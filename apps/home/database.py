@@ -160,18 +160,23 @@ def get_top_queries(db_config):
        con.close()  
     return rows
 
+
 def get_rank_queries(db_config):
     """
-    Retrieves ranked database queries.
+    Retrieves the ranked queries from the database.
     """    
     rows = [] 
     con, message = connectdb(db_config)
     if con:
        try:
-           rows,description=db_query(con,'rank_queries')
+            #print("DB VERSION =", db_config.get('version'))
+            if db_config.get('version')==18:
+               rows,description=db_query(con,'top_ranking_18')
+            else:
+               rows,description=db_query(con,'top_ranking')
        except:
            rows=[] 
-       con.close()
+       con.close()  
     return rows
 
 def exec_cmd(db_config,query_id):
@@ -320,6 +325,7 @@ def db_query(cnx, query_id, db_name=None):
     for query in PGA_QUERIES['sql']:
         if query['id']==query_id:
             sql=query['sql']
+            #sql = '/* launched by pgAssistant */ ' + sql
             if db_name:
                 sql = sql.replace ('$1', db_name)
             if query['type']=='select' or query['type']=='param_query':
@@ -332,7 +338,7 @@ def get_query_by_id_reporing(query_id):
 
     for query in PGA_QUERIES['sql']:
         if query_id == query['id']:
-            return query['sql']
+            return '/* launched by pgAssistant */ ' + query['sql']
     return None
 
 
