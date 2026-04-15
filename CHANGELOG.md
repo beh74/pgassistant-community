@@ -1,5 +1,17 @@
 # Change Log
 
+## Improvements
+
+- Improved **Rank Queries** scoring by taking workload share into account:
+  - ranking now gives more weight to queries representing a large share of total execution time
+  - call frequency and I/O share are better reflected in the priority score
+- Added new **Rank Queries** workload metrics in query cards:
+  - load share
+  - calls share
+  - I/O share
+- Improved **Rank Queries** UI with a more adaptive card layout for wide screens
+
+
 ## [2.7.2] - 2026-09-04
 
 ## Improvements

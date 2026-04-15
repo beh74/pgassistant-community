@@ -122,10 +122,14 @@ def rank_queries(rows):
         if not _should_exclude_query(row.get("query", ""))
     ]
 
-    max_total_time = max((r["total_exec_time"] for r in normalized_rows), default=0.0)
+    if not normalized_rows:
+        return []
+
     max_mean_time = max((r["mean_exec_time"] for r in normalized_rows), default=0.0)
-    max_calls = max((r["calls"] for r in normalized_rows), default=0)
-    max_blks_read = max((r["total_blks_read"] for r in normalized_rows), default=0)
+
+    sum_total_time = sum((r["total_exec_time"] for r in normalized_rows), 0.0)
+    sum_calls = sum((r["calls"] for r in normalized_rows), 0)
+    sum_blks_read = sum((r["total_blks_read"] for r in normalized_rows), 0)
 
     ranked = []
 
@@ -145,31 +149,59 @@ def rank_queries(rows):
         cache_hit_ratio = (shared_hit / total_blocks * 100.0) if total_blocks > 0 else 100.0
         rows_per_call = (rows_count / calls) if calls > 0 else 0.0
 
-        norm_total = (total_time / max_total_time) if max_total_time else 0.0
+        # ------------------------------------------------------------
+        # Workload shares
+        # ------------------------------------------------------------
+        share_total = (total_time / sum_total_time) if sum_total_time else 0.0
+        share_calls = (calls / sum_calls) if sum_calls else 0.0
+        share_io = (blks_read / sum_blks_read) if sum_blks_read else 0.0
+
+        # Mean time stays relative to the slowest query
         norm_mean = (mean_time / max_mean_time) if max_mean_time else 0.0
-        norm_io = (blks_read / max_blks_read) if max_blks_read else 0.0
-        norm_calls = (math.log1p(calls) / math.log1p(max_calls)) if max_calls else 0.0
 
+        # Saturation:
+        # beyond 20% of a workload dimension, treat as "very high"
+        norm_share_total = min(share_total / 0.20, 1.0)
+        norm_share_calls = min(share_calls / 0.20, 1.0)
+        norm_share_io = min(share_io / 0.20, 1.0)
+
+        # ------------------------------------------------------------
+        # Score
+        # ------------------------------------------------------------
         score = 0.0
-        score += norm_total * 40
-        score += norm_mean * 25
-        score += norm_io * 15
-        score += norm_calls * 10
 
+        # Total workload contribution
+        score += norm_share_total * 35
+
+        # Unit cost
+        score += norm_mean * 20
+
+        # I/O pressure
+        score += norm_share_io * 15
+
+        # Frequency impact
+        score += norm_share_calls * 20
+
+        # Poor cache
         if cache_hit_ratio < 95:
             score += (95 - cache_hit_ratio) * 0.5
 
+        # Temp usage
         if temp_written > 0:
             score += 15
 
+        # Variability / instability
         if mean_time > 0 and stddev > mean_time * 2:
             score += 10
 
         score = min(score, 100.0)
 
+        # ------------------------------------------------------------
+        # Signals
+        # ------------------------------------------------------------
         signals = []
 
-        if norm_total > 0.5:
+        if share_total >= 0.10:
             signals.append("high_load")
 
         if mean_time > 50:
@@ -181,31 +213,43 @@ def rank_queries(rows):
         if temp_written > 0:
             signals.append("temp_usage")
 
-        if norm_calls > 0.7:
+        if share_calls >= 0.10:
             signals.append("high_calls")
 
         if mean_time > 10:
             cv = stddev / mean_time
-
             if cv > 1.5 and row.get("max_exec_time", 0) > mean_time * 3:
                 signals.append("unstable")
 
+        # ------------------------------------------------------------
+        # Reason
+        # ------------------------------------------------------------
         reason_parts = []
 
         if "high_load" in signals:
-            reason_parts.append("High total load")
+            reason_parts.append(f"High total load ({share_total:.1%} of total time)")
+
+        if "high_calls" in signals:
+            reason_parts.append(f"Very frequent execution ({share_calls:.1%} of calls)")
+
         if "slow" in signals:
             reason_parts.append("Slow execution")
+
         if "poor_cache" in signals:
             reason_parts.append("Poor cache efficiency")
+
         if "temp_usage" in signals:
             reason_parts.append("Temp file usage")
+
         if "unstable" in signals:
             reason_parts.append("High execution variance")
 
         if not reason_parts:
             reason_parts.append("Moderate resource usage")
 
+        # ------------------------------------------------------------
+        # Priority level
+        # ------------------------------------------------------------
         if score >= 80:
             level = "Critical"
         elif score >= 60:
@@ -224,6 +268,9 @@ def rank_queries(rows):
             "cache_hit_ratio": round(cache_hit_ratio, 2),
             "rows_per_call": round(rows_per_call, 2),
             "total_exec_time_formatted": format_duration_ms(total_time),
+            "share_total_time": round(share_total * 100, 2),
+            "share_calls": round(share_calls * 100, 2),
+            "share_io": round(share_io * 100, 2),
         })
 
         ranked.append(enriched)

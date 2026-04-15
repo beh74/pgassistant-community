@@ -3,9 +3,6 @@
 {% block title %} Rank Queries {% endblock %}
 
 {% block stylesheets %}
-<!-- Bootstrap Icons CDN for help icons and other UI elements 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"> 
--->
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
 <style>
 
@@ -75,10 +72,14 @@
   opacity: 1;
 }
 
+.rankqueries-help-btn {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
 /* ---------------------------------- */
 /* Filters card */
 /* ---------------------------------- */
-
 .rankqueries-filters-card .card-body {
   padding: 1.25rem;
 }
@@ -106,8 +107,6 @@
   border-radius: 0.75rem;
 }
 
-/* Actions (Apply / Reset) */
-
 .rankqueries-actions {
   display: flex;
   gap: 0.6rem;
@@ -128,8 +127,6 @@
 .rankqueries-actions .btn-outline-secondary {
   min-width: 90px;
 }
-
-/* Responsive */
 
 @media (max-width: 1199.98px) {
   .rankqueries-toolbar {
@@ -154,7 +151,6 @@
 /* ---------------------------------- */
 /* Header */
 /* ---------------------------------- */
-
 .rankqueries-header-row {
   display: flex;
   align-items: center;
@@ -172,7 +168,6 @@
 /* ---------------------------------- */
 /* Summary cards */
 /* ---------------------------------- */
-
 .rankqueries-summary {
   display: flex;
   flex-wrap: wrap;
@@ -205,6 +200,23 @@
 /* ---------------------------------- */
 /* Query cards */
 /* ---------------------------------- */
+.rank-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.rank-query-col {
+  min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+  .rank-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
 
 .rank-query-card {
   border: 1px solid var(--bs-border-color);
@@ -229,8 +241,6 @@
   padding: 1rem;
 }
 
-/* Priority badge */
-
 .rank-priority-badge {
   font-size: 0.72rem;
   padding: 0.35rem 0.6rem;
@@ -238,77 +248,22 @@
   font-weight: 700;
 }
 
-/* Score */
-
 .rank-query-score {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--bs-body-color);
 }
 
-/* SQL block */
-
-.rank-query-sql {
-  font-family: var(--bs-font-monospace);
-  font-size: 0.83rem;
-  line-height: 1.4;
-  background: var(--bs-tertiary-bg);
-  border: 1px solid var(--bs-border-color-translucent);
-  border-radius: 0.7rem;
-  padding: 0.7rem;
-  margin-bottom: 0.75rem;
-
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Reason */
-
 .rank-query-reason {
-  font-size: 0.85rem;
-  color: var(--bs-secondary-color);
+  font-size: 0.96rem;
+  color: var(--bs-body-color);
+  line-height: 1.45;
   margin-bottom: 0.85rem;
 }
 
-/* Metrics */
-
-.rank-query-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem 1.25rem;
-  margin-bottom: 0.9rem;
-  align-items: flex-start;
-}
-
-.metric-inline-item {
-  flex: 1 1 140px;
-  min-width: 140px;
-  max-width: 220px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.metric-inline-label {
-  font-size: 0.72rem;
-  color: var(--bs-secondary-color);
-  text-transform: uppercase;
-  letter-spacing: .02em;
-  line-height: 1.1;
-}
-
-.metric-inline-value {
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--bs-body-color);
-  line-height: 1.2;
-  word-break: break-word;
-}
-
+/* ---------------------------------- */
 /* Signals */
-
+/* ---------------------------------- */
 .rank-query-signals {
   display: flex;
   flex-wrap: wrap;
@@ -322,8 +277,6 @@
   font-weight: 600;
   padding: 0.3rem 0.55rem;
 }
-
-/* Signal colors */
 
 .rank-signal-high-load {
   background: rgba(220, 53, 69, .10);
@@ -355,16 +308,18 @@
   color: #198754;
 }
 
+/* ---------------------------------- */
 /* Footer */
-
+/* ---------------------------------- */
 .rank-query-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+/* ---------------------------------- */
 /* Empty state */
-
+/* ---------------------------------- */
 .rank-empty-state {
   text-align: center;
   padding: 3rem 1rem;
@@ -382,8 +337,9 @@
   color: var(--bs-secondary-color);
 }
 
+/* ---------------------------------- */
 /* Cache colors */
-
+/* ---------------------------------- */
 .text-cache-danger {
   color: #dc3545 !important;
 }
@@ -400,7 +356,20 @@
 
   <div class="rankqueries-header-row">
     <div>
-      <h1 class="h4 mb-1">Rank Queries</h1>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="h4 mb-1">Rank Queries</h1>
+
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary rankqueries-help-btn"
+          data-bs-toggle="modal"
+          data-bs-target="#rankHelpModal"
+        >
+          <i class="bi bi-info-circle me-1"></i>
+          How ranking works
+        </button>
+      </div>
+
       <p class="rankqueries-subtitle">
         Quickly identify the queries that deserve investigation first.
         Scores and priority levels are computed relative to workload intensity and may be less relevant on low-activity systems.
@@ -412,170 +381,168 @@
     </span>
   </div>
 
-{% if ranked_queries is defined and ranked_queries %}
-  <div class="rankqueries-summary">
-    <div class="rankqueries-summary-card">
-      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
-        Queries ranked
-        <i
-          class="bi bi-question-circle summary-help-icon"
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          title="Number of queries currently included in this ranking view."
-        ></i>
-      </span>
-      <span class="rankqueries-summary-value">{{ ranked_queries|length }}</span>
-    </div>
-
-    <div class="rankqueries-summary-card">
-      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
-        Critical
-        <i
-          class="bi bi-question-circle summary-help-icon"
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          title="Queries with the highest priority score based on execution time, cost, I/O pressure, cache efficiency, and other ranking signals."
-        ></i>
-      </span>
-      <span class="rankqueries-summary-value">
-        {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
-      </span>
-    </div>
-
-    <div class="rankqueries-summary-card">
-      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
-        High priority
-        <i
-          class="bi bi-question-circle summary-help-icon"
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          title="Queries considered important to review, but below the Critical threshold."
-        ></i>
-      </span>
-      <span class="rankqueries-summary-value">
-        {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
-      </span>
-    </div>
-
-    <div class="rankqueries-summary-card">
-      <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
-        Top 10 workload share
-        <i
-          class="bi bi-question-circle summary-help-icon"
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          title="Percentage of total execution time represented by the first 10 ranked queries."
-        ></i>
-      </span>
-      <span class="rankqueries-summary-value">
-        {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
-        {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
-        {% if total_all > 0 %}
-          {{ "%.1f"|format((total_top10 / total_all) * 100) }}%
-        {% else %}
-          0.0%
-        {% endif %}
-      </span>
-    </div>
-  </div>
-{% endif %}
-
-  <div class="card shadow-sm mb-4">
-<div class="card shadow-sm mb-4 rankqueries-filters-card">
-  <div class="card-body">
-    <div class="rankqueries-toolbar">
-
-      <div class="rankqueries-field">
-        <label for="rank-search" class="form-label">Search</label>
-        <input
-          type="text"
-          class="form-control"
-          id="rank-search"
-          placeholder="Search SQL text..."
-        >
-      </div>
-
-      <div class="rankqueries-field">
-        <label for="rank-priority" class="form-label">Priority</label>
-        <select class="form-select" id="rank-priority">
-          <option value="">All</option>
-          <option value="Critical">Critical</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
-      </div>
-
-      <div class="rankqueries-field">
-        <label for="rank-sort" class="form-label">Sort by</label>
-        <select class="form-select" id="rank-sort">
-          <option value="priority">Priority score</option>
-          <option value="total_exec_time">Total time</option>
-          <option value="mean_exec_time">Mean time</option>
-          <option value="calls">Calls</option>
-          <option value="cache_hit_ratio">Cache ratio</option>
-        </select>
-      </div>
-
-      <div class="rankqueries-field">
-        <label for="rank-signal" class="form-label d-inline-flex align-items-center gap-1">
-        Signal
-        <i
+  {% if ranked_queries is defined and ranked_queries %}
+    <div class="rankqueries-summary">
+      <div class="rankqueries-summary-card">
+        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+          Queries ranked
+          <i
             class="bi bi-question-circle summary-help-icon"
             data-bs-toggle="tooltip"
             data-bs-placement="top"
-            data-bs-html="true"
-            title="
-            <strong>Signals:</strong><br>
-            High load: High total execution time<br>
-            Slow: High latency per call<br>
-            Poor cache: Low cache hit ratio<br>
-            Temp usage: Disk spill (temp files)<br>
-            Unstable: High latency variance<br>
-            High calls: Frequently executed query
-            "
-        ></i>
-        </label>
-        <select class="form-select" id="rank-signal">
-          <option value="">All</option>
-          <option value="high_load">High load</option>
-          <option value="slow">Slow</option>
-          <option value="poor_cache">Poor cache</option>
-          <option value="temp_usage">Temp usage</option>
-          <option value="unstable">Unstable</option>
-          <option value="high_calls">High calls</option>
-        </select>
+            title="Number of queries currently included in this ranking view."
+          ></i>
+        </span>
+        <span class="rankqueries-summary-value">{{ ranked_queries|length }}</span>
       </div>
 
-      <div class="rankqueries-field">
-        <label for="rank-per-page" class="form-label">Cards per page</label>
-        <select class="form-select" id="rank-per-page">
-          <option value="10" selected>10</option>
-          <option value="20">20</option>
-          <option value="30">30</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
+      <div class="rankqueries-summary-card">
+        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+          Critical
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Queries with the highest priority score based on workload contribution, execution cost, cache efficiency, and other ranking signals."
+          ></i>
+        </span>
+        <span class="rankqueries-summary-value">
+          {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
+        </span>
       </div>
 
-      <div class="rankqueries-field">
-        <label class="form-label d-block">&nbsp;</label>
-        <div class="rankqueries-actions">
-          <button type="button" id="rank-apply-btn" class="btn btn-primary">Apply</button>
-          <button type="button" id="rank-reset-btn" class="btn btn-outline-secondary">Reset</button>
-        </div>
+      <div class="rankqueries-summary-card">
+        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+          High priority
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Queries considered important to review, but below the Critical threshold."
+          ></i>
+        </span>
+        <span class="rankqueries-summary-value">
+          {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
+        </span>
       </div>
 
+      <div class="rankqueries-summary-card">
+        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+          Top 10 workload share
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Percentage of total execution time represented by the first 10 ranked queries."
+          ></i>
+        </span>
+        <span class="rankqueries-summary-value">
+          {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
+          {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
+          {% if total_all > 0 %}
+            {{ "%.1f"|format((total_top10 / total_all) * 100) }}%
+          {% else %}
+            0.0%
+          {% endif %}
+        </span>
+      </div>
     </div>
-  </div>
-</div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4 rankqueries-filters-card">
+    <div class="card-body">
+      <div class="rankqueries-toolbar">
+
+        <div class="rankqueries-field">
+          <label for="rank-search" class="form-label">Search</label>
+          <input
+            type="text"
+            class="form-control"
+            id="rank-search"
+            placeholder="Search SQL text..."
+          >
+        </div>
+
+        <div class="rankqueries-field">
+          <label for="rank-priority" class="form-label">Priority</label>
+          <select class="form-select" id="rank-priority">
+            <option value="">All</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+
+        <div class="rankqueries-field">
+          <label for="rank-sort" class="form-label">Sort by</label>
+          <select class="form-select" id="rank-sort">
+            <option value="priority">Priority score</option>
+            <option value="total_exec_time">Total time</option>
+            <option value="mean_exec_time">Mean time</option>
+            <option value="calls">Calls</option>
+            <option value="cache_hit_ratio">Cache ratio</option>
+          </select>
+        </div>
+
+        <div class="rankqueries-field">
+          <label for="rank-signal" class="form-label d-inline-flex align-items-center gap-1">
+            Signal
+            <i
+              class="bi bi-question-circle summary-help-icon"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-html="true"
+              title="
+              <strong>Signals:</strong><br>
+              High load: Large share of total execution time<br>
+              Slow: High latency per call<br>
+              Poor cache: Low cache hit ratio<br>
+              Temp usage: Disk spill (temp files)<br>
+              Unstable: High latency variance<br>
+              High calls: Frequently executed query
+              "
+            ></i>
+          </label>
+          <select class="form-select" id="rank-signal">
+            <option value="">All</option>
+            <option value="high_load">High load</option>
+            <option value="slow">Slow</option>
+            <option value="poor_cache">Poor cache</option>
+            <option value="temp_usage">Temp usage</option>
+            <option value="unstable">Unstable</option>
+            <option value="high_calls">High calls</option>
+          </select>
+        </div>
+
+        <div class="rankqueries-field">
+          <label for="rank-per-page" class="form-label">Cards per page</label>
+          <select class="form-select" id="rank-per-page">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+
+        <div class="rankqueries-field">
+          <label class="form-label d-block">&nbsp;</label>
+          <div class="rankqueries-actions">
+            <button type="button" id="rank-apply-btn" class="btn btn-primary">Apply</button>
+            <button type="button" id="rank-reset-btn" class="btn btn-outline-secondary">Reset</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   {% if ranked_queries is defined and ranked_queries %}
-    <div class="row" id="rank-cards-container">
+    <div class="rank-cards-grid" id="rank-cards-container">
       {% for row in ranked_queries %}
         <div
-          class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4 rank-query-col"
+          class="rank-query-col"
           data-query="{{ (row.query or '') | lower | e }}"
           data-priority="{{ row.priority_level | e }}"
           data-signals="{{ (row.signals | join(' ')) | e }}"
@@ -584,6 +551,9 @@
           data-mean-exec-time="{{ row.mean_exec_time }}"
           data-calls="{{ row.calls }}"
           data-cache-hit-ratio="{{ row.cache_hit_ratio }}"
+          data-share-total="{{ row.share_total_time if row.share_total_time is defined else 0 }}"
+          data-share-calls="{{ row.share_calls if row.share_calls is defined else 0 }}"
+          data-share-io="{{ row.share_io if row.share_io is defined else 0 }}"
         >
           <div class="card shadow-sm h-100 rank-query-card">
 
@@ -604,31 +574,31 @@
               <span class="text-muted small rank-card-index">#{{ loop.index }}</span>
             </div>
 
-            <div class="card-body">
-              <div class="topquery-sql">{{ row.query }}</div>
+            <div class="card-body d-flex flex-column">
+              <div class="topquery-sql mb-3">{{ row.query }}</div>
 
-              <div class="rank-query-reason">
-                
+              <div class="rank-query-reason mb-3">
+                {{ row.reason if row.reason else "Moderate resource usage" }}
               </div>
 
-              <div class="rank-query-metrics">
-                <div class="metric-inline-item">
-                  <span class="metric-inline-label">Total Time</span>
-                  <span class="metric-inline-value">
+              <div class="rank-query-metric-chips mb-3">
+                <div class="rank-query-metric-chip">
+                  <span class="label">Total Time</span>
+                  <span class="value">
                     {{ row.total_exec_time_formatted if row.total_exec_time_formatted else row.total_exec_time ~ " ms" }}
                   </span>
                 </div>
 
-                <div class="metric-inline-item">
-                  <span class="metric-inline-label">Mean Time</span>
-                  <span class="metric-inline-value">
+                <div class="rank-query-metric-chip">
+                  <span class="label">Mean</span>
+                  <span class="value">
                     {{ "%.2f"|format((row.mean_exec_time | float) if row.mean_exec_time else 0) }} ms
                   </span>
                 </div>
 
-                <div class="metric-inline-item">
-                  <span class="metric-inline-label">Calls</span>
-                  <span class="metric-inline-value">
+                <div class="rank-query-metric-chip">
+                  <span class="label">Calls</span>
+                  <span class="value">
                     {% set calls = (row.calls | int) if row.calls else 0 %}
                     {% if calls >= 1000000 %}
                       {{ "%.1f"|format(calls / 1000000) }}M
@@ -640,9 +610,9 @@
                   </span>
                 </div>
 
-                <div class="metric-inline-item">
-                  <span class="metric-inline-label">Cache Ratio</span>
-                  <span class="metric-inline-value
+                <div class="rank-query-metric-chip">
+                  <span class="label">Cache</span>
+                  <span class="value
                     {% if row.cache_hit_ratio is defined and row.cache_hit_ratio is not none %}
                       {% if row.cache_hit_ratio < 80 %} text-cache-danger
                       {% elif row.cache_hit_ratio < 95 %} text-cache-warning
@@ -652,58 +622,91 @@
                     {{ "%.1f"|format((row.cache_hit_ratio | float) if row.cache_hit_ratio is defined and row.cache_hit_ratio is not none else 100) }}%
                   </span>
                 </div>
+
+                <div class="rank-query-metric-chip">
+                  <span class="label">Load Share</span>
+                  <span class="value
+                    {% if row.share_total_time is defined %}
+                      {% if row.share_total_time >= 20 %} text-cache-danger
+                      {% elif row.share_total_time >= 10 %} text-cache-warning
+                      {% endif %}
+                    {% endif %}
+                  ">
+                    {{ "%.1f"|format((row.share_total_time | float) if row.share_total_time is defined else 0) }}%
+                  </span>
+                </div>
+
+                <div class="rank-query-metric-chip">
+                  <span class="label">Calls Share</span>
+                  <span class="value">
+                    {{ "%.1f"|format((row.share_calls | float) if row.share_calls is defined else 0) }}%
+                  </span>
+                </div>
+
+                <div class="rank-query-metric-chip">
+                  <span class="label">I/O Share</span>
+                  <span class="value">
+                    {{ "%.1f"|format((row.share_io | float) if row.share_io is defined else 0) }}%
+                  </span>
+                </div>
+
+                <div class="rank-query-metric-chip">
+                  <span class="label">Rows/Call</span>
+                  <span class="value">
+                    {% set rows_per_call = (row.rows_per_call | float) if row.rows_per_call else 0 %}
+                    {% if rows_per_call >= 1000000 %}
+                      {{ "%.1f"|format(rows_per_call / 1000000) }}M
+                    {% elif rows_per_call >= 1000 %}
+                      {{ "%.1f"|format(rows_per_call / 1000) }}k
+                    {% else %}
+                      {{ rows_per_call }}
+                    {% endif %}
+                  </span>
+                </div>
               </div>
 
-            {% if row.signals %}
-            <div class="rank-query-signals">
-                {% for signal in row.signals %}
+              {% if row.signals %}
+                <div class="rank-query-signals mb-3">
+                  {% for signal in row.signals %}
 
-                {% if signal == 'high_load' %}
-                    <span class="rank-signal-badge rank-signal-high-load">
-                    <i class="bi bi-fire me-1"></i>High load
-                    </span>
+                    {% if signal == 'high_load' %}
+                      <span class="rank-signal-badge rank-signal-high-load">
+                        <i class="bi bi-fire me-1"></i>High load
+                      </span>
 
-                {% elif signal == 'slow' %}
-                    <span class="rank-signal-badge rank-signal-slow">
-                    <i class="bi bi-hourglass-split me-1"></i>Slow
-                    </span>
+                    {% elif signal == 'slow' %}
+                      <span class="rank-signal-badge rank-signal-slow">
+                        <i class="bi bi-hourglass-split me-1"></i>Slow
+                      </span>
 
-                {% elif signal == 'poor_cache' %}
-                    <span class="rank-signal-badge rank-signal-poor-cache">
-                    <i class="bi bi-hdd me-1"></i>Poor cache
-                    </span>
+                    {% elif signal == 'poor_cache' %}
+                      <span class="rank-signal-badge rank-signal-poor-cache">
+                        <i class="bi bi-hdd me-1"></i>Poor cache
+                      </span>
 
-                {% elif signal == 'temp_usage' %}
-                    <span class="rank-signal-badge rank-signal-temp">
-                    <i class="bi bi-box-seam me-1"></i>Temp usage
-                    </span>
+                    {% elif signal == 'temp_usage' %}
+                      <span class="rank-signal-badge rank-signal-temp">
+                        <i class="bi bi-box-seam me-1"></i>Temp usage
+                      </span>
 
-                {% elif signal == 'unstable' %}
-                    <span class="rank-signal-badge rank-signal-unstable">
-                    <i class="bi bi-graph-up-arrow me-1"></i>Unstable
-                    </span>
+                    {% elif signal == 'unstable' %}
+                      <span class="rank-signal-badge rank-signal-unstable">
+                        <i class="bi bi-graph-up-arrow me-1"></i>Unstable
+                      </span>
 
-                {% elif signal == 'high_calls' %}
-                    <span class="rank-signal-badge rank-signal-high-calls">
-                    <i class="bi bi-lightning me-1"></i>High calls
-                    </span>
+                    {% elif signal == 'high_calls' %}
+                      <span class="rank-signal-badge rank-signal-high-calls">
+                        <i class="bi bi-lightning me-1"></i>High calls
+                      </span>
 
-                {% endif %}
+                    {% endif %}
 
-                {% endfor %}
-            </div>
-            {% endif %}
-
-              <div class="rank-query-footer">
-                <div class="rank-query-meta">
-                <span class="metric-inline-label">
-                  {% if row.rows_per_call is defined %}
-                    Rows/call: {{ "%.2f"|format((row.rows_per_call | float) if row.rows_per_call else 0) }}
-                  {% elif row.rows is defined and row.calls %}
-                    Rows/call: {{ "%.2f"|format((row.rows | float) / (row.calls | float)) if row.calls else "0.00" }}
-                  {% endif %}
-                </span>  
+                  {% endfor %}
                 </div>
+              {% endif %}
+
+              <div class="rank-query-footer mt-auto">
+                <div></div>
 
                 <div class="rank-query-actions">
                   {% if row.queryid is defined and row.queryid %}
@@ -719,6 +722,7 @@
         </div>
       {% endfor %}
     </div>
+
   {% else %}
     <div class="rank-empty-state">
       <div class="empty-title">No ranked queries available</div>
@@ -728,6 +732,60 @@
     </div>
   {% endif %}
 
+</div>
+
+<div class="modal fade" id="rankHelpModal" tabindex="-1" aria-labelledby="rankHelpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="h5 modal-title" id="rankHelpModalLabel">How query ranking works</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p>
+          The ranking is designed to highlight the queries most likely to deserve investigation first,
+          based on the workload currently observed in the database.
+        </p>
+
+        <p>
+          The score is relative, not absolute. A query marked <strong>Critical</strong> or <strong>High</strong>
+          is considered important compared with other queries in the same workload snapshot.
+          On a lightly used database, these levels may be less meaningful.
+        </p>
+
+        <h3 class="h6 mt-4">Main factors used in the score</h3>
+        <ul class="mb-3">
+          <li><strong>Total workload share:</strong> queries consuming the largest share of total execution time are prioritized.</li>
+          <li><strong>Mean execution time:</strong> slower queries get a higher score.</li>
+          <li><strong>Call volume share:</strong> frequently executed queries are ranked higher because their cumulative impact can be significant.</li>
+          <li><strong>I/O share:</strong> queries responsible for a large share of block reads are considered more expensive.</li>
+        </ul>
+
+        <h3 class="h6 mt-4">Additional penalty signals</h3>
+        <ul class="mb-3">
+          <li><strong>Poor cache efficiency:</strong> a low cache hit ratio increases the score.</li>
+          <li><strong>Temp file usage:</strong> queries writing temp blocks are penalized.</li>
+          <li><strong>Execution instability:</strong> highly variable execution time may increase the score.</li>
+        </ul>
+
+        <h3 class="h6 mt-4">Priority levels</h3>
+        <ul class="mb-3">
+          <li><strong>Critical:</strong> highest-priority queries based on the current workload.</li>
+          <li><strong>High:</strong> strong candidates for investigation.</li>
+          <li><strong>Medium:</strong> worth reviewing if you are optimizing broader workload efficiency.</li>
+          <li><strong>Low:</strong> currently less important than other queries in this ranking.</li>
+        </ul>
+
+        <h3 class="h6 mt-4">Important note</h3>
+        <p class="mb-0">
+          The ranking is a prioritization aid, not a verdict. A query can be frequent and harmless,
+          or slow but rarely executed. Always interpret the score together with the query text,
+          execution pattern, and business context.
+        </p>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock content %}
 
@@ -777,7 +835,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const priority = prioritySelect?.value || "";
     const signal = signalSelect?.value || "";
     const sort = sortSelect?.value || "priority";
-    const perPage = Number(perPageSelect?.value || 20);
+    const perPage = Number(perPageSelect?.value || 10);
 
     let filtered = cards.filter((card) => {
       const query = card.dataset.query || "";
@@ -837,7 +895,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (prioritySelect) prioritySelect.value = "";
     if (signalSelect) signalSelect.value = "";
     if (sortSelect) sortSelect.value = "priority";
-    if (perPageSelect) perPageSelect.value = "20";
+    if (perPageSelect) perPageSelect.value = "10";
     applyFilters();
   }
 
