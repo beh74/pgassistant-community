@@ -125,6 +125,14 @@
   font-size: 0.8rem;
 }
 
+.metric-inline-value-link {
+  text-decoration: none;
+}
+
+.metric-inline-value-link:hover {
+  text-decoration: underline;
+}
+
 .metrics-inline {
   display: flex;
   flex-wrap: wrap;
@@ -192,6 +200,21 @@
 }
 </style>
 {% endblock %}
+
+
+{% macro format_rows(n) %}
+  {% if n is none %}
+    -
+  {% elif n >= 1000000000 %}
+    {{ (n / 1000000000)|round(1) }}B
+  {% elif n >= 1000000 %}
+    {{ (n / 1000000)|round(1) }}M
+  {% elif n >= 1000 %}
+    {{ (n / 1000)|round(1) }}k
+  {% else %}
+    {{ n }}
+  {% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -271,7 +294,12 @@
           {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
           {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
           {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
-          {% set size = r.size if r.size is defined else r['size'] %}
+          {% set total_size = r.total_size if r.total_size is defined else r['total_size'] %}
+          {% set table_size = r.table_size if r.table_size is defined else r['table_size'] %}
+          {% set index_size = r.index_size if r.index_size is defined else r['index_size'] %}
+          {% set index_pct = r.index_pct if r.index_pct is defined else r['index_pct'] %}
+          {% set dead_pct = r.dead_pct if r.dead_pct is defined else r['dead_pct'] %}
+          {% set estimated_dead_size = r.estimated_dead_size if r.estimated_dead_size is defined else r['estimated_dead_size'] %}
           {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
 
           <div class="table-card-item">
@@ -305,12 +333,42 @@
                 <div class="metrics-inline mb-3">
                   <div class="metric-inline-item">
                     <span class="metric-inline-label">Rows</span>
-                    <span class="metric-inline-value">{{ row_count }}</span>
+                    <span class="metric-inline-value" title="{{ row_count }}">
+                      {{ format_rows(row_count) }}
+                    </span>
                   </div>
                   <div class="metric-inline-item">
-                    <span class="metric-inline-label">Size</span>
-                    <span class="metric-inline-value">{{ size }}</span>
+                    <span class="metric-inline-label">Total</span>
+                    <span class="metric-inline-value">{{ total_size }}</span>
                   </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Table</span>
+                    <span class="metric-inline-value">{{ table_size }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Indexes</span>
+                    <a class="metric-inline-value metric-inline-value-link"
+                      href="/generic/index_io?schemaname={{ schema|urlencode }}&relname={{ table|urlencode }}">
+                      {{ index_size }}
+                    </a>
+                  </div>
+                  {% set pct = index_pct|float %}
+
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Index %</span>
+                    <span class="metric-inline-value {% if pct >= 50 %}text-danger fw-bold{% elif pct >= 30 %}text-warning fw-semibold{% endif %}">
+                      {{ index_pct }}%
+                    </span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Dead size</span>
+                    <span class="metric-inline-value">{{ estimated_dead_size }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Dead %</span>
+                    <span class="metric-inline-value">{{ dead_pct }}%</span>
+                  </div>
+
                 </div>
 
                 <div class="tables-actions">

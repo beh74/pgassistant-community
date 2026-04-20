@@ -635,7 +635,8 @@
                   <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
                   <div class="dashboard-progress-meta">
                     <span>{{ table['percentage_calls'] }} %</span>
-                    <span>{{ table['total_calls'] }} calls</span>
+                    <span>{{ humanize_number(table['total_calls']) }} calls</span>
+                    
                   </div>
                   <div class="progress dashboard-progress">
                     <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>

@@ -317,6 +317,11 @@ def analyze_query(querid):
                 sql_query = sqlhelper.replace_query_parameters(sql_query, params)
                 
                 sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
+                
+                # generic plan
+                #sql_query = database.get_pgstat_query_by_id(session, querid)
+                #sql_query_analyze = f" EXPLAIN (GENERIC_PLAN, VERBOSE,  SETTINGS, FORMAT JSON)  {sql_query}"
+                #print("SQL for GENERIC PLAN:", sql_query_analyze)
 
                 if request.form.get('action') == 'analyze':
                     parameters = {}
@@ -346,7 +351,7 @@ def analyze_query(querid):
                                 advisor_result["recommendations"],
                                 key=lambda r: priority.get(r.get("confidence"), 99)
                             )
-                        analyze_advisor.pretty_print_analysis(advisor_result)
+                        #analyze_advisor.pretty_print_analysis(advisor_result)
 
                     except Exception as e:
                         advisor_result = None

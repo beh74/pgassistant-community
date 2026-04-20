@@ -117,6 +117,41 @@
 {% block content %}
 <div class="container-fluid py-4">
 
+  {# Optional filters from query string #}
+  {% set filter_schema = request.args.get('SCHEMANAME', request.args.get('schemaname', ''))|trim|lower %}
+  {% set filter_relname = request.args.get('RELNAME', request.args.get('relname', ''))|trim|lower %}
+
+  {# Filter rows only if parameters are provided #}
+  {% if rows and rows|length > 0 and (filter_schema or filter_relname) %}
+    {% set ns_filter = namespace(display_rows=[]) %}
+    {% for row in rows %}
+      {% set row_schema = (
+          row.get('schemaname')
+          or row.get('SCHEMANAME')
+          or row.get('table_schema')
+          or row.get('TABLE_SCHEMA')
+          or ''
+      )|string|trim|lower %}
+      {% set row_relname = (
+          row.get('relname')
+          or row.get('RELNAME')
+          or row.get('table_name')
+          or row.get('TABLE_NAME')
+          or ''
+      )|string|trim|lower %}
+
+      {% set match_schema = (not filter_schema) or (row_schema == filter_schema) %}
+      {% set match_relname = (not filter_relname) or (row_relname == filter_relname) %}
+
+      {% if match_schema and match_relname %}
+        {% set _ = ns_filter.display_rows.append(row) %}
+      {% endif %}
+    {% endfor %}
+    {% set display_rows = ns_filter.display_rows %}
+  {% else %}
+    {% set display_rows = rows %}
+  {% endif %}
+
   <div class="query-page-header">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
       <div>
@@ -153,7 +188,6 @@
       </div>
     </div>
   </div>
-
 
   <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default-label" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -206,18 +240,30 @@
     <div class="card-body p-4">
       <div class="query-section-title">Results</div>
 
-      {% if rows and rows|length > 0 %}
+      {% if (filter_schema or filter_relname) %}
+      <div class="alert alert-info d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-funnel"></i>
+        <div>
+          Filter applied
+          {% if filter_schema %}<strong>SCHEMANAME={{ filter_schema }}</strong>{% endif %}
+          {% if filter_schema and filter_relname %} · {% endif %}
+          {% if filter_relname %}<strong>RELNAME={{ filter_relname }}</strong>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if display_rows and display_rows|length > 0 %}
       <div class="table-responsive query-table-wrap">
         <table id="generic" class="table table-striped align-middle" style="width:100%">
           <thead class="thead-light">
             <tr>
-              {% for row in rows[0] %}
+              {% for row in display_rows[0] %}
               <th>{{ row }}</th>
               {% endfor %}
             </tr>
           </thead>
           <tbody>
-            {% for row in rows %}
+            {% for row in display_rows %}
             <tr>
               {% for key, value in row.items() %}
               <td>
@@ -242,16 +288,16 @@
     </div>
   </div>
 
-  {% if rows and rows|length > 0 %}
+  {% if display_rows and display_rows|length > 0 %}
     {% set ns = namespace(suggestion_keys=[], suggestions=[]) %}
 
-    {% for key in rows[0].keys() %}
+    {% for key in display_rows[0].keys() %}
       {% if key.startswith('pga_suggestion') %}
         {% set _ = ns.suggestion_keys.append(key) %}
       {% endif %}
     {% endfor %}
 
-    {% for row in rows %}
+    {% for row in display_rows %}
       {% for key in ns.suggestion_keys %}
         {% if key in row and row[key] and not row[key].lstrip().startswith('--') %}
           {% set _ = ns.suggestions.append(row[key]) %}

@@ -428,27 +428,40 @@
 
                     <div class="position-relative mb-3">
                       {% set gp = genius_parameters or {} %}
+                      {% set initial_value = request.form.get(param, '') %}
 
-                      <input
-                        class="form-control suggestion-field"
-                        value=""
-                        id="{{ param }}"
-                        name="{{ param }}"
-                        type="text"
-                        placeholder="Enter parameter value"
-                        autocomplete="off"
-                        data-table="{{ gp[param_key][0] if param_key in gp and gp[param_key][0] is not none else '' }}"
-                        data-column="{{ gp[param_key][1] if param_key in gp and gp[param_key][0] is not none else '' }}"
-                        data-type="{{ gp[param_key][2] if param_key in gp else '' }}"
-                      >
+                      <input type="hidden" id="final-{{ param }}" name="{{ param }}" value="{{ initial_value }}">
 
-                      {% if param_key in gp and gp[param_key][0] is not none %}
-                      <span class="search-icon" onclick="showSuggestions('{{ param }}')">🔍</span>
-                      {% endif %}
+                      <div class="row g-2">
+                        <div class="col-12 col-lg-7">
+                          <label for="select-{{ param }}" class="form-label small text-muted mb-1">Suggested values</label>
+                          <select
+                            class="form-select suggestion-select"
+                            id="select-{{ param }}"
+                            
+                            data-param="{{ param }}"
+                            data-table="{{ gp[param_key][0] if param_key in gp and gp[param_key][0] is not none else '' }}"
+                            data-column="{{ gp[param_key][1] if param_key in gp and gp[param_key][0] is not none else '' }}"
+                            data-type="{{ gp[param_key][2] if param_key in gp else '' }}"
+                            data-loaded="false"
+                          >
+                            <option value="">Loading suggestions...</option>
+                          </select>
+                        </div>
 
-                      <div class="suggestions-box" id="suggestions-{{ param }}"></div>
+                        <div class="col-12 col-lg-5">
+                          <label for="custom-{{ param }}" class="form-label small text-muted mb-1">Custom value</label>
+                          <input
+                            class="form-control suggestion-custom"
+                            id="custom-{{ param }}"
+                            type="text"
+                            value="{{ initial_value }}"
+                            placeholder="Enter a custom value"
+                            data-param="{{ param }}"
+                          >
+                        </div>
                       </div>
-
+                    </div>
                       {% if param_key in gp %}
                         {% set guess = gp[param_key] %}
                         <div class="alert alert-info mb-0 py-2">
@@ -821,7 +834,13 @@
                       {% if rec.stats_reason %}
                       <div class="advisor-section">
                         <div class="advisor-section-title">Column statistics</div>
-                        <div class="advisor-text-block small">{{ rec.stats_reason }}</div>
+                        <div class="vstack gap-2">
+                          {% for stat_line in rec.stats_reason.split(' | ') %}
+                            <div class="border rounded-3 px-3 py-2 bg-white small">
+                              {{ stat_line }}
+                            </div>
+                          {% endfor %}
+                        </div>
                       </div>
                       {% endif %}
 
@@ -1010,10 +1029,11 @@
 
 {% endif %}
 </div>
+{% endblock content %}
 
+{% block javascripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const suggestionFields = document.querySelectorAll('.suggestion-field');
 
   document.querySelectorAll(".copy-btn").forEach(btn => {
     btn.addEventListener("click", async function () {
@@ -1033,110 +1053,141 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  suggestionFields.forEach(field => {
-    field.addEventListener('input', function () {
-      const table = field.getAttribute('data-table');
-      const column = field.getAttribute('data-column');
-      const type = field.getAttribute('data-type');
-      const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
+  document.querySelectorAll('.suggestion-select').forEach(select => {
+    const table = select.getAttribute('data-table');
+    const column = select.getAttribute('data-column');
+    const type = select.getAttribute('data-type');
+    const param = select.getAttribute('data-param');
 
-      if (table && column && type) {
-        fetch('/api/v1/fetch_column_data', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ table, column, data_type: type })
-        }).then(response => response.json())
-          .then(data => {
-            if (data.data && data.data.length > 0) {
-              suggestionsBox.innerHTML = "";
-              data.data.slice(0, 20).forEach(value => {
-                let suggestionItem = document.createElement("div");
-                suggestionItem.classList.add("suggestion-item");
-                suggestionItem.textContent = value;
+    if (table && column && type) {
+      loadSelectSuggestions(param, false);
+    }
 
-                suggestionItem.addEventListener('click', function () {
-                  if (['character varying', 'text', 'date', 'timestamp', 'timestamp without time zone'].includes(type)) {
-                    field.value = `'${value}'`;
-                  } else {
-                    field.value = value;
-                  }
-                  suggestionsBox.style.display = 'none';
-                });
-
-                suggestionsBox.appendChild(suggestionItem);
-              });
-
-              suggestionsBox.style.display = "block";
-            } else {
-              suggestionsBox.style.display = "none";
-            }
-          }).catch(error => {
-            console.error("Fetch failed. Error:", error);
-          });
-      }
+    select.addEventListener('change', function () {
+      syncFinalParamValue(param);
     });
+  });
 
-    field.addEventListener('blur', function () {
-      setTimeout(() => {
-        const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
-        if (suggestionsBox) {
-          suggestionsBox.style.display = 'none';
-        }
-      }, 200);
+  document.querySelectorAll('.suggestion-custom').forEach(input => {
+    const param = input.getAttribute('data-param');
+
+    input.addEventListener('input', function () {
+      syncFinalParamValue(param);
     });
+  });
+
+  document.querySelectorAll('input[id^="final-"]').forEach(hidden => {
+    const param = hidden.id.replace('final-', '');
+    syncInitialParamValue(param);
   });
 });
 
-function showSuggestions(paramId) {
-  const field = document.getElementById(paramId);
-  const table = field.getAttribute('data-table');
-  const column = field.getAttribute('data-column');
-  const type = field.getAttribute('data-type');
-  const suggestionsBox = document.getElementById(`suggestions-${field.id}`);
+function normalizeSqlType(sqlType) {
+  return (sqlType || '').toLowerCase();
+}
 
+function shouldBeQuoted(sqlType) {
+  const t = normalizeSqlType(sqlType);
   const stringTypes = [
     'char', 'varchar', 'text',
-    'date', 'timestamp', 'timestamptz', 'time', 'timetz', 'interval',
+    'date', 'timestamp', 'timestamp without time zone', 'timestamp with time zone',
+    'timestamptz', 'time', 'timetz', 'interval',
     'uuid', 'json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8',
     'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle',
     'bit', 'bit varying', 'xml', 'money'
   ];
+  return stringTypes.some(st => t.includes(st));
+}
 
-  function shouldBeQuoted(sqlType) {
-    if (!sqlType) return false;
-    const t = sqlType.toLowerCase();
-    return stringTypes.some(st => t.includes(st));
+function formatSuggestionValue(value, sqlType) {
+  if (value === null || value === undefined) return '';
+  return shouldBeQuoted(sqlType) ? `'${value}'` : String(value);
+}
+
+function syncInitialParamValue(param) {
+  const hidden = document.getElementById(`final-${param}`);
+  const select = document.getElementById(`select-${param}`);
+  const custom = document.getElementById(`custom-${param}`);
+
+  if (!hidden || !select || !custom) return;
+
+  const initial = (hidden.value || '').trim();
+  if (!initial) return;
+
+  custom.value = initial;
+}
+
+function syncFinalParamValue(param) {
+  const hidden = document.getElementById(`final-${param}`);
+  const select = document.getElementById(`select-${param}`);
+  const custom = document.getElementById(`custom-${param}`);
+
+  if (!hidden || !select || !custom) return;
+
+  const customValue = custom.value.trim();
+  const selectValue = (select.value || '').trim();
+
+  hidden.value = customValue !== '' ? customValue : selectValue;
+}
+
+async function loadSelectSuggestions(param, forceReload) {
+  const select = document.getElementById(`select-${param}`);
+  const custom = document.getElementById(`custom-${param}`);
+  if (!select) return;
+
+  const table = select.getAttribute('data-table');
+  const column = select.getAttribute('data-column');
+  const type = select.getAttribute('data-type');
+
+  if (!table || !column || !type) {
+    select.innerHTML = '<option value="">No suggestions available</option>';
+    select.disabled = true;
+    return;
   }
 
-  if (table && column && type) {
-    fetch('/api/v1/fetch_column_data', {
+  if (!forceReload && select.getAttribute('data-loaded') === 'true') return;
+
+  select.innerHTML = '<option value="">Loading suggestions...</option>';
+  select.disabled = true;
+
+  try {
+    const response = await fetch('/api/v1/fetch_column_data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ table, column, data_type: type })
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.data && data.data.length > 0) {
-        suggestionsBox.innerHTML = '';
-        data.data.slice(0, 20).forEach(value => {
-          let suggestionItem = document.createElement("div");
-          suggestionItem.classList.add("suggestion-item");
-          suggestionItem.textContent = value;
-
-          suggestionItem.addEventListener('click', function () {
-            field.value = shouldBeQuoted(type) ? `'${value}'` : value;
-            suggestionsBox.style.display = 'none';
-          });
-
-          suggestionsBox.appendChild(suggestionItem);
-        });
-        suggestionsBox.style.display = 'block';
-      } else {
-        suggestionsBox.style.display = 'none';
-      }
+      body: JSON.stringify({
+        table: table,
+        column: column,
+        data_type: type
+      })
     });
+
+    const data = await response.json();
+    const values = Array.isArray(data.data) ? data.data : [];
+
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = values.length > 0 ? 'Choose a suggested value...' : 'No suggestions available';
+    select.appendChild(placeholder);
+
+    values.slice(0, 50).forEach(value => {
+      const formatted = formatSuggestionValue(value, type);
+      const option = document.createElement('option');
+      option.value = formatted;
+      option.textContent = formatted;
+      select.appendChild(option);
+    });
+
+    select.disabled = values.length === 0;
+    select.setAttribute('data-loaded', 'true');
+
+    if (custom && custom.value.trim() === '') {
+      syncFinalParamValue(param);
+    }
+  } catch (error) {
+    console.error("Fetch failed:", error);
+    select.innerHTML = '<option value="">Failed to load suggestions</option>';
+    select.disabled = true;
   }
 }
 
@@ -1149,9 +1200,15 @@ function copy() {
 function myButtonAnalyze(el) {
   const form = document.getElementById("form_analyse");
   if (form.checkValidity()) {
+    document.querySelectorAll('input[id^="final-"]').forEach(hidden => {
+      const param = hidden.id.replace('final-', '');
+      syncFinalParamValue(param);
+    });
+
     document.getElementById("analyze").disabled = true;
-    document.getElementById("analyze").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
-    document.getElementById("action").setAttribute('value', 'analyze');
+    document.getElementById("analyze").innerHTML =
+      '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing ...';
+    document.getElementById("action").value = 'analyze';
     form.submit();
   } else {
     form.reportValidity();
@@ -1161,9 +1218,15 @@ function myButtonAnalyze(el) {
 function myButtonAnalyzeOpenAI(el) {
   const form = document.getElementById("form_analyse");
   if (form.checkValidity()) {
+    document.querySelectorAll('input[id^="final-"]').forEach(hidden => {
+      const param = hidden.id.replace('final-', '');
+      syncFinalParamValue(param);
+    });
+
     document.getElementById("analyzeopenai").disabled = true;
-    document.getElementById("analyzeopenai").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
-    document.getElementById("action").setAttribute('value', 'chatgpt');
+    document.getElementById("analyzeopenai").innerHTML =
+      '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing ...';
+    document.getElementById("action").value = 'chatgpt';
     form.submit();
   } else {
     form.reportValidity();
@@ -1173,44 +1236,19 @@ function myButtonAnalyzeOpenAI(el) {
 function myButtonDDL(el) {
   const form = document.getElementById("form_analyse");
   if (form.checkValidity()) {
+    document.querySelectorAll('input[id^="final-"]').forEach(hidden => {
+      const param = hidden.id.replace('final-', '');
+      syncFinalParamValue(param);
+    });
+
     document.getElementById("ddl").disabled = true;
-    document.getElementById("ddl").innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Analyzing ...';
-    document.getElementById("action").setAttribute('value', 'ddl');
+    document.getElementById("ddl").innerHTML =
+      '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing ...';
+    document.getElementById("action").value = 'ddl';
     form.submit();
   } else {
     form.reportValidity();
   }
 }
-</script>
-{% endblock content %}
-
-{% block javascripts %}
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'loose'
-  });
-
-  async function renderMermaid() {
-    await mermaid.run({
-      querySelector: '#graph pre.mermaid'
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const graphTab = document.getElementById('graph-tab');
-
-    if (graphTab) {
-      graphTab.addEventListener('shown.bs.tab', async () => {
-        await renderMermaid();
-      });
-    }
-
-    if (document.querySelector('#graph.show')) {
-      renderMermaid();
-    }
-  });
 </script>
 {% endblock javascripts %}

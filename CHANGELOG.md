@@ -1,4 +1,16 @@
+
+
+
 # Change Log
+
+## [2.7.4] - 2026-20-04
+
+## Improvements
+
+- UI/UX refinements across the application.
+
+
+## [2.7.3] - 2026-15-04
 
 ## Improvements
 

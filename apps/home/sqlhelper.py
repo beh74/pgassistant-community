@@ -65,9 +65,10 @@ def replace_query_parameters(query, params):
     return re.sub(r"\$(\d+)", replace_match, query)
 
 
-def parse_most_common_vals(value):
+def parse_most_common_vals(value, limit=10):
     """
     Parse PostgreSQL's most_common_vals field into a Python list.
+    Limit the number of returned values (default: 10).
     """
     if not value or value == "{}":
         return []
@@ -83,7 +84,11 @@ def parse_most_common_vals(value):
     matches = re.findall(pattern, value)
 
     parsed_values = []
-    for match in matches:
+
+    for i, match in enumerate(matches):
+        if i >= limit:
+            break
+
         raw_value = match[0] if match[0] else match[1]
 
         try:
