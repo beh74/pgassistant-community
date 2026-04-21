@@ -3,6 +3,13 @@
 
 # Change Log
 
+## [2.7.5] - 2026-21-04
+
+## Bug Fix
+
+- Bundle Mermaid.js locally to eliminate external CDN dependency
+- Bundle Bootstrap Icons locally to eliminate external CDN dependency
+
 ## [2.7.4] - 2026-20-04
 
 ## Improvements

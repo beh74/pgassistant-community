@@ -1251,4 +1251,47 @@ function myButtonDDL(el) {
   }
 }
 </script>
+
+<script type="module">
+  
+  import mermaid from '{{ config.ASSETS_ROOT }}/js/mermaid.esm.min.mjs';
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose'
+  });
+
+  let mermaidRendered = false;
+
+  async function renderMermaid() {
+    if (mermaidRendered) return;
+
+    const target = document.querySelector('#graph pre.mermaid');
+    if (!target) return;
+
+    try {
+      await mermaid.run({
+        querySelector: '#graph pre.mermaid'
+      });
+      mermaidRendered = true;
+    } catch (err) {
+      console.error('Mermaid render failed:', err);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const graphTab = document.getElementById('graph-tab');
+
+    if (graphTab) {
+      graphTab.addEventListener('shown.bs.tab', async () => {
+        await renderMermaid();
+      });
+    }
+
+    if (document.querySelector('#graph.show')) {
+      renderMermaid();
+    }
+  });
+</script>
+
 {% endblock javascripts %}
