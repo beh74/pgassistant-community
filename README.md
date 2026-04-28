@@ -36,12 +36,13 @@ pgAssistant is an open-source tool designed to help developers and DBAs **unders
 It combines:
 
 - Deterministic database analysis  
+- **Global Advisor (deterministic, database-wide analysis)**  
+- Query-level advisor based on real execution plans (`EXPLAIN ANALYZE`)  
 - Full schema inspection (DDL) with automatic relational graph visualization to reveal table dependencies and structural issues  
 - Structural issue detection (missing indexes, redundant indexes, missing foreign keys, datatype inconsistencies)  
 - Naming convention and RFC(s) validation  
-- Real `EXPLAIN ANALYZE` execution plans with index advisor  
 - Database parameters & statistics  
-- Optional AI-assisted reasoning
+- Optional AI-assisted reasoning  
 
 The goal: turn raw PostgreSQL internals into **actionable optimization decisions**.
 
@@ -77,27 +78,59 @@ This is not “copy-paste your query into ChatGPT”.
 
 It is **structured, contextualized database analysis**.
 
-## Deterministic vs AI-Assisted Analysis
+## Deterministic Analysis First, AI When Needed
 
-pgAssistant does not rely solely on AI.
+Starting with **pgAssistant v2.8**, deterministic analysis is no longer a collection of isolated checks.
 
-Many checks are fully deterministic and based directly on PostgreSQL system catalogs:
+It is now unified into the **Global Advisor**.
 
-- Redundant indexes  
+### Global Advisor (One-Click Analysis)
+
+The **Global Advisor** allows you to run a full database analysis **in one click**.
+
+It aggregates all deterministic checks performed directly on PostgreSQL system catalogs and turns them into **prioritized, actionable recommendations**.
+
+Each recommendation is enriched with:
+
+- **Ranking** (what to fix first)  
+- **Confidence level** (how reliable the finding is)  
+- **Impact** (expected performance or maintainability gain)  
+- **Effort** (estimated implementation cost)  
+
+Typical detected issues include:
+
 - Missing indexes on foreign keys  
-- Unused indexes
 - Datatype inconsistencies in relationships  
-- Index coverage analysis  
-- Cache usage diagnostics  
+- Redundant or overlapping indexes  
+- Unused indexes  
+- Index coverage gaps  
 
-AI is used as an optional augmentation layer for:
+
+This approach is:
+
+- **Deterministic** → no randomness, no hallucination  
+- **Consistent** → same input, same output  
+- **Actionable** → directly usable in production workflows  
+
+---
+
+### AI-Assisted Analysis (Optional Layer)
+
+AI is used as an **optional augmentation layer**, not a replacement.
+
+It helps with:
 
 - Query rewrite suggestions  
 - Context-aware optimization reasoning  
 - RFC compliance checks  
-- Conventions recommendations 
+- Naming and convention recommendations  
 
 ---
+
+pgAssistant’s philosophy is simple:
+
+> **Start with deterministic truth.  
+> Then use AI to go further.**
 
 # Real-World Example
 
@@ -138,6 +171,9 @@ AI is optional. pgAssistant remains fully usable without it.
 
 ## Dashboard
 ![Dashboard](media/dashboard.png)
+
+## Global advisor
+![Global advisor](media/global_advisor.png)
 
 ## Query Insight
 ![Query Insight](media/analyze_query_insight.png)

@@ -24,6 +24,7 @@
 
 {# ------------------- Active state helpers ------------------- #}
 {% set is_dashboard = current_path == '/dashboard.html' or 'dashboard' in segment %}
+{% set is_global_advisor = current_path == '/global/advisor' or 'global_advisor' in segment %}
 {% set is_tables_cards = current_path == '/tables_cards.html' or 'tables_cards' in segment %}
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
 {% set is_rankqueries = current_path == '/rankqueries.html' or 'rankqueries' in segment %}
@@ -107,6 +108,26 @@
           <div class="sidebar-text">Dashboard</div>
         </a>
       </li>
+
+      <li class="nav-item {% if is_global_advisor %}active{% endif %}">
+        <a href="/global/advisor" class="nav-link" {% if is_global_advisor %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <svg fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3z"></path>
+              <path d="M4.222 5.636a1 1 0 011.414-1.414l.707.707a1 1 0 11-1.414 1.414l-.707-.707z"></path>
+              <path d="M3 10a1 1 0 100-2H2a1 1 0 100 2h1z"></path>
+              <path d="M5.636 15.778a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707z"></path>
+              <path d="M10 18a1 1 0 011-1h0a1 1 0 110 2h0a1 1 0 01-1-1z"></path>
+              <path d="M15.778 14.364a1 1 0 10-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707z"></path>
+              <path d="M18 10a1 1 0 100-2h-1a1 1 0 100 2h1z"></path>
+              <path d="M14.364 5.636a1 1 0 011.414-1.414l.707.707a1 1 0 11-1.414 1.414l-.707-.707z"></path>
+              <path d="M10 6a4 4 0 00-4 4c0 1.657 1.343 3 3 3h2c1.657 0 3-1.343 3-3a4 4 0 00-4-4z"></path>
+            </svg>
+          </div>
+          <div class="sidebar-text">Global Advisor</div>
+        </a>
+      </li>
+
 
       <li class="nav-item {% if is_tables_cards %}active{% endif %}">
         <a href="/tables_cards.html?q=&per_page=12&page=1" class="nav-link" {% if is_tables_cards %}aria-current="page"{% endif %}>

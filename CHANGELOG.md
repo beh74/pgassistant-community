@@ -3,6 +3,21 @@
 
 # Change Log
 
+## [2.8.0] - 2026-04-28
+
+## Improvements
+
+- Introduced **Global Advisor (initial version)**  
+  A first implementation of a global analysis engine that aggregates multiple database signals (queries, schema, statistics) to provide higher-level recommendations.  
+  This feature is experimental and will evolve in future releases with more advanced diagnostics and prioritization logic.
+
+- Improved issue detection and accuracy:
+  - **Datatype mismatch on foreign keys**  
+    Enhanced detection logic to better identify inconsistencies between referencing and referenced columns, reducing false positives and improving recommendation relevance.
+  
+  - **Missing indexes on foreign keys**  
+    Optimized analysis to more reliably detect absent indexes on foreign key columns, with clearer and more actionable recommendations.
+
 ## [2.7.5] - 2026-21-04
 
 ## Bug Fix

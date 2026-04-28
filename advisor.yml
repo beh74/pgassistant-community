@@ -1,0 +1,543 @@
+recommendations:
+  - id: foreign_key_columns_different_data_types
+    label: Foreign key columns with different data types
+    source: design_checks
+    category_id: DESIGN
+    object_type: COLUMN
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 100
+    impact: 100
+    effort: 60
+
+    sql: |
+      WITH foreign_key_columns AS (
+          SELECT
+              c.oid AS object_id,
+              c.conname AS fk_name,
+              ns_fk.nspname AS schema_name,
+              fk_table.relname AS table_name,
+              ref_table.relname AS referenced_table_name,
+              fk_col.attname AS column_name,
+              ref_col.attname AS referenced_column_name,
+              pg_catalog.format_type(fk_col.atttypid, fk_col.atttypmod) AS fk_column_type,
+              pg_catalog.format_type(ref_col.atttypid, ref_col.atttypmod) AS referenced_column_type
+          FROM pg_constraint c
+          JOIN pg_class fk_table ON fk_table.oid = c.conrelid
+          JOIN pg_namespace ns_fk ON ns_fk.oid = fk_table.relnamespace
+          JOIN pg_class ref_table ON ref_table.oid = c.confrelid
+          JOIN unnest(c.conkey) WITH ORDINALITY AS fk_keys(attnum, ord) ON true
+          JOIN unnest(c.confkey) WITH ORDINALITY AS ref_keys(attnum, ord)
+            ON ref_keys.ord = fk_keys.ord
+          JOIN pg_attribute fk_col
+            ON fk_col.attrelid = c.conrelid
+           AND fk_col.attnum = fk_keys.attnum
+          JOIN pg_attribute ref_col
+            ON ref_col.attrelid = c.confrelid
+           AND ref_col.attnum = ref_keys.attnum
+          WHERE c.contype = 'f'
+            AND ns_fk.nspname = 'public'
+      ),
+      mismatched_types AS (
+          SELECT
+              object_id,
+              fk_name,
+              schema_name,
+              table_name,
+              column_name,
+              referenced_table_name,
+              referenced_column_name,
+              fk_column_type,
+              referenced_column_type,
+              schema_name || '.' || table_name || '.' || column_name AS object_name,
+              'ALTER TABLE '
+              || format('%I.%I', schema_name, table_name)
+              || ' ALTER COLUMN '
+              || quote_ident(column_name)
+              || ' TYPE '
+              || referenced_column_type
+              || ' USING '
+              || quote_ident(column_name)
+              || '::'
+              || referenced_column_type
+              || ';' AS improvement_sql
+          FROM foreign_key_columns
+          WHERE fk_column_type <> referenced_column_type
+      )
+      SELECT
+          object_id,
+          object_name,
+          fk_name,
+          schema_name,
+          table_name,
+          column_name,
+          referenced_table_name,
+          referenced_column_name,
+          fk_column_type,
+          referenced_column_type,
+            'Column '
+            || format('%I.%I.%I', schema_name, table_name, column_name)
+            || ' (' || fk_column_type || ') differs from '
+            || format('%I.%I.%I', schema_name, referenced_table_name, referenced_column_name)
+            || ' (' || referenced_column_type || '). '
+            || 'Foreign key columns should use the same data type to avoid implicit casts and ensure index usage.'
+            AS recommendation_note,
+
+          improvement_sql
+      FROM mismatched_types
+      ORDER BY schema_name, table_name, fk_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      schema_name: schema_name
+      table_name: table_name
+      column_name: column_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+
+  - id: missing_useful_foreign_key_indexes
+    label: Missing useful foreign key indexes
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 85
+    impact: 75
+    effort: 30
+
+    sql: |
+        WITH fks AS (
+            SELECT
+                c.oid AS fk_oid,
+                n.nspname AS schema_name,
+                child.oid AS table_oid,
+                child.relname AS table_name,
+                c.conname AS fk_name,
+                c.conkey AS fk_cols,
+                c.confrelid AS referenced_table_oid,
+                ref_ns.nspname AS referenced_schema_name,
+                ref.relname AS referenced_table_name
+            FROM pg_constraint c
+            JOIN pg_class child ON child.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = child.relnamespace
+            JOIN pg_class ref ON ref.oid = c.confrelid
+            JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+            WHERE c.contype = 'f'
+            AND n.nspname = 'public'
+        ),
+        fkeys_without_indexes AS (
+            SELECT f.*
+            FROM fks f
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_index i
+                WHERE i.indrelid = f.table_oid
+                AND i.indisvalid
+                AND i.indisready
+                AND i.indpred IS NULL
+                AND i.indkey[0:array_length(f.fk_cols, 1)-1] = f.fk_cols
+            )
+        ),
+        table_stats AS (
+            SELECT
+                relid,
+                n_live_tup
+            FROM pg_stat_user_tables
+        ),
+        fk_columns AS (
+            SELECT
+                f.fk_oid,
+                string_agg(quote_ident(a.attname), ', ' ORDER BY u.ord) AS fk_columns
+            FROM fkeys_without_indexes f
+            JOIN unnest(f.fk_cols) WITH ORDINALITY AS u(attnum, ord) ON true
+            JOIN pg_attribute a
+            ON a.attrelid = f.table_oid
+            AND a.attnum = u.attnum
+            GROUP BY f.fk_oid
+        )
+        SELECT
+            f.fk_oid AS object_id,
+            f.schema_name,
+            f.table_name,
+            f.fk_name,
+            fc.fk_columns,
+            f.schema_name || '.' || f.table_name || ' (' || fc.fk_columns || ')' AS object_name,
+            f.referenced_schema_name || '.' || f.referenced_table_name AS referenced_table,
+            child_stats.n_live_tup AS estimated_rows,
+            ref_stats.n_live_tup AS referenced_estimated_rows,
+            CASE
+                WHEN GREATEST(
+                        COALESCE(child_stats.n_live_tup, 0),
+                        COALESCE(ref_stats.n_live_tup, 0)
+                    ) >= 100000 THEN 'HIGH'
+                WHEN GREATEST(
+                        COALESCE(child_stats.n_live_tup, 0),
+                        COALESCE(ref_stats.n_live_tup, 0)
+                    ) >= 10000 THEN 'MEDIUM'
+                ELSE 'LOW'
+            END AS index_importance,
+            CASE
+                WHEN COALESCE(child_stats.n_live_tup, 0) >= 1000
+                AND COALESCE(ref_stats.n_live_tup, 0) >= 1000 THEN
+                    'Table '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' and referenced table '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' are both significant; creating an index on the foreign key is likely beneficial.'
+
+                WHEN COALESCE(child_stats.n_live_tup, 0) >= 1000 THEN
+                    'Table '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' is significant; an index on the foreign key may improve joins and lookups.'
+
+                WHEN COALESCE(ref_stats.n_live_tup, 0) >= 1000 THEN
+                    'Referenced table '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' is significant; an index on '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' may improve UPDATE/DELETE performance on the parent side.'
+
+                ELSE
+                    'Tables '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' and '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' are small; index usefulness should be reviewed.'
+            END AS recommendation_note,
+            'CREATE INDEX CONCURRENTLY IF NOT EXISTS '
+            || quote_ident('pga_idx_fk_' || f.table_name || '_' || f.fk_name)
+            || ' ON '
+            || format('%I.%I', f.schema_name, f.table_name)
+            || ' ('
+            || fc.fk_columns
+            || ');' AS improvement_sql
+        FROM fkeys_without_indexes f
+        JOIN fk_columns fc ON fc.fk_oid = f.fk_oid
+        LEFT JOIN table_stats child_stats ON child_stats.relid = f.table_oid
+        LEFT JOIN table_stats ref_stats ON ref_stats.relid = f.referenced_table_oid
+        WHERE
+            COALESCE(child_stats.n_live_tup, 0) >= 1000
+            OR COALESCE(ref_stats.n_live_tup, 0) >= 1000
+        ORDER BY
+            GREATEST(
+                COALESCE(child_stats.n_live_tup, 0),
+                COALESCE(ref_stats.n_live_tup, 0)
+            ) DESC,
+            f.schema_name,
+            f.table_name,
+            f.fk_name;
+
+    result_mapping:
+      object_name: object_name
+      schema_name: schema_name
+      table_name: table_name
+      index_name: object_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+  - id: redundant_non_unique_indexes_covered_by_unique
+    label: Non-unique indexes covered by unique indexes
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 95
+    impact: 70
+    effort: 10
+
+    sql: |
+        WITH indexes AS (
+            SELECT
+                ix.indexrelid,
+                ix.indrelid,
+                ix.indkey,
+                ix.indclass,
+                ix.indcollation,
+                ix.indoption,
+                ix.indnkeyatts,
+                ix.indnatts,
+                ix.indexprs,
+                ix.indpred,
+                ix.indisunique,
+                ix.indisprimary,
+                ix.indisexclusion,
+                idx.relam,
+                ns.nspname AS schema_name,
+                tbl.relname AS table_name,
+                tbl.oid AS table_id,
+                idx.relname AS index_name,
+                idx.oid AS object_id,
+                pg_get_indexdef(idx.oid) AS index_definition,
+                COALESCE(stat.idx_scan, 0) AS idx_scan,
+                pg_relation_size(idx.oid) AS index_size_bytes
+            FROM pg_index ix
+            JOIN pg_class idx ON idx.oid = ix.indexrelid
+            JOIN pg_class tbl ON tbl.oid = ix.indrelid
+            JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+            LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
+            WHERE ns.nspname = 'public'
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisexclusion
+        )
+        SELECT
+            ni.object_id,
+            ni.schema_name || '.' || ni.index_name AS object_name,
+            ni.schema_name,
+            ni.table_name,
+            ni.table_id,
+            ni.index_name,
+            ui.index_name AS duplicate_of_index_name,
+            ni.idx_scan,
+            ni.index_size_bytes,
+            ni.index_definition,
+            ui.index_definition AS covering_index_definition,
+            'Index '
+            || format('%I.%I', ni.schema_name, ni.index_name)
+            || ' on table '
+            || format('%I.%I', ni.schema_name, ni.table_name)
+            || ' is redundant because it is covered by unique index '
+            || format('%I.%I', ui.schema_name, ui.index_name)
+            || '. Both indexes use the same column set, so the unique index can handle all lookup operations.'
+            AS recommendation_note,
+            'DROP INDEX CONCURRENTLY IF EXISTS '
+            || format('%I.%I', ni.schema_name, ni.index_name)
+            || ';' AS improvement_sql
+        FROM indexes ni
+        JOIN indexes ui
+        ON ui.indrelid = ni.indrelid
+        AND ui.relam = ni.relam
+        AND ui.indkey = ni.indkey
+        AND ui.indclass = ni.indclass
+        AND ui.indcollation = ni.indcollation
+        AND ui.indoption = ni.indoption
+        AND ui.indnkeyatts = ni.indnkeyatts
+        AND ui.indnatts = ni.indnatts
+        AND COALESCE(ui.indexprs::text, '') = COALESCE(ni.indexprs::text, '')
+        AND COALESCE(ui.indpred::text, '') = COALESCE(ni.indpred::text, '')
+        WHERE ni.indisunique = false
+        AND ni.indisprimary = false
+        AND ui.indisunique = true
+        AND ni.idx_scan = 0
+        ORDER BY
+            ni.schema_name,
+            ni.table_name,
+            ni.index_size_bytes DESC,
+            ni.index_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+  - id: strictly_duplicate_unused_indexes
+    label: Strictly duplicate unused indexes
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 98
+    impact: 75
+    effort: 15
+
+    sql: |
+      WITH duplicate_groups AS (
+          SELECT
+              ix.indrelid,
+              ix.indkey,
+              ix.indclass,
+              ix.indcollation,
+              ix.indoption,
+              ix.indnkeyatts,
+              ix.indnatts,
+              ix.indexprs,
+              ix.indpred,
+              idx.relam,
+              array_agg(ix.indexrelid ORDER BY ix.indexrelid) AS index_oids,
+              COUNT(*) AS duplicate_count
+          FROM pg_index ix
+          JOIN pg_class idx ON idx.oid = ix.indexrelid
+          JOIN pg_class tbl ON tbl.oid = ix.indrelid
+          JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+          WHERE ns.nspname = 'public'
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisprimary
+            AND NOT ix.indisunique
+            AND NOT ix.indisexclusion
+          GROUP BY
+              ix.indrelid,
+              ix.indkey,
+              ix.indclass,
+              ix.indcollation,
+              ix.indoption,
+              ix.indnkeyatts,
+              ix.indnatts,
+              ix.indexprs,
+              ix.indpred,
+              idx.relam
+          HAVING COUNT(*) > 1
+      ),
+      duplicate_indexes AS (
+          SELECT
+              unnest(index_oids[2:array_length(index_oids, 1)]) AS index_oid,
+              index_oids[1] AS kept_index_oid
+          FROM duplicate_groups
+      )
+      SELECT
+          idx.oid AS object_id,
+          ns.nspname || '.' || idx.relname AS object_name,
+          ns.nspname AS schema_name,
+          tbl.relname AS table_name,
+          tbl.oid AS table_id,
+          idx.relname AS index_name,
+          kept_idx.relname AS duplicate_of_index_name,
+          COALESCE(stat.idx_scan, 0) AS idx_scan,
+          pg_relation_size(idx.oid) AS index_size_bytes,
+          pg_get_indexdef(idx.oid) AS index_definition,
+          'DROP INDEX CONCURRENTLY IF EXISTS '
+          || format('%I.%I', ns.nspname, idx.relname)
+          || ';' AS improvement_sql
+      FROM duplicate_indexes d
+      JOIN pg_class idx ON idx.oid = d.index_oid
+      JOIN pg_class kept_idx ON kept_idx.oid = d.kept_index_oid
+      JOIN pg_index ix ON ix.indexrelid = idx.oid
+      JOIN pg_class tbl ON tbl.oid = ix.indrelid
+      JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+      LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
+      WHERE COALESCE(stat.idx_scan, 0) = 0
+      ORDER BY
+          ns.nspname,
+          tbl.relname,
+          pg_relation_size(idx.oid) DESC,
+          idx.relname;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+
+  - id: unused_non_constraint_indexes
+    label: Unused indexes not supporting constraints
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 75
+    impact: 65
+    effort: 20
+
+    sql: |
+      WITH index_columns AS (
+          SELECT
+              i.indexrelid,
+              array_agg(k.attnum ORDER BY k.ord) AS index_key_attnums
+          FROM pg_index i
+          JOIN unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+            ON k.ord <= i.indnkeyatts
+          GROUP BY i.indexrelid
+      ),
+      fk_columns AS (
+          SELECT
+              c.conrelid,
+              c.oid AS constraint_oid,
+              c.conname AS constraint_name,
+              c.conkey AS fk_attnums
+          FROM pg_constraint c
+          WHERE c.contype = 'f'
+      ),
+      candidate_indexes AS (
+          SELECT
+              s.schemaname AS schema_name,
+              s.relname AS table_name,
+              s.relid AS table_id,
+              s.indexrelname AS index_name,
+              s.indexrelid AS object_id,
+              s.idx_scan,
+              pg_relation_size(s.indexrelid) AS index_size_bytes,
+              pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size_pretty,
+              pg_get_indexdef(s.indexrelid) AS index_definition,
+              ix.indrelid,
+              ix.indisunique,
+              ix.indisprimary,
+              ix.indisexclusion,
+              ix.indpred,
+              ix.indexprs,
+              ic.index_key_attnums
+          FROM pg_stat_user_indexes s
+          JOIN pg_index ix ON ix.indexrelid = s.indexrelid
+          JOIN index_columns ic ON ic.indexrelid = s.indexrelid
+          WHERE s.schemaname = 'public'
+            AND s.idx_scan = 0
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisprimary
+            AND NOT ix.indisunique
+            AND NOT ix.indisexclusion
+            AND NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint c
+                WHERE c.conindid = ix.indexrelid
+                  AND c.contype IN ('p', 'u', 'x')
+            )
+      )
+      SELECT
+          ci.object_id,
+          ci.schema_name || '.' || ci.index_name AS object_name,
+          ci.schema_name,
+          ci.table_name,
+          ci.table_id,
+          ci.index_name,
+          ci.idx_scan,
+          ci.index_size_bytes,
+          ci.index_size_pretty,
+          ci.index_definition,
+          'DROP INDEX CONCURRENTLY IF EXISTS '
+          || format('%I.%I', ci.schema_name, ci.index_name)
+          || ';' AS improvement_sql
+      FROM candidate_indexes ci
+      WHERE NOT EXISTS (
+          SELECT 1
+          FROM fk_columns fk
+          WHERE fk.conrelid = ci.indrelid
+            AND ci.index_key_attnums[1:array_length(fk.fk_attnums, 1)] = fk.fk_attnums
+      )
+      ORDER BY
+          ci.index_size_bytes DESC,
+          ci.schema_name,
+          ci.table_name,
+          ci.index_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql

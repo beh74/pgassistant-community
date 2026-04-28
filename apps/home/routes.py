@@ -26,7 +26,7 @@ from . import pgstat_helper
 from . import analyze_advisor
 from . import tetris
 from . import ranking
-import re
+from . import global_advisor 
 import requests
 import json
 
@@ -59,6 +59,8 @@ def handle_dashboard_get(segment: str):
         return redirect("/database.html")
 
 def handle_topqueries_get(template: str, segment: str, tablename: str = None):
+
+
     if session.get("db_name"):
         
         # get optional tablename parameter from URL
@@ -722,6 +724,16 @@ def api_apply_recommendations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@blueprint.route('/global/advisor', methods=['GET'])
+def global_advisor_route():
+    try:
+        
+        result = global_advisor.run_global_advisor(session, yaml_path="advisor.yml")
+        return render_template('home/advisor.html', segment='global_advisor.html', recommendations=result["recommendations"])
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"error": str(e1), "traceback": tb}), 500
 
 @blueprint.route('/<template>', methods=['GET', 'POST'])
 def route_template(template: str):
