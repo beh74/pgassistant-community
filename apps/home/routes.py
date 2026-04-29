@@ -5,6 +5,7 @@ Main routes
 import traceback
 import os
 import math 
+import re
 from apps.home import blueprint
 from flask import render_template, request, session,redirect, jsonify, Response
 from jinja2 import TemplateNotFound

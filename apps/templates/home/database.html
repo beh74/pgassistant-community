@@ -97,7 +97,7 @@
             </div>
           </div>
 
-          <form method="POST" id="form_connect">
+          <form method="POST" id="form_connect" novalidate>
             <div class="mb-4">
               <div class="connect-section-title">Connection URI</div>
               <div class="connect-subtle-box">
@@ -219,70 +219,68 @@
 
 {% block javascripts %}
 <script>
-  function fillFieldsFromUri() {
-    const uriInput = document.getElementById("db_uri");
-    if (!uriInput) return;
+function fillFieldsFromUri() {
+  const uriInput = document.getElementById("db_uri");
+  if (!uriInput) return;
 
-    const uri = uriInput.value.trim();
-    if (!uri) {
-      return;
-    }
-
-    let normalized = uri;
-    if (uri.startsWith("postgresql://") || uri.startsWith("postgres://")) {
-      normalized = uri.replace(/^postgres(ql)?:\/\//, "http://");
-    } else {
-      alert("Invalid URI: it should start with postgresql:// or postgres://");
-      throw new Error("Invalid URI");
-    }
-
-    let url;
-    try {
-      url = new URL(normalized);
-    } catch (e) {
-      alert("Invalid connection URI: " + e.message);
-      throw e;
-    }
-
-    const host = url.hostname || "";
-    const port = url.port || "5432";
-    const dbname = (url.pathname || "").replace(/^\//, "");
-    const user = decodeURIComponent(url.username || "");
-    const password = decodeURIComponent(url.password || "");
-
-    document.getElementById("db_host").value = host;
-    document.getElementById("db_port").value = port;
-    document.getElementById("db_name").value = dbname;
-    document.getElementById("db_user").value = user;
-    document.getElementById("db_password").value = password;
+  const uri = uriInput.value.trim();
+  if (!uri) {
+    return;
   }
 
-  function myButtonCircle() {
-    const form = document.getElementById("form_connect");
+  let normalized = uri;
 
-    try {
-      fillFieldsFromUri();
-    } catch (e) {
-      return;
-    }
-
-    if (form.checkValidity()) {
-      const connectBtn = document.getElementById("connect");
-      connectBtn.disabled = true;
-      connectBtn.innerHTML =
-        '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting ...';
-      form.submit();
-    } else {
-      form.reportValidity();
-    }
+  if (uri.startsWith("postgresql://") || uri.startsWith("postgres://")) {
+    normalized = uri.replace(/^postgres(ql)?:\/\//, "http://");
+  } else {
+    alert("Invalid URI: it should start with postgresql:// or postgres://");
+    throw new Error("Invalid URI");
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const form = document.getElementById("form_connect");
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      myButtonCircle();
-    });
+  let url;
+  try {
+    url = new URL(normalized);
+  } catch (e) {
+    alert("Invalid connection URI: " + e.message);
+    throw e;
+  }
+
+  document.getElementById("db_host").value = url.hostname || "";
+  document.getElementById("db_port").value = url.port || "5432";
+  document.getElementById("db_name").value = (url.pathname || "").replace(/^\//, "");
+  document.getElementById("db_user").value = decodeURIComponent(url.username || "");
+  document.getElementById("db_password").value = decodeURIComponent(url.password || "");
+}
+
+function myButtonCircle() {
+  const form = document.getElementById("form_connect");
+
+  try {
+    fillFieldsFromUri();
+  } catch (e) {
+    return;
+  }
+
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
+  const connectBtn = document.getElementById("connect");
+  connectBtn.disabled = true;
+  connectBtn.innerHTML =
+    '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting ...';
+
+  form.submit();
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("form_connect");
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    myButtonCircle();
   });
+});
 </script>
 {% endblock javascripts %}
