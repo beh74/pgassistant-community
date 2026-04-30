@@ -1,0 +1,10 @@
+vault:
+  url: "https://vault.example.com"
+  mount_point: "secret"
+
+mapping:
+  host: "host"
+  port: "port"
+  dbname: "dbname"
+  username: "username"
+  password: "password"

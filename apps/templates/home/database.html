@@ -1,171 +1,286 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Settings {% endblock %} 
+{% block title %}Database connection{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .connect-page-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .connect-muted {
+    color: #6c757d;
+  }
+
+  .connect-summary-card,
+  .connect-section-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+  }
+
+  .connect-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .connect-subtle-box {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.85rem;
+    padding: 1rem;
+  }
+
+  .connect-kpi {
+    border-radius: 0.85rem;
+    background: #f8f9fa;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .connect-kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+  }
+
+  .connect-kpi-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0;
+  }
+
+  .connect-info-alert {
+    border-radius: 0.85rem;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
+<div class="container-fluid py-4">
 
-        <div class="row">
-        <div class="col-12 col-xl-8">
-            <div class="card card-body border-0 shadow mb-4">
-                <h2 class="h5 mb-4">Database connexion</h2>
+  <div class="connect-page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">Database connection</h1>
+        <p class="connect-muted mb-0">
+          Connect pgAssistant to your PostgreSQL instance using either a connection URI or manual connection details.
+        </p>
+      </div>
+    </div>
+  </div>
 
-                <div class="alert alert-info d-flex align-items-center" role="alert">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" fill="currentColor" class="me-2" viewBox="0 0 20 20">
-                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-                    </svg>
-                    <div>PgAssistant needs pg_stat_statements module to be activated on Postgresql database. </br>
-                    You can find <a target="_blank" href="https://beh74.github.io/pgassistant-blog/doc/pg_stat_statments/" class="alert-link">here</a> a way to do it.</div>
-                
-                </div>
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
 
-                <form method="POST" id="form_connect">
-                    <div class="row">
-                        <div class="col-lg-12 mb-3">
-                            <div>
-                                <label for="db_uri">Connection URI (optional)</label>
-                                <input class="form-control"
-                                    id="db_uri"
-                                    name="db_uri"
-                                    type="text"
-                                    placeholder="postgresql://user:password@host:port/dbname">
-                            </div>
-                        </div>
-                    </div>                    
 
-                    <div class="row">
-                        <div class="col-lg-6 mb-3">
-                            <div>
-                                <label for="db_host">Host name</label>
-                                <input class="form-control" value="{{ session['db_host'] }}" id="db_host" name="db_host" type="text" placeholder="Enter database hostname" required>
-                            </div>
-                        </div>
-                        <div class="col-lg-6 mb-3">
-                            <div>
-                                <label for="db_port">Port</label>
-                                
-                                <input class="form-control" maxlength="8" value="{{ session['db_port'] }}" id="db_port" name="db_port" type="number" placeholder="DB port" required>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="row">
-                        <div class="col-lg-6 mb-3">
-                            <div class="form-group">
-                                <label for="db_name">Database Name</label>
-                                <input class="form-control" value="{{ session['db_name'] }}" id="db_name" name="db_name" type="text" placeholder="Enter the database name" required>
-                            </div>
-                        </div>
-                        <div class="col-lg-6 mb-3">
-                            <div class="form-group">
-                                <label for="db_user">User</label>
-                                <input class="form-control" value="{{ session['db_user'] }}" id="db_user" name="db_user" type="text" placeholder="Enter user name" required>
-                                
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-lg-6 mb-3">
-                            <div class="form-group">
-                                <label for="db_password">Password</label>
-                                <input class="form-control" value="{{ session['db_password'] }}" id="db_password" name="db_password" type="password" placeholder="Enter user password" required/>
-                            </div>
-                        </div>
-                    </div>
-                            
-                    <button id="connect" onclick="myButtonCircle(this)" class="btn btn-primary" type="submit">Connect
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M4.318 2.687C5.234 2.271 6.536 2 8 2s2.766.27 3.682.687C12.644 3.125 13 3.627 13 4c0 .374-.356.875-1.318 1.313C10.766 5.729 9.464 6 8 6s-2.766-.27-3.682-.687C3.356 4.875 3 4.373 3 4c0-.374.356-.875 1.318-1.313M13 5.698V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7V5.698c.271.202.58.378.904.525C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777A5 5 0 0 0 13 5.698M14 4c0-1.007-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1s-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4v9c0 1.007.875 1.755 1.904 2.223C4.978 15.71 6.427 16 8 16s3.022-.289 4.096-.777C13.125 14.755 14 14.007 14 13zm-1 4.698V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10V8.698c.271.202.58.378.904.525C4.978 9.71 6.427 10 8 10s3.022-.289 4.096-.777A5 5 0 0 0 13 8.698m0 3V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13v-1.302c.271.202.58.378.904.525C4.978 12.71 6.427 13 8 13s3.022-.289 4.096-.777c.324-.147.633-.323.904-.525"/>
-                            </svg>
-                    </button>
-                                                                  
-                </div>
+      <div class="card connect-section-card">
+        <div class="card-body p-4">
+          <h2 class="h5 mb-4">Database connection</h2>
 
-                {% if dbinfo['error'] %}
-                    <div id="database-error" class="alert alert-danger d-flex align-items-center" role="alert">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-diamond me-2" viewBox="0 0 20 20">
-                            <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
-                            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
-                          </svg>
-                        <div>
-                            {{ dbinfo['error'] }}
-                        </div>
-                    </div>
-                {% endif %}
-                </form>
+          <div class="alert alert-info d-flex align-items-start connect-info-alert" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" fill="currentColor" class="me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+            </svg>
+            <div>
+              pgAssistant needs the <code>pg_stat_statements</code> module to be activated on the PostgreSQL database.<br>
+              You can find <a target="_blank" href="https://beh74.github.io/pgassistant-blog/doc/pg_stat_statments/" class="alert-link">here</a> a way to do it.
             </div>
-            
+          </div>
+
+          <form method="POST" id="form_connect" novalidate>
+            <div class="mb-4">
+              <div class="connect-section-title">Connection URI</div>
+              <div class="connect-subtle-box">
+                <label for="db_uri" class="form-label">Connection URI (optional)</label>
+                <input
+                  class="form-control"
+                  id="db_uri"
+                  name="db_uri"
+                  type="text"
+                  placeholder="postgresql://user:password@host:5432/dbname"
+                  autocomplete="off"
+                >
+                <div class="form-text">
+                  If provided, the URI will populate the fields below automatically before the connection attempt.
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="connect-section-title">Connection details</div>
+              <div class="connect-subtle-box">
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <label for="db_host" class="form-label">Host name</label>
+                    <input
+                      class="form-control"
+                      value="{{ session.get('db_host', '') }}"
+                      id="db_host"
+                      name="db_host"
+                      type="text"
+                      placeholder="Enter database hostname"
+                      required
+                    >
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <label for="db_port" class="form-label">Port</label>
+                    <input
+                      class="form-control"
+                      value="{{ session.get('db_port', '') }}"
+                      id="db_port"
+                      name="db_port"
+                      type="number"
+                      min="1"
+                      max="65535"
+                      placeholder="DB port"
+                      required
+                    >
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <label for="db_name" class="form-label">Database name</label>
+                    <input
+                      class="form-control"
+                      value="{{ session.get('db_name', '') }}"
+                      id="db_name"
+                      name="db_name"
+                      type="text"
+                      placeholder="Enter the database name"
+                      required
+                    >
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <label for="db_user" class="form-label">User</label>
+                    <input
+                      class="form-control"
+                      value="{{ session.get('db_user', '') }}"
+                      id="db_user"
+                      name="db_user"
+                      type="text"
+                      placeholder="Enter user name"
+                      required
+                    >
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <label for="db_password" class="form-label">Password</label>
+                    <input
+                      class="form-control"
+                      value="{{ session['db_password'] }}"
+                      id="db_password"
+                      name="db_password"
+                      type="password"
+                      placeholder="Enter user password"
+                      required
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <button id="connect" class="btn btn-primary" type="submit">
+                Connect
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" class="ms-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4.318 2.687C5.234 2.271 6.536 2 8 2s2.766.27 3.682.687C12.644 3.125 13 3.627 13 4c0 .374-.356.875-1.318 1.313C10.766 5.729 9.464 6 8 6s-2.766-.27-3.682-.687C3.356 4.875 3 4.373 3 4c0-.374.356-.875 1.318-1.313M13 5.698V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7V5.698c.271.202.58.378.904.525C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777A5 5 0 0 0 13 5.698M14 4c0-1.007-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1s-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4v9c0 1.007.875 1.755 1.904 2.223C4.978 15.71 6.427 16 8 16s3.022-.289 4.096-.777C13.125 14.755 14 14.007 14 13zm-1 4.698V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10V8.698c.271.202.58.378.904.525C4.978 9.71 6.427 10 8 10s3.022-.289 4.096-.777A5 5 0 0 0 13 8.698m0 3V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13v-1.302c.271.202.58.378.904.525C4.978 12.71 6.427 13 8 13s3.022-.289 4.096-.777c.324-.147.633-.323.904-.525"/>
+                </svg>
+              </button>
+            </div>
+
+            {% if dbinfo['error'] %}
+            <div id="database-error" class="alert alert-danger d-flex align-items-start mt-4" role="alert">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-diamond me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
+                <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
+                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+              </svg>
+              <div>{{ dbinfo['error'] }}</div>
+            </div>
+            {% endif %}
+          </form>
         </div>
+      </div>
 
     </div>
-<script type="text/javascript">
-
-    function fillFieldsFromUri() {
-        const uriInput = document.getElementById("db_uri");
-        if (!uriInput) return;
-
-        const uri = uriInput.value.trim();
-        if (!uri) {
-            // Rien à faire, l'utilisateur n'utilise pas l'URI
-            return;
-        }
-
-        // Accepte postgres:// ou postgresql://
-        let normalized = uri;
-        if (uri.startsWith("postgresql://") || uri.startsWith("postgres://")) {
-            normalized = uri.replace(/^postgres(ql)?:\/\//, "http://");
-        } else {
-            alert("Invalid URI: it should start with postgresql:// or postgres://");
-            throw new Error("Invalid URI");
-        }
-
-        let url;
-        try {
-            url = new URL(normalized);
-        } catch (e) {
-            alert("Invalid connection URI: " + e.message);
-            throw e;
-        }
-
-        const host = url.hostname || "";
-        const port = url.port || "5432";
-        const dbname = (url.pathname || "").replace(/^\//, "");
-        const user = decodeURIComponent(url.username || "");
-        const password = decodeURIComponent(url.password || "");
-
-        // Remplir les champs du formulaire
-        document.getElementById("db_host").value = host;
-        document.getElementById("db_port").value = port;
-        document.getElementById("db_name").value = dbname;
-        document.getElementById("db_user").value = user;
-        document.getElementById("db_password").value = password;
-    }
-
-    function myButtonCircle(el) {
-        const form = document.getElementById("form_connect");
-
-        try {
-            // Si l'utilisateur a renseigné une URI, on remplit d'abord les champs
-            fillFieldsFromUri();
-        } catch (e) {
-            // Erreur déjà affichée à l'utilisateur, on annule la soumission
-            return;
-        }
-
-        if (form.checkValidity()) {
-            document.getElementById("connect").disabled = true;
-            document.getElementById("connect").innerHTML =
-                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting  ...';
-            form.submit();
-        } else {
-            form.reportValidity();
-        }
-    }
-</script>
+  </div>
+</div>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+function fillFieldsFromUri() {
+  const uriInput = document.getElementById("db_uri");
+  if (!uriInput) return;
+
+  const uri = uriInput.value.trim();
+  if (!uri) {
+    return;
+  }
+
+  let normalized = uri;
+
+  if (uri.startsWith("postgresql://") || uri.startsWith("postgres://")) {
+    normalized = uri.replace(/^postgres(ql)?:\/\//, "http://");
+  } else {
+    alert("Invalid URI: it should start with postgresql:// or postgres://");
+    throw new Error("Invalid URI");
+  }
+
+  let url;
+  try {
+    url = new URL(normalized);
+  } catch (e) {
+    alert("Invalid connection URI: " + e.message);
+    throw e;
+  }
+
+  document.getElementById("db_host").value = url.hostname || "";
+  document.getElementById("db_port").value = url.port || "5432";
+  document.getElementById("db_name").value = (url.pathname || "").replace(/^\//, "");
+  document.getElementById("db_user").value = decodeURIComponent(url.username || "");
+  document.getElementById("db_password").value = decodeURIComponent(url.password || "");
+}
+
+function myButtonCircle() {
+  const form = document.getElementById("form_connect");
+
+  try {
+    fillFieldsFromUri();
+  } catch (e) {
+    return;
+  }
+
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
+  const connectBtn = document.getElementById("connect");
+  connectBtn.disabled = true;
+  connectBtn.innerHTML =
+    '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Connecting ...';
+
+  form.submit();
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("form_connect");
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    myButtonCircle();
+  });
+});
+</script>
+{% endblock javascripts %}

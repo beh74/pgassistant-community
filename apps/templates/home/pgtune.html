@@ -1,88 +1,227 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Settings {% endblock %} 
+{% block title %}pgTune{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .tune-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .tune-helper-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    line-height: 1.5;
+  }
+
+  .tune-submit-btn .icon {
+    margin-left: 0.35rem;
+  }
+
+  .tune-card-subtle {
+    background-color: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .label-with-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: help;
+    color: #6c757d;
+    border: 1px solid #ced4da;
+    background: #fff;
+    line-height: 1;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-4">
 
-        <div class="row">
-        <div class="col-12 col-xl-8">
-            <div class="card card-body border-0 shadow mb-4">
-                <h2 class="h5 mb-4">PG Tune</h2>
+    <div class="col-12 col-xl-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <h1 class="h4 mb-1">pgTune</h1>
+            <p class="text-muted mb-0">
+              Generate PostgreSQL tuning recommendations from your workload profile and server resources.
+            </p>
+          </div>
 
-
-                <form method="POST">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div>
-                                <label class="my-1 me-2">DB Type</label>
-                                <select class="form-select" id="db_type" name="db_type" aria-label="Web application">
-                                    <option selected value="web">Web application</option>
-                                    <option value="oltp">Online transaction processing system</option>
-                                    <option value="dw">Data warehouse</option>
-                                </select>
-                            </div>
-                        </div>
-                    
-                    <div class="row"></div>
-                        <div class="col-sm-5 mb-3">
-                            <div>
-                                <label class="my-1 me-2" for="db_memory">Total Memory (RAM)</label>
-                                <input class="form-control" value="2" id="db_memory" name="db_memory" type="number" min="1" required>
-                                <label class="my-1 me-2" >Memory unit</label>
-                                <select class="form-select" id="db_memory_unity" name="db_memory_unity">
-                                    <option value="MB">MB</option>
-                                    <option selected value="GB">GB</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row align-items-end">
-                        <div class="col-sm-3 mb-3">
-                            <div class="form-group">
-                                <label for="db_name">Number of CPUs</label>
-                                <input class="form-control" value="1" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
-                            </div>
-                        </div>
-                        <div class="col-sm-3 mb-3">
-                            <div class="form-group">
-                                <label for="db_user">Number of Connections</label>
-                                <input class="form-control" value="200" id="db_maxconn" name="db_maxconn" type="number" min="10" max="2000" required>
-                                
-                            </div>
-                        </div>
-                        <div class="col-sm-5 mb-3">
-                            <div class="form-group">
-                                <label class="my-1 me-2" >Data Storage</label>
-                                <select class="form-select" id="db_storage" name="db_storage">
-                                    <option selected value="ssd">SSD Storage</option>
-                                    <option value="san">SAN Storage</option>
-                                    <option value="hdd">HDD Storage</option>
-                                    
-                                </select>                            
-                            </div>
-                        </div>                        
-                    </div>         
-                    
-                    <div class="mt-3">
-                        <button class="btn btn-primary" type="submit">Tune !
-                            <svg class="icon icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" 
-                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"></path>
-                            </svg>
-                        </button>
-                    </div>             
-                </form>
+          <form method="POST">
+            <div class="mb-4">
+              <div class="tune-section-title">Workload profile</div>
+              <div class="tune-card-subtle">
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <label for="db_type" class="form-label">
+                      <span class="label-with-help">
+                        <span>Database type</span>
+                        <span
+                          class="help-icon"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="Select the workload pattern that best matches your PostgreSQL usage: web, OLTP, or data warehouse."
+                        >?</span>
+                      </span>
+                    </label>
+                    <select class="form-select" id="db_type" name="db_type" aria-label="Database type">
+                      <option selected value="web">Web application</option>
+                      <option value="oltp">Online transaction processing system</option>
+                      <option value="dw">Data warehouse</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-        </div>
 
+            <div class="mb-4">
+              <div class="tune-section-title">Server resources</div>
+              <div class="tune-card-subtle">
+                <div class="row g-3">
+                  <div class="col-12 col-md-4">
+                    <label for="db_memory" class="form-label">
+                      <span class="label-with-help">
+                        <span>Total memory</span>
+                        <span
+                          class="help-icon"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="Total RAM available on the server hosting PostgreSQL. This strongly influences shared_buffers and cache-related settings."
+                        >?</span>
+                      </span>
+                    </label>
+                    <div class="input-group">
+                      <input class="form-control" value="2" id="db_memory" name="db_memory" type="number" min="1" required>
+                      <select class="form-select" id="db_memory_unity" name="db_memory_unity" style="max-width: 110px;">
+                        <option value="MB">MB</option>
+                        <option selected value="GB">GB</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-4">
+                    <label for="db_cpu" class="form-label">
+                      <span class="label-with-help">
+                        <span>Number of CPUs</span>
+                        <span
+                          class="help-icon"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="Number of CPU cores available to PostgreSQL. This can influence planner and parallelism-related recommendations."
+                        >?</span>
+                      </span>
+                    </label>
+                    <input class="form-control" value="1" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
+                  </div>
+
+                  <div class="col-12 col-md-4">
+                    <label for="db_maxconn" class="form-label">
+                      <span class="label-with-help">
+                        <span>Max connections</span>
+                        <span
+                          class="help-icon"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="Expected maximum concurrent connections. High values can significantly affect memory usage, especially work_mem planning."
+                        >?</span>
+                      </span>
+                    </label>
+                    <input class="form-control" value="200" id="db_maxconn" name="db_maxconn" type="number" min="10" max="2000" required>
+                  </div>
+
+                  <div class="col-12 col-md-4">
+                    <label for="db_storage" class="form-label">
+                      <span class="label-with-help">
+                        <span>Data storage</span>
+                        <span
+                          class="help-icon"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="Storage type affects I/O-related assumptions. SSD is usually faster for random reads than HDD or some SAN-backed storage."
+                        >?</span>
+                      </span>
+                    </label>
+                    <select class="form-select" id="db_storage" name="db_storage">
+                      <option selected value="ssd">SSD storage</option>
+                      <option value="san">SAN storage</option>
+                      <option value="hdd">HDD storage</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end pt-2">
+              <button class="btn btn-primary tune-submit-btn" type="submit">
+                Generate tuning
+                <svg class="icon icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"></path>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
 
+    <div class="col-12 col-xl-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-4">
+            <h2 class="h5 mb-3">How it works</h2>
+
+            <p class="tune-helper-text mb-3">
+                pgAssistant uses the well-known <strong>pgTune</strong> algorithm to estimate a sensible
+                PostgreSQL configuration based on your workload and server resources.
+            </p>
+
+            <p class="tune-helper-text mb-3">
+                You can learn more about pgTune here:
+                <a href="https://pgtune.leopard.in.ua/" target="_blank" rel="noopener">
+                https://pgtune.leopard.in.ua/
+                </a>
+            </p>
+
+            <p class="tune-helper-text mb-0">
+                Review generated settings carefully before applying them in production, especially
+                <code>shared_buffers</code>, <code>work_mem</code>, <code>effective_cache_size</code>,
+                and <code>max_connections</code>.
+            </p>
+            </div>
+      </div>
+    </div>
+
+  </div>
+</div>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  });
+</script>
+{% endblock javascripts %}

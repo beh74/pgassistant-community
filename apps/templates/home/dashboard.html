@@ -1,581 +1,983 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Dashboard {% endblock %} 
+{% block title %}Dashboard{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+  .dashboard-page-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .dashboard-muted {
+    color: #6c757d;
+  }
+
+  .dashboard-card {
+    border: 1px solid rgba(17, 24, 39, 0.06);
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.06);
+    border-radius: 1rem;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .dashboard-card .card-header {
+    background: #fbfcfd;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.06);
+    padding: 0.95rem 1.2rem;
+    font-weight: 700;
+    color: #243447;
+  }
+
+  .dashboard-card .card-body {
+    padding: 1.2rem;
+  }
+
+  .dashboard-section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .dashboard-section-title i {
+    color: #336791;
+    font-size: 1rem;
+  }
+
+  .dashboard-kpi-card {
+    position: relative;
+  }
+
+  .dashboard-kpi-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .dashboard-kpi-top {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .dashboard-kpi-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.85rem;
+    background: #f4f7fb;
+    color: #336791;
+    border: 1px solid rgba(51, 103, 145, 0.08);
+    font-size: 1.2rem;
+  }
+
+  .dashboard-kpi-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6b7280;
+    margin-bottom: 0.15rem;
+  }
+
+  .dashboard-kpi-value {
+    font-size: 1.65rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 0;
+    color: #1f2937;
+  }
+
+  .dashboard-kpi-subtext {
+    color: #6c757d;
+    margin-bottom: 0;
+  }
+
+  .dashboard-status-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .dashboard-status-good {
+    color: #198754;
+  }
+
+  .dashboard-status-warn {
+    color: #b7791f;
+  }
+
+  .dashboard-status-bad {
+    color: #dc3545;
+  }
+
+  .dashboard-profile-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .dashboard-profile-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .dashboard-profile-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    min-width: 2.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.8rem;
+    background: #f8f9fa;
+    border: 1px solid rgba(17, 24, 39, 0.06);
+    color: #336791;
+    font-size: 1.1rem;
+  }
+
+  .dashboard-profile-content {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dashboard-profile-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+    text-transform: capitalize;
+    color: #243447;
+  }
+
+  .dashboard-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-progress {
+    height: 10px;
+    border-radius: 999px;
+    background: #edf2f7;
+    overflow: hidden;
+  }
+
+  .dashboard-progress .progress-bar {
+    background: linear-gradient(90deg, #336791 0%, #4f85ad 100%);
+    border-radius: 999px;
+  }
+
+  .dashboard-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 0;
+  }
+
+  .dashboard-item-row + .dashboard-item-row {
+    border-top: 1px solid rgba(17, 24, 39, 0.06);
+  }
+
+  .dashboard-item-main {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+  }
+
+  .dashboard-item-icon {
+    width: 2.1rem;
+    height: 2.1rem;
+    min-width: 2.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.7rem;
+    background: #f8f9fa;
+    border: 1px solid rgba(17, 24, 39, 0.06);
+    color: #336791;
+    font-size: 1rem;
+  }
+
+  .dashboard-item-label {
+    font-weight: 700;
+    margin-bottom: 0;
+    color: #243447;
+  }
+
+  .dashboard-item-label a {
+    text-decoration: none;
+  }
+
+  .dashboard-item-value {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .label-with-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+    cursor: help;
+  }
+
+  .dashboard-side-list .d-flex + .d-flex {
+    border-top: 1px solid rgba(17, 24, 39, 0.06);
+  }
+
+  .dashboard-side-list .d-flex {
+    padding: 0.95rem 0;
+  }
+
+  .dashboard-side-list .d-flex:first-child {
+    padding-top: 0;
+  }
+
+  .dashboard-side-list .d-flex:last-child {
+    padding-bottom: 0;
+  }
+
+  .dashboard-side-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-weight: 700;
+    color: #243447;
+  }
+
+  .dashboard-side-title i {
+    font-size: 1.1rem;
+  }
+
+  .dashboard-side-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .dashboard-helper-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .dashboard-helper-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    border: 1px solid rgba(17, 24, 39, 0.06);
+    border-radius: 0.8rem;
+    background: #f8f9fa;
+  }
+
+  .dashboard-helper-icon {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.65rem;
+    background: #fff;
+    border: 1px solid rgba(17, 24, 39, 0.06);
+    color: #336791;
+    font-size: 1rem;
+  }
+
+  .dashboard-helper-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+    text-transform: capitalize;
+    color: #243447;
+  }
+
+  .dashboard-helper-desc {
+    font-size: 0.78rem;
+    color: #6c757d;
+    line-height: 1.35;
+    margin-bottom: 0;
+  }
+
+  .dashboard-badge-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+  }
+
+  .dashboard-badge-soft.good {
+    background: rgba(25, 135, 84, 0.10);
+    color: #198754;
+    border-color: rgba(25, 135, 84, 0.18);
+  }
+
+  .dashboard-badge-soft.warn {
+    background: rgba(255, 193, 7, 0.15);
+    color: #9a6b00;
+    border-color: rgba(255, 193, 7, 0.25);
+  }
+
+  .dashboard-badge-soft.bad {
+    background: rgba(220, 53, 69, 0.10);
+    color: #dc3545;
+    border-color: rgba(220, 53, 69, 0.18);
+  }
+
+  .dashboard-modal-divider {
+    margin: 1.5rem 0;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
 
-    <div class="row">
+{% macro humanize_ms(value) %}
+  {% set ms = (value | float) if value is not none and value != '' else 0 %}
+  {% set seconds = ms / 1000 %}
+  {% set minutes = seconds / 60 %}
+  {% set hours = minutes / 60 %}
+  {% set days = hours / 24 %}
 
-        <div class="col-12 col-sm-6 col-xl-4 mb-4">
-            <div class="card text-bg-light mb-3">
-                <div class="card-header"><span class="fw-bold mb-0">Database version & uptime</span></div>
-                <div class="card-body">
-                    <a target="blanck" href="https://www.postgresql.org/docs/release/">
-                        <h3 class="fw-extrabold mb-2">{{ dbinfo['version'] }} </h3>
-                    </a>    
-                  <p class="card-text">Uptime : <b>{{ dbinfo['uptime'] }}</b></p>
+  {% if ms < 1000 %}
+    {{ '%.0f ms'|format(ms) }}
+  {% elif seconds < 10 %}
+    {{ '%.2f s'|format(seconds) }}
+  {% elif seconds < 60 %}
+    {{ '%.1f s'|format(seconds) }}
+  {% elif minutes < 60 %}
+    {{ '%.1f min'|format(minutes) }}
+  {% elif hours < 24 %}
+    {{ '%.1f h'|format(hours) }}
+  {% else %}
+    {{ '%.1f d'|format(days) }}
+  {% endif %}
+{% endmacro %}
+
+{% macro humanize_number(value) %}
+  {% set n = (value | int) if value is not none and value != '' else 0 %}
+  {% if n >= 1000000000 %}
+    {{ "%.1f"|format(n / 1000000000) }}B
+  {% elif n >= 1000000 %}
+    {{ "%.1f"|format(n / 1000000) }}M
+  {% elif n >= 1000 %}
+    {{ "%.1f"|format(n / 1000) }}k
+  {% else %}
+    {{ n }}
+  {% endif %}
+{% endmacro %}
+
+{% macro format_integer(value) %}
+  {% set n = (value | int) if value is not none and value != '' else 0 %}
+  {{ "{:,}".format(n).replace(",", " ") }}
+{% endmacro %}
+
+{% macro query_type_icon_class(query_type) %}
+  {% if query_type == 'select' %}bi-eye
+  {% elif query_type == 'insert' %}bi-plus-square
+  {% elif query_type == 'update' %}bi-pencil-square
+  {% elif query_type == 'delete' %}bi-trash
+  {% elif query_type == 'upsert' %}bi-arrow-repeat
+  {% elif query_type == 'ddl' %}bi-diagram-3
+  {% elif query_type == 'maintenance' %}bi-tools
+  {% elif query_type == 'session' %}bi-sliders
+  {% elif query_type == 'transaction' %}bi-arrow-left-right
+  {% elif query_type == 'call' %}bi-file-earmark-code
+  {% else %}bi-clock-history
+  {% endif %}
+{% endmacro %}
+
+{% macro query_type_helpers() %}
+  <div class="dashboard-helper-grid">
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('select') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">select</div>
+        <p class="dashboard-helper-desc">Read-only queries returning rows.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('insert') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">insert</div>
+        <p class="dashboard-helper-desc">New rows inserted into tables.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('update') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">update</div>
+        <p class="dashboard-helper-desc">Existing rows modified.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('delete') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">delete</div>
+        <p class="dashboard-helper-desc">Rows removed from tables.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('upsert') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">upsert</div>
+        <p class="dashboard-helper-desc">Insert-or-update operations, typically using ON CONFLICT.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('ddl') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">ddl</div>
+        <p class="dashboard-helper-desc">Schema changes such as CREATE, ALTER, DROP or TRUNCATE.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('maintenance') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">maintenance</div>
+        <p class="dashboard-helper-desc">Administrative operations like VACUUM, ANALYZE, EXPLAIN or COPY.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('session') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">session</div>
+        <p class="dashboard-helper-desc">Session-level commands such as SET, SHOW, PREPARE or EXECUTE.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('transaction') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">transaction</div>
+        <p class="dashboard-helper-desc">Transaction control statements like BEGIN, COMMIT or ROLLBACK.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('call') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">call</div>
+        <p class="dashboard-helper-desc">Stored procedure calls.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-helper-item">
+      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('other') }}"></i></div>
+      <div>
+        <div class="dashboard-helper-label">other</div>
+        <p class="dashboard-helper-desc">Statements that do not fit the main categories or could not be classified.</p>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% set top_profile_calls = dbinfo['profile'][:4] %}
+{% set more_profile_calls = dbinfo['profile'][4:] %}
+{% set top_profile_time = dbinfo['profile'][:4] %}
+{% set more_profile_time = dbinfo['profile'][4:] %}
+
+<div class="container-fluid py-4">
+
+  <div class="dashboard-page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">Dashboard</h1>
+        <p class="dashboard-muted mb-0">
+          Overview of PostgreSQL health, workload distribution, schema issues, and client activity.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-12 col-sm-6 col-xl-4">
+      <div class="card dashboard-card dashboard-kpi-card h-100">
+        <div class="card-body">
+          <div class="dashboard-kpi-top">
+            <div class="dashboard-kpi-icon">
+              <i class="bi bi-database"></i>
+            </div>
+            <div>
+              <div class="dashboard-kpi-label">Database version</div>
+              <a target="_blank" href="https://www.postgresql.org/docs/release/" class="text-decoration-none">
+                <h3 class="dashboard-kpi-value">{{ dbinfo['version'] }}</h3>
+              </a>
+            </div>
+          </div>
+          <p class="dashboard-kpi-subtext mb-0">
+            Uptime: <strong>{{ dbinfo['uptime'] }}</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-4">
+      <div class="card dashboard-card dashboard-kpi-card h-100">
+        <div class="card-body">
+          <div class="dashboard-kpi-top">
+            <div class="dashboard-kpi-icon">
+              <i class="bi bi-hdd-rack"></i>
+            </div>
+            <div>
+              <div class="dashboard-kpi-label">Database size</div>
+              <h3 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h3>
+            </div>
+          </div>
+          <p class="dashboard-kpi-subtext mb-0">
+            Shared buffers (25% of RAM):
+            <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-4">
+      <div class="card dashboard-card dashboard-kpi-card h-100">
+        <div class="card-body">
+          <div class="dashboard-kpi-top">
+            <div class="dashboard-kpi-icon">
+              <i class="bi bi-speedometer2"></i>
+            </div>
+            <div>
+              <div class="dashboard-kpi-label">Hit Cache Ratio</div>
+              <a href="/cache_table.html" class="text-decoration-none">
+                <h3 class="dashboard-kpi-value">{{ dbinfo['cache'] }} %</h3>
+              </a>
+            </div>
+          </div>
+
+          {% if dbinfo['cache'] >= 99 %}
+            <div class="dashboard-status-inline dashboard-status-good">
+              <i class="bi bi-check-circle-fill"></i>
+              Excellent
+            </div>
+          {% elif dbinfo['cache'] >= 95 %}
+            <div class="dashboard-status-inline dashboard-status-good">
+              <i class="bi bi-check-circle-fill"></i>
+              Good
+            </div>
+          {% else %}
+            <div class="dashboard-status-inline dashboard-status-bad">
+              <i class="bi bi-x-circle-fill"></i>
+              Needs attention
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <div class="row g-4">
+
+        <div class="col-12 col-xxl-6">
+          <div class="card dashboard-card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <span class="label-with-help">
+                <span class="dashboard-section-title">
+                  <i class="bi bi-bar-chart-line"></i>
+                  <span>Profile - Calls</span>
+                </span>
+                <i
+                  class="bi bi-question-circle help-icon"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="Shows the 4 most frequent query categories. Click More to see all categories and their meaning."
+                ></i>
+              </span>
+            </div>
+            <div class="card-body">
+              {% for table in top_profile_calls %}
+              <div class="dashboard-profile-row">
+                <div class="dashboard-profile-icon">
+                  <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
+                </div>
+                <div class="dashboard-profile-content">
+                  <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                  <div class="dashboard-progress-meta">
+                    <span>{{ table['percentage_calls'] }} %</span>
+                    <span>{{ humanize_number(table['total_calls']) }} calls</span>
+                    
+                  </div>
+                  <div class="progress dashboard-progress">
+                    <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
                 </div>
               </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-4 mb-4">
-            <div class="card text-bg-light mb-3">
-                <div class="card-header"><span class="fw-bold mb-0">Database size</span></div>
-                <div class="card-body">
-                    <h3 class="fw-extrabold mb-2">{{ dbinfo['size'] }}</h3> 
-                  <p class="card-text">Shared buffers (25% of RAM) : <a href="/pgtune.html"><b>{{ dbinfo['shared_buffers'] }}</b></a></p>
-                </div>
+              {% endfor %}
+
+              {% if more_profile_calls %}
+              <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profileCallsModal">
+                  More
+                </button>
+              </div>
+              {% endif %}
             </div>
+          </div>
         </div>
-        <div class="col-12 col-sm-6 col-xl-4 mb-4">
-            <div class="card text-bg-light mb-3">
-                <div class="card-header"><span class="fw-bold mb-0">Hit Cache Ratio</span></div>
-                <div class="card-body">
-                    <a href="/cache_table.html">
-                    <h3 class="fw-extrabold mb-2">{{ dbinfo['cache'] }} % 
-                            <!-- hit ratio ICON -->
-                            {% if dbinfo['cache'] >= 99 %}
-                                <svg class="icon icon-sm ms-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: green;">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <path d="M9 12l2 2 4-4"></path>
-                                </svg> <!-- ✅ Excellent) -->
-                            {% elif dbinfo['cache'] >= 95 %}
-                            <svg class="icon icon-sm text-warning ms-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: orange;">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M9 12l2 2 4-4"></path>
-                            </svg> <!-- 👍 Good -->
-                            {% elif dbinfo['cache'] >= 90 %}
-                                <svg class="icon icon-sm text-warning ms-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: orange;">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <path d="M12 8v4m0 4h.01"></path>
-                                </svg> <!-- ⚠️ Average  -->
-                            {% else %}
-                                <svg class="icon icon-sm text-danger ms-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: red;">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                                </svg> <!-- ❌ Poor -->
-                            {% endif %}
-                            </h3>
-                    </a>
-                  <p class="card-text">Should be &gt; 95%</b></p>
-                </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card dashboard-card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <span class="label-with-help">
+                <span class="dashboard-section-title">
+                  <i class="bi bi-stopwatch"></i>
+                  <span>Profile - Time consumed</span>
+                </span>
+                <i
+                  class="bi bi-question-circle help-icon"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="Shows the 4 query categories consuming the most execution time. Click More to see all categories and their meaning."
+                ></i>
+              </span>
             </div>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-12 col-xl-8">
-            <div class="row">
-                <div class="col-12 col-xxl-6 mb-4">
-                    <div class="card text-bg-light">
-                        <div class="card-header border-bottom d-flex align-items-center justify-content-between">
-                            <span class="fw-bold mb-0">Profile - Calls</span>
-                              <a href="/generic/reporting_db_profile" class="btn btn-sm btn-primary">See all</a>
-                          </div>
-                        <div class="card-body">
-                            <!-- Profile - Calls -->
-                            {% for table in dbinfo['profile'] %}
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                        <svg 
-                                        width="24" 
-                                        height="24" 
-                                        data-slot="icon" 
-                                        fill="none" 
-                                        stroke-width="1.5" 
-                                        stroke="currentColor"
-                                        style="color: grey;" 
-                                        viewBox="0 0 24 24" 
-                                        xmlns="http://www.w3.org/2000/svg" 
-                                        aria-hidden="true"
-                                        >
-                                            <path 
-                                            stroke-linecap="round" 
-                                            stroke-linejoin="round" 
-                                            {% if table['query_type']=='select' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"
-                                            {% elif table['query_type']=='insert' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% elif table['query_type']=='update' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% else %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% endif %} 
-                                            </path>
-                                        </svg>
-                                </div>                                    
-                                <div class="col">
-                                    <div class="progress-wrapper">            
-                                        {% if table['query_type']=='select' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }} </span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_calls'] }} % ({{ table['total_calls'] }} calls)</span>
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="select_percentage_time" aria-label="select_percentage_time" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% elif table['query_type']=='insert' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                                
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_calls'] }} % ({{ table['total_calls'] }} calls)</span>
-
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="insert_percentage_time" aria-label="insert_percentage_time" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% elif table['query_type']=='update' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_calls'] }} % ({{ table['total_calls'] }} calls)</span>
-                                             
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="update_percentage_time" aria-label="update_percentage_time" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% else %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_calls'] }} % ({{ table['total_calls'] }} calls)</span>
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="delete_percentage_time" aria-label="delete_percentage_time" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>        
-                            {% endfor %}
-                        </div>
-                    </div>
+            <div class="card-body">
+              {% for table in top_profile_time %}
+              <div class="dashboard-profile-row">
+                <div class="dashboard-profile-icon">
+                  <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
                 </div>
-                <div class="col-12 col-xxl-6 mb-4">
-                    <div class="card text-bg-light">
-                        <div class="card-header border-bottom d-flex align-items-center justify-content-between">
-                            <span class="fw-bold mb-0">Profile - Time consume</span>
-                              <a href="/generic/reporting_db_profile" class="btn btn-sm btn-primary">See all</a>
-                          </div>
-                        <div class="card-body">
-                            <!-- Project 1 -->
-                            {% for table in dbinfo['profile'] %}
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                        <svg 
-                                        width="24" 
-                                        height="24" 
-                                        data-slot="icon" 
-                                        fill="none" 
-                                        stroke-width="1.5" 
-                                        stroke="currentColor"
-                                        style="color: grey;" 
-                                        viewBox="0 0 24 24" 
-                                        xmlns="http://www.w3.org/2000/svg" 
-                                        aria-hidden="true"
-                                        >
-                                            <path 
-                                            stroke-linecap="round" 
-                                            stroke-linejoin="round" 
-                                            {% if table['query_type']=='select' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"
-                                            {% elif table['query_type']=='insert' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% elif table['query_type']=='update' %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% else %}
-                                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                                            {% endif %} 
-                                            </path>
-                                        </svg>
-                                </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        {% if table['query_type']=='select' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }} </span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_exec_time'] }} % </span>
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="select_exec_time" aria-label="select_exec_time" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% elif table['query_type']=='insert' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                                
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_exec_time'] }} % </span>
-
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="insert_exec_time" aria-label="insert_exec_time" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% elif table['query_type']=='update' %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_exec_time'] }} % </span>
-                                             
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="update_exec_time" aria-label="update_exec_time" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% else %}
-                                        <div class="progress-info">
-                                            <div class="progress-label">
-                                                <span>{{ table['query_type'] }}</span>
-                                            </div>
-                                            <div class="progress-percentage">
-                                                <span>{{ table['percentage_exec_time'] }} % </span>
-                                            </div>
-                                        </div>
-                                        <div class="progress">
-                                            <div class="progress-bar bg-info" id="delete_exec_time" aria-label="delete_exec_time" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>        
-                            {% endfor %}
-                        </div>
-                    </div>
+                <div class="dashboard-profile-content">
+                  <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                  <div class="dashboard-progress-meta">
+                    <span>{{ table['percentage_exec_time'] }} %</span>
+                    <span>
+                      {% if table['total_exec_time'] is defined %}
+                        {{ humanize_ms(table['total_exec_time']) }}
+                      {% endif %}
+                    </span>
+                  </div>
+                  <div class="progress dashboard-progress">
+                    <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
                 </div>
-                <div class="col-12 col-xxl-6 mb-4">
-                    <div class="card text-bg-light">
-                        <div class="card-header border-bottom d-flex align-items-center justify-content-between">
-                            <span class="fw-bold mb-0">Top 5 tables</span>
-                              <a href="/generic/table_size" class="btn btn-sm btn-primary">See all</a>
-                          </div>
-                        <div class="card-body container">
-                            <!-- Tables-->
-                            {% for table in dbinfo['table_size'] %}
-                            <div class="row align-items-center mb-3">
-                               <div class="col-auto text-dark"> 
-                                <svg width="16" 
-                                height="16" 
-                                data-slot="icon" 
-                                style="color: #336791;" 
-                                viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 2h-4v3h4zm0 4h-4v3h4zm0 4h-4v3h3a1 1 0 0 0 1-1zm-5 3v-3H6v3zm-5 0v-3H1v2a1 1 0 0 0 1 1zm-4-4h4V8H1zm0-4h4V4H1zm5-3v3h4V4zm4 4H6v3h4z"/>
-                                </svg>
-                                </div>
+              </div>
+              {% endfor %}
 
-                                <div class="col align-items-center justify-content-between d-inline-flex" style="height: 24px;">
-                                    <div class="h6 mb-0">{{ table['table_name'] }}</div>
-                                    <div class="small fw-bold text-gray-500"><span> {{ table['size'] }} (<small>≈{{ table['row_count'] }} rows)</small></span></div>
-                                </div>
-                            </div>        
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-xxl-6 mb-4">
-                    <div class="card text-bg-light">
-                        <div class="card-header border-bottom d-flex align-items-center justify-content-between">
-                            <span class="fw-bold mb-0">Top 5 clients</span>
-                              <a href="/generic/database_activity_grouped" class="btn btn-sm btn-primary">See all</a>
-                          </div>
-                        <div class="card-body container">
-                            <!-- Cients -->
-                            {% for client in dbinfo['top_clients'] %}
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                    <svg 
-                                    width="24" 
-                                    height="24" 
-                                    data-slot="icon" 
-                                    fill="none" 
-                                    stroke-width="1.5" 
-                                    stroke="currentColor"
-                                    style="color: green;" 
-                                    viewBox="0 0 24 24" 
-                                    xmlns="http://www.w3.org/2000/svg" 
-                                    aria-hidden="true"
-                                    >
-                                        <path 
-                                        stroke-linecap="round" 
-                                        stroke-linejoin="round" 
-                                        d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25">
-                                        ></path>
-                                    </svg>
-                                </div>
-                                <div class="col align-items-center justify-content-between d-inline-flex" style="height: 24px;">
-                                    <div class="h6 mb-0">{{ client['client_addr'] }}</div>
-                                    <div class="small fw-bold text-gray-500"><span> {{ client['total_connections'] }} connection(s)</span></div>
-                                    <div class="small fw-bold text-gray-500"><span> {{ client['active_connections'] }} active(s)</span></div>
-                                </div>
-                            </div>        
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>    
-            
+              {% if more_profile_time %}
+              <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profileTimeModal">
+                  More
+                </button>
+              </div>
+              {% endif %}
             </div>
+          </div>
         </div>
-        <div class="col-12 col-xl-4">
-            
-            <div class="col-12 px-0 mb-4">
-                <div class="card text-bg-light">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between border-bottom pb-3">
-                            <div>
-                                <div class="h6 mb-0 d-flex align-items-center">
-                                    <svg class="me-2 icon-24" width="24" height="24" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" style="color: green;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25"></path></svg>
-                                    Connections
-                                </div>
-                            </div>
-                            <div>
-                                <a href="/generic/database_activity" class="d-flex align-items-center fw-bold">
-                                    {{ dbinfo['connexions'] }} / {{ dbinfo['max_connexions'] }}
-                                    <svg class="icon icon-xs text-gray-500 ms-2"  viewBox="0 0 20 20" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"></path>
-                                    </svg>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center justify-content-between border-bottom py-3">
-                            <div>
-                                <div class="h6 mb-0 d-flex align-items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" style="color: red;" class="me-2 icon-24" viewBox="0 0 16 16">
-                                        <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
-                                        <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
-                                      </svg>
-                                    Conflicts
-                                </div>
-                            </div>
-                            <div>
-                                <a href="/generic/database_conflicts" class="d-flex align-items-center fw-bold">
-                                    {{ dbinfo['conflicts'] }}
-                                <svg class="icon icon-xs text-gray-500 ms-2"  viewBox="0 0 20 20" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"></path>
-                                </svg>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center justify-content-between pt-3">
-                            <div>
-                                <div class="h6 mb-0 d-flex align-items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-2 icon-24 icon-dark-blue" viewBox="0 0 16 16">
-                                        <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/></svg>
-                                    Running queries
-                                </div>
 
-                            </div>
-                            <div>
-                                <a href="/generic/database_running_queries" class="d-flex align-items-center fw-bold">
-                                    #2
-                                    <svg class="icon icon-xs text-gray-500 ms-2"  viewBox="0 0 20 20" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"></path>
-                                    </svg>
-                                 </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="col-12 col-xxl-6">
+          <div class="card dashboard-card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <span class="dashboard-section-title">
+                <i class="bi bi-table"></i>
+                <span>Top 5 tables</span>
+              </span>
+              <a href="/generic/table_size" class="btn btn-sm btn-primary">See all</a>
             </div>
-            
-            <div class="col-12 px-0 mb-4">
-                    <div class="card text-bg-light">
-                        <div class="card-header border-bottom d-flex align-items-center justify-content-between">
-                            <span class="fw-bold mb-0">Issues on schema</span>
-                              
-                          </div>
-                        <div class="card-body">
-                            <!-- Issues -->
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark">
-                                    {% if dbinfo['issue_no_pk'] > 0 %}
-                                    <svg 
-                                    width="16" 
-                                    height="16" 
-                                    data-slot="icon" 
-                                    fill="currentColor"
-                                    style="color: red;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M7.005 3.1a1 1 0 1 1 1.99 0l-.388 6.35a.61.61 0 0 1-1.214 0zM7 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
-                                    </svg>
-
-                                    {% else %}
-
-                                    <svg 
-                                    width="16" 
-                                    height="16"
-                                    data-slot="icon"
-                                    fill="currentColor"
-                                    style="color: green;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                                    </svg>
-
-                                    {% endif %}
-                                </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info mb-0">
-                                            <div class="h6 mb-0"><a href="/generic/issue_no_pk">Tables without primary keys</a></div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ dbinfo['issue_no_pk'] }}</span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>        
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                    {% if dbinfo['issue_idx_fk_missing'] > 0 %}
-                                    <svg 
-                                    width="16" 
-                                    height="16" 
-                                    data-slot="icon" 
-                                    fill="currentColor"
-                                    style="color: red;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M7.005 3.1a1 1 0 1 1 1.99 0l-.388 6.35a.61.61 0 0 1-1.214 0zM7 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
-                                    </svg>
-
-                                    {% else %}
-
-                                    <svg 
-                                    width="16" 
-                                    height="16"
-                                    data-slot="icon"
-                                    fill="currentColor"
-                                    style="color: green;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                                    </svg>
-
-                                    {% endif %}
-                                </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info mb-0">
-                                            <div class="h6 mb-0"><a href="/generic/issue_idx_fk_missing">Missing indexes on foreign keys</a></div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ dbinfo['issue_idx_fk_missing'] }}</span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div> 
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                    {% if dbinfo['issue_idx_redundant'] > 0 %}
-                                    <svg 
-                                    width="16" 
-                                    height="16" 
-                                    data-slot="icon" 
-                                    fill="currentColor"
-                                    style="color: red;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M7.005 3.1a1 1 0 1 1 1.99 0l-.388 6.35a.61.61 0 0 1-1.214 0zM7 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
-                                    </svg>
-
-                                    {% else %}
-
-                                    <svg 
-                                    width="16" 
-                                    height="16"
-                                    data-slot="icon"
-                                    fill="currentColor"
-                                    style="color: green;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                                    </svg>
-
-                                    {% endif %}
-                                </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info mb-0">
-                                            <div class="h6 mb-0"><a href="/generic/issue_idx_redundant">Redundants indexes</a></div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ dbinfo['issue_idx_redundant'] }}</span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row align-items-center mb-3">
-                                <div class="col-auto text-dark"> 
-                                    {% if dbinfo['issue_idx_fk_datatype'] > 0 %}
-                                    <svg 
-                                    width="16" 
-                                    height="16" 
-                                    data-slot="icon" 
-                                    fill="currentColor"
-                                    style="color: red;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M7.005 3.1a1 1 0 1 1 1.99 0l-.388 6.35a.61.61 0 0 1-1.214 0zM7 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
-                                    </svg>
-
-                                    {% else %}
-
-                                    <svg 
-                                    width="16" 
-                                    height="16"
-                                    data-slot="icon"
-                                    fill="currentColor"
-                                    style="color: green;" 
-                                    viewBox="0 0 16 16" 
-                                    class="icon-20"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                                    </svg>
-
-                                    {% endif %}
-                                </div>
-                                <div class="col">
-                                    <div class="progress-wrapper">
-                                        <div class="progress-info mb-0">
-                                            <div class="h6 mb-0"><a href="/generic/issue_idx_fk_datatype">Datatype on foreign keys are different</a></div>
-                                            <div class="small fw-bold text-gray-500"><span> {{ dbinfo['issue_idx_fk_datatype'] }}</span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>                                                         
-                        </div>
-                    </div>
-                </div>   
+            <div class="card-body">
+              {% for table in dbinfo['table_size'] %}
+              <div class="dashboard-item-row">
+                <div class="dashboard-item-main">
+                  <div class="dashboard-item-icon">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                  </div>
+                  <div>
+                    <div class="dashboard-item-label">{{ table['table_name'] }}</div>
+                  </div>
+                </div>
+                <div class="dashboard-item-value">
+                  {{ table['size'] }}<br>
+                  <small title="{{ format_integer(table['row_count']) }} rows">
+                  ≈{{ humanize_number(table['row_count']) }} rows
+                  </small>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
         </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card dashboard-card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <span class="dashboard-section-title">
+                <i class="bi bi-pc-display"></i>
+                <span>Top 5 clients</span>
+              </span>
+              <a href="/generic/database_activity_grouped" class="btn btn-sm btn-primary">See all</a>
+            </div>
+            <div class="card-body">
+              {% for client in dbinfo['top_clients'] %}
+              <div class="dashboard-item-row">
+                <div class="dashboard-item-main">
+                  <div class="dashboard-item-icon">
+                    <i class="bi bi-display"></i>
+                  </div>
+                  <div>
+                    <div class="dashboard-item-label">{{ client['client_addr'] }}</div>
+                  </div>
+                </div>
+                <div class="dashboard-item-value">
+                  <span title="{{ format_integer(client['total_connections']) }} connections">
+                    {{ humanize_number(client['total_connections']) }} connection(s)
+                  </span><br>
+                  <small title="{{ format_integer(client['active_connections']) }} active">
+                    {{ humanize_number(client['active_connections']) }} active(s)
+                  </small>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
+    <div class="col-12 col-xl-4">
+
+      <div class="mb-4">
+        <div class="card dashboard-card">
+          <div class="card-body dashboard-side-list">
+
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="dashboard-side-title">
+                <i class="bi bi-people-fill text-success"></i>
+                <span>Connections</span>
+              </div>
+              <a href="/generic/database_activity" class="dashboard-side-link">
+                {{ dbinfo['connexions'] }} / {{ dbinfo['max_connexions'] }}
+                <i class="bi bi-arrow-right-circle"></i>
+              </a>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="dashboard-side-title">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                <span>Conflicts</span>
+              </div>
+              <a href="/generic/database_conflicts" class="dashboard-side-link">
+                {{ dbinfo['conflicts'] }}
+                <i class="bi bi-arrow-right-circle"></i>
+              </a>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="dashboard-side-title">
+                <i class="bi bi-code-slash text-primary"></i>
+                <span>Running queries</span>
+              </div>
+              <a href="/generic/database_running_queries" class="dashboard-side-link">
+                #2
+                <i class="bi bi-arrow-right-circle"></i>
+              </a>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="card dashboard-card">
+          <div class="card-header">
+            <span class="dashboard-section-title">
+              <i class="bi bi-shield-exclamation"></i>
+              <span>Issues on schema</span>
+            </span>
+          </div>
+          <div class="card-body">
+
+            <div class="dashboard-item-row">
+              <div class="dashboard-item-main">
+                <div class="dashboard-item-icon">
+                  {% if dbinfo['issue_no_pk'] > 0 %}
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                  {% else %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                  {% endif %}
+                </div>
+                <div class="dashboard-item-label"><a href="/generic/issue_no_pk">Tables without primary keys</a></div>
+              </div>
+              <div class="dashboard-item-value">{{ dbinfo['issue_no_pk'] }}</div>
+            </div>
+
+            <div class="dashboard-item-row">
+              <div class="dashboard-item-main">
+                <div class="dashboard-item-icon">
+                  {% if dbinfo['issue_idx_fk_missing'] > 0 %}
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                  {% else %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                  {% endif %}
+                </div>
+                <div class="dashboard-item-label"><a href="/generic/issue_idx_fk_missing">Missing indexes on foreign keys</a></div>
+              </div>
+              <div class="dashboard-item-value">{{ dbinfo['issue_idx_fk_missing'] }}</div>
+            </div>
+
+            <div class="dashboard-item-row">
+              <div class="dashboard-item-main">
+                <div class="dashboard-item-icon">
+                  {% if dbinfo['issue_idx_redundant'] > 0 %}
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                  {% else %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                  {% endif %}
+                </div>
+                <div class="dashboard-item-label"><a href="/generic/issue_idx_redundant">Redundant indexes</a></div>
+              </div>
+              <div class="dashboard-item-value">{{ dbinfo['issue_idx_redundant'] }}</div>
+            </div>
+
+            <div class="dashboard-item-row">
+              <div class="dashboard-item-main">
+                <div class="dashboard-item-icon">
+                  {% if dbinfo['issue_idx_fk_datatype'] > 0 %}
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                  {% else %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                  {% endif %}
+                </div>
+                <div class="dashboard-item-label"><a href="/generic/issue_idx_fk_datatype">Datatype on foreign keys are different</a></div>
+              </div>
+              <div class="dashboard-item-value">{{ dbinfo['issue_idx_fk_datatype'] }}</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {% if more_profile_calls %}
+  <div class="modal fade" id="profileCallsModal" tabindex="-1" aria-labelledby="profileCallsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="h5 modal-title" id="profileCallsModalLabel">Profile - Calls</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% for table in dbinfo['profile'] %}
+          <div class="dashboard-profile-row">
+            <div class="dashboard-profile-icon">
+              <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
+            </div>
+            <div class="dashboard-profile-content">
+              <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+              <div class="dashboard-progress-meta">
+                <span>{{ table['percentage_calls'] }} %</span>
+                <span title="{{ format_integer(table['total_calls']) }} calls">
+                  {{ humanize_number(table['total_calls']) }} calls
+                </span>
+              </div>
+              <div class="progress dashboard-progress">
+                <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+          <hr class="dashboard-modal-divider">
+          {{ query_type_helpers() }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if more_profile_time %}
+  <div class="modal fade" id="profileTimeModal" tabindex="-1" aria-labelledby="profileTimeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="h5 modal-title" id="profileTimeModalLabel">Profile - Time consumed</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% for table in dbinfo['profile'] %}
+          <div class="dashboard-profile-row">
+            <div class="dashboard-profile-icon">
+              <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
+            </div>
+            <div class="dashboard-profile-content">
+              <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+              <div class="dashboard-progress-meta">
+                <span>{{ table['percentage_exec_time'] }} %</span>
+                <span>
+                  {% if table['total_exec_time'] is defined %}
+                    {{ humanize_ms(table['total_exec_time']) }}
+                  {% endif %}
+                </span>
+              </div>
+              <div class="progress dashboard-progress">
+                <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+          <hr class="dashboard-modal-divider">
+          {{ query_type_helpers() }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
 
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  });
+</script>
+{% endblock javascripts %}

@@ -1,0 +1,457 @@
+{# templates/tables_cards.html #}
+{% extends "layouts/base.html" %}
+
+{% block title %}Tables{% endblock %}
+
+{% block stylesheets %}
+
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+.tables-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.tables-search-group {
+  flex: 0 1 420px;
+  min-width: 250px;
+}
+
+.tables-toolbar-right {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tables-pages-group {
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+.tables-search-group .form-control,
+.tables-pages-group .form-select {
+  height: 38px;
+}
+
+@media (max-width: 992px) {
+  .tables-toolbar {
+    align-items: stretch;
+  }
+
+  .tables-search-group,
+  .tables-toolbar-right {
+    width: 100%;
+  }
+
+  .tables-toolbar-right {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 768px) {
+  .tables-toolbar-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tables-pages-group {
+    width: 100%;
+  }
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 992px) {
+  .tables-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.table-card-item.d-none {
+  display: none !important;
+}
+
+.table-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.05);
+  height: 100%;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.table-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.10) !important;
+}
+
+.table-card .card-body {
+  padding: 1rem;
+}
+
+.table-schema-badge {
+  display: inline-block;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: #eef2f7 !important;
+  color: #1f2937 !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.table-status-badge {
+  display: inline-block;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tables-name {
+  word-break: break-word;
+}
+
+.tables-name code {
+  font-size: 0.8rem;
+}
+
+.metric-inline-value-link {
+  text-decoration: none;
+}
+
+.metric-inline-value-link:hover {
+  text-decoration: underline;
+}
+
+.metrics-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.metric-inline-item {
+  background: #fbfcfd;
+  border: 1px solid #edf0f2;
+  border-radius: 999px;
+  padding: 0.28rem 0.58rem;
+  font-size: 0.80rem;
+}
+
+.metric-inline-label {
+  color: #6c757d;
+  margin-right: 0.3rem;
+}
+
+.metric-inline-value {
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.tables-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tables-actions .btn {
+  flex: 1 1 auto;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.pagination-info {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.page-number {
+  min-width: 42px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+</style>
+{% endblock %}
+
+
+{% macro format_rows(n) %}
+  {% if n is none %}
+    -
+  {% elif n >= 1000000000 %}
+    {{ (n / 1000000000)|round(1) }}B
+  {% elif n >= 1000000 %}
+    {{ (n / 1000000)|round(1) }}M
+  {% elif n >= 1000 %}
+    {{ (n / 1000)|round(1) }}k
+  {% else %}
+    {{ n }}
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  {% set q = request.args.get('q', q|default(''))|trim %}
+  {% set q_lower = q|lower %}
+  {% set page = request.args.get('page', page|default(1))|int %}
+  {% set per_page = request.args.get('per_page', per_page|default(24))|int %}
+
+  {# Filter first, then paginate #}
+  {% if q %}
+    {% set filtered = [] %}
+    {% for r in tables %}
+      {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+      {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
+      {% set hay = (schema ~ '.' ~ table ~ ' ' ~ schema ~ ' ' ~ table)|lower %}
+      {% if q_lower in hay %}
+        {% set _ = filtered.append(r) %}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    {% set filtered = tables %}
+  {% endif %}
+
+  {% set total = filtered|length %}
+  {% set total_pages = ((total + per_page - 1) // per_page) if per_page else 1 %}
+
+  {% if page < 1 %}{% set page = 1 %}{% endif %}
+  {% if total_pages > 0 and page > total_pages %}{% set page = total_pages %}{% endif %}
+
+  {% set start_idx = (page - 1) * per_page %}
+  {% set end_idx = start_idx + per_page %}
+  {% set paged_tables = filtered[start_idx:end_idx] %}
+
+  <div class="py-4">
+    <div class="mb-3 mb-lg-0">
+      <h1 class="h4">Table definition helper</h1>
+      <p class="mb-0">Explore your tables and launch RFC checks, convention checks, or Tetris reordering suggestions.</p>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow mb-4">
+    <div class="card-body">
+
+      <form class="tables-toolbar" method="get" action="" role="search">
+        <div class="tables-search-group">
+          <label for="tableSearch" class="form-label mb-1">Search</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input id="tableSearch"
+                   name="q"
+                   class="form-control"
+                   type="search"
+                   value="{{ q }}"
+                   placeholder="Schema, table name..."
+                   aria-label="Search tables">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+          </div>
+        </div>
+
+        <div class="tables-toolbar-right">
+          <div class="tables-pages-group">
+            <label for="perPageSelect" class="form-label mb-1">Cards per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select" onchange="this.form.submit()">
+              {% for n in [12,24,36,48,72,96] %}
+                <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <input type="hidden" name="page" value="1">
+      </form>
+
+      <div id="tablesGrid" class="tables-grid">
+        {% for r in paged_tables %}
+          {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+          {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
+          {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
+          {% set total_size = r.total_size if r.total_size is defined else r['total_size'] %}
+          {% set table_size = r.table_size if r.table_size is defined else r['table_size'] %}
+          {% set index_size = r.index_size if r.index_size is defined else r['index_size'] %}
+          {% set index_pct = r.index_pct if r.index_pct is defined else r['index_pct'] %}
+          {% set dead_pct = r.dead_pct if r.dead_pct is defined else r['dead_pct'] %}
+          {% set estimated_dead_size = r.estimated_dead_size if r.estimated_dead_size is defined else r['estimated_dead_size'] %}
+          {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
+
+          <div class="table-card-item">
+            <div class="card table-card">
+              <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="table-schema-badge">
+                      <i class="bi bi-diagram-3 me-1"></i>{{ schema }}
+                    </span>
+
+                    {% if b == 'HIGH' %}
+                      <span class="table-status-badge bg-danger-subtle text-danger border border-danger-subtle">High bloat</span>
+                    {% elif b == 'MEDIUM' %}
+                      <span class="table-status-badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Medium bloat</span>
+                    {% elif b == 'LOW' %}
+                      <span class="table-status-badge bg-success-subtle text-success border border-success-subtle">Low bloat</span>
+                    {% elif b == 'SMALL_TABLE' %}
+                      <span class="table-status-badge bg-light text-muted border">Small table</span>
+                    {% elif b == 'NO_STATS' %}
+                      <span class="table-status-badge bg-secondary-subtle text-secondary border border-secondary-subtle">No stats</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="tables-name mb-3">
+                  <code class="text-muted">{{ schema }}</code>.<strong>{{ table }}</strong>
+                </div>
+
+                <div class="metrics-inline mb-3">
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Rows</span>
+                    <span class="metric-inline-value" title="{{ row_count }}">
+                      {{ format_rows(row_count) }}
+                    </span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Total</span>
+                    <span class="metric-inline-value">{{ total_size }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Table</span>
+                    <span class="metric-inline-value">{{ table_size }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Indexes</span>
+                    <a class="metric-inline-value metric-inline-value-link"
+                      href="/generic/index_io?schemaname={{ schema|urlencode }}&relname={{ table|urlencode }}">
+                      {{ index_size }}
+                    </a>
+                  </div>
+                  {% set pct = index_pct|float %}
+
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Index %</span>
+                    <span class="metric-inline-value {% if pct >= 50 %}text-danger fw-bold{% elif pct >= 30 %}text-warning fw-semibold{% endif %}">
+                      {{ index_pct }}%
+                    </span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Dead size</span>
+                    <span class="metric-inline-value">{{ estimated_dead_size }}</span>
+                  </div>
+                  <div class="metric-inline-item">
+                    <span class="metric-inline-label">Dead %</span>
+                    <span class="metric-inline-value">{{ dead_pct }}%</span>
+                  </div>
+
+                </div>
+
+                <div class="tables-actions">
+                  <a class="btn btn-sm btn-primary"
+                     href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-check2-circle me-1"></i> Check RFC
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-list-check me-1"></i> Check conventions
+                  </a>
+                  <a class="btn btn-sm btn-warning"
+                     href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}">
+                    <i class="bi bi-grid-3x3-gap me-1"></i> Play Tetris
+                  </a>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if paged_tables|length == 0 %}
+        <div class="no-results">
+          No table found{% if q %} for <strong>{{ q }}</strong>{% endif %}.
+        </div>
+      {% endif %}
+
+      {% if total_pages > 1 %}
+      <div class="pagination-wrapper">
+        <div class="pagination-info">
+          Showing {{ start_idx + 1 if total > 0 else 0 }}-{{ end_idx if end_idx < total else total }} of {{ total }} tables
+        </div>
+
+        <div class="pagination-controls">
+          {% set prev_page = page - 1 %}
+          {% set next_page = page + 1 %}
+
+          <a class="btn btn-outline-primary btn-sm {% if page <= 1 %}disabled{% endif %}"
+             href="?page={{ prev_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+            Previous
+          </a>
+
+          {% set start = page - 2 %}
+          {% if start < 1 %}{% set start = 1 %}{% endif %}
+          {% set end = page + 2 %}
+          {% if end > total_pages %}{% set end = total_pages %}{% endif %}
+
+          {% if start > 1 %}
+            <a class="btn btn-outline-primary btn-sm page-number" href="?page=1&per_page={{ per_page }}&q={{ q|urlencode }}">1</a>
+            {% if start > 2 %}
+              <span class="btn btn-sm btn-light disabled">…</span>
+            {% endif %}
+          {% endif %}
+
+          {% for p in range(start, end + 1) %}
+            <a class="btn btn-sm page-number {% if p == page %}btn-primary{% else %}btn-outline-primary{% endif %}"
+               href="?page={{ p }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+              {{ p }}
+            </a>
+          {% endfor %}
+
+          {% if end < total_pages %}
+            {% if end < total_pages - 1 %}
+              <span class="btn btn-sm btn-light disabled">…</span>
+            {% endif %}
+            <a class="btn btn-outline-primary btn-sm page-number"
+               href="?page={{ total_pages }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+              {{ total_pages }}
+            </a>
+          {% endif %}
+
+          <a class="btn btn-outline-primary btn-sm {% if page >= total_pages %}disabled{% endif %}"
+             href="?page={{ next_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
+            Next
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

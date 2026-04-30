@@ -4,10 +4,13 @@ Main routes
 """
 import traceback
 import os
+import math 
+import re
 from apps.home import blueprint
 from flask import render_template, request, session,redirect, jsonify, Response
 from jinja2 import TemplateNotFound
 from . import database
+from . import dbanalyze
 from . import llm
 from . import pgtune
 from . import sqlhelper
@@ -18,7 +21,13 @@ from . import analyze_aquery
 from . import config
 from . import reporting
 from . import action
-import re
+from . import graph
+from . import graph_table
+from . import pgstat_helper
+from . import analyze_advisor
+from . import tetris
+from . import ranking
+from . import global_advisor 
 import requests
 import json
 
@@ -51,6 +60,8 @@ def handle_dashboard_get(segment: str):
         return redirect("/database.html")
 
 def handle_topqueries_get(template: str, segment: str, tablename: str = None):
+
+
     if session.get("db_name"):
         
         # get optional tablename parameter from URL
@@ -76,7 +87,7 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             rows_filtered = [row for row in rows_filtered if tablename in row['tables']]
 
         # Render the template with the filtered data
-        return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename)
+        return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename,column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
     else:
         return redirect("/database.html")
@@ -84,35 +95,8 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
 def handle_rank_queries_get(template: str, segment: str):
     if session.get("db_name"):
         rows = database.get_rank_queries(session)
-        
-        i=0
-        table_stats=[]
-        for query in rows:            
-            tables = sqlhelper.get_tables(query['query'])
-            for table  in tables:
-                stats.add_or_update_table_info(table_stats,
-                                               table, 
-                                               query['calls'], 
-                                               query['mean_exec_time'],
-                                               query['rows'],
-                                               'select',
-                                               []
-                                               )
-            rows[i]['tables']=tables
-            i = i + 1   
-        pga_tables=database.get_pga_tables()
-        rows_filtered=[]
-        for row in rows:
-            filtered=False
-            for table in row ['tables']:
-                if table in pga_tables:
-                    filtered=True
-            if not row ['tables']:
-                filtered=True    
-            if not filtered:
-                rows_filtered.append(row)
-        
-        return render_template(f"home/{template}", segment=segment, rows=rows_filtered)
+        ranked_queries = ranking.rank_queries(rows)
+        return render_template(f"home/{template}", segment=segment, ranked_queries=ranked_queries)
     else:
         return redirect("/database.html")    
 
@@ -162,8 +146,8 @@ def handle_primarykey_get(template: str, segment: str):
 
 def handle_table_rfc_get(template: str, segment: str):
     if session.get("db_name"):
-            query_rows,description=database.generic_select(session,"table_list")
-            return render_template("home/table_rfc.html", rows=query_rows, segment=segment, description=description )
+            query_rows,description=database.generic_select(session,"table_size")
+            return render_template("home/tables_cards.html", tables=query_rows, segment="tables_cards.html" )
     else:
         return redirect("/database.html")
 
@@ -197,21 +181,24 @@ def handle_myqueries_get():
     queries=database.get_my_queries()
     return render_template(f"home/search.html", segment='search.html', rows=queries, searchkey='My queries')
 
+def handle_tools_get():
+    return render_template(f"home/tools.html", segment='tools.html')
+
 def handle_reset_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_reset")
     rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows)
+    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
 def handle_enable_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_enable")
     rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows)
+    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
 
 def handle_lint_post():
     original_sql = request.form.get('sqlo')
     
     return render_template("home/lint.html", segment="lint.html",
-                           sqlo=original_sql, linted=sqlhelper.format_sql(original_sql))
+                           sqlo=original_sql, linted=sqlhelper.get_formated_sql(original_sql)) 
 
 def handle_search_post():
     searchkey = request.form.get('searchkey')
@@ -258,8 +245,9 @@ def generic(genericid):
         else:
             return redirect("/database.html")
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route('/generic_param/<genericid>', methods=['GET', 'POST'])
 def generic_param(genericid):
@@ -283,8 +271,9 @@ def generic_param(genericid):
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route('/analyze/<querid>', methods=['GET', 'POST'])
 def analyze_query(querid):
@@ -294,67 +283,226 @@ def analyze_query(querid):
         if session.get("db_name"):
             rows = []
             tables_and_columns = {}
-            sql_query = database.get_pgstat_query_by_id(session,querid)
+            statistics = {}
+            mermaid_code = None
+            queryplan = None
+            plan_text = None
+            advisor_result = None
+
+            # Clear any previous analyze-derived table list when opening a new query page (optional but recommended)
+            prev_qid = session.get("analyze_querid")
+            if prev_qid != querid:
+                session.pop("analyze_tables", None)
+                session.pop("full_query", None)
+                session["analyze_querid"] = querid
+
+            sql_query = database.get_pgstat_query_by_id(session, querid)
+
             # format SQL
-            sql_query = sqlhelper.get_formated_sql(sql_query)
+            # sql_query = sqlhelper.get_formated_sql(sql_query)
             tables = sqlhelper.get_tables(sql_query)
-            
+
             # extract parameters list
-            pattern = r'\$[0-9]+' 
+            pattern = r'\$[0-9]+'
             parameters = re.findall(pattern, sql_query)
             parameters = sorted(set(parameters), key=lambda p: int(p[1:]))
 
             if request.method == 'POST':
-
                 params = {}
                 for key, val in request.form.items():
-                # Verify parameters ($1, $2, ...)
+                    # Verify parameters ($1, $2, ...)
                     if key.startswith('$'):
                         param_index = int(key[1:])  # Convert '$1' to 1
-                        if val is None or val.strip()=='':
-                            val='NULL'
-                        params[param_index] = val  # Add to dictionnary
+                        if val is None or val.strip() == '':
+                            val = 'NULL'
+                        params[param_index] = val  # Add to dictionary
 
-                sql_query=sqlhelper.replace_query_parameters(sql_query,params)
-                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS) {sql_query}"
+                sql_query = sqlhelper.replace_query_parameters(sql_query, params)
+                
+                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
+                
+                # generic plan
+                #sql_query = database.get_pgstat_query_by_id(session, querid)
+                #sql_query_analyze = f" EXPLAIN (GENERIC_PLAN, VERBOSE,  SETTINGS, FORMAT JSON)  {sql_query}"
+                #print("SQL for GENERIC PLAN:", sql_query_analyze)
 
-                if request.form.get('action')=='chatgpt':
-                    rows = database.generic_select_with_sql(session,sql_query_analyze)
-                    chatgpt = llm.get_llm_query_for_query_analyze(db_config=session, sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
-
-                    chatgpt_response=llm.query_chatgpt(chatgpt)
-                    return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
-                elif request.form.get('action')=='analyze':                   
+                if request.form.get('action') == 'analyze':
                     parameters = {}
-                    rows = database.generic_select_with_sql(session,sql_query_analyze)
-                    chatgpt = llm.get_llm_query_for_query_analyze(db_config=session,sql_query=sql_query_analyze, rows=rows, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+                    rows = database.generic_select_with_sql(session, sql_query_analyze)
 
-                    # Get more informations on query
-                    existing_indexes = database.get_existing_indexes(session)
-                    analyzed_query = analyze_aquery.analyze_table_conditions(sql_query)
-                    tables_and_columns =  analyze_aquery.check_index_coverage(existing_indexes,analyzed_query)
-                elif request.form.get('action')=='optimize':
-                    question_optimize=llm.get_llm_query_for_query_optimize(sql_query)
-                    chatgpt_response=llm.query_chatgpt(question_optimize)
-                    return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)
-                elif request.form.get('action')=='ddl':
-                    tables=sqlhelper.get_tables(sql_query)
-                    sql_text=ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
-                    sql_text=ddl.sql_to_html(sql_text)
+                    session["full_query"] = sql_query  # Store the full query with parameters in session
+
+                    # get statistics from EXPLAIN ANALYZE result
+                    queryplan = rows[0]["QUERY PLAN"]
+
+                    try:
+                        advisor_result = analyze_advisor.analyze_plan_for_safe_indexes(
+                            queryplan, session, querid
+                        )
+
+                        # ------------------------------------------------------------
+                        # SORT ONLY BY CONFIDENCE (safe > review > none)
+                        # ------------------------------------------------------------
+                        if advisor_result and advisor_result.get("recommendations"):
+
+                            priority = {
+                                "safe": 0,
+                                "review": 1,
+                                "none": 2,
+                            }
+                            advisor_result["recommendations"] = sorted(
+                                advisor_result["recommendations"],
+                                key=lambda r: priority.get(r.get("confidence"), 99)
+                            )
+                        #analyze_advisor.pretty_print_analysis(advisor_result)
+
+                    except Exception as e:
+                        advisor_result = None
+                        print("Error during advisor analysis:", e)
+
+                    if isinstance(queryplan, str):
+                        plan_text = queryplan
+                    else:
+                        plan_text = json.dumps(queryplan, indent=2, ensure_ascii=False)
+
+                    statistics = dbanalyze.decode_explain_json_with_buffers(
+                        rows[0]["QUERY PLAN"],
+                        include_top_nodes=True,
+                        top_n=20
+                    )
+
+                    # ✅ Store the table list from decode_explain_json_with_buffers into session
+                    # dbanalyze.tables_from_decode_stats(stats) returns ["schema.table", ...]
+                    tables_from_analyze = dbanalyze.tables_from_decode_stats(statistics)
+                    tables_from_sql = sqlhelper.get_tables(sql_query)
+                    tables = dbanalyze.union_tables(tables_from_analyze, tables_from_sql)
+                    session["analyze_tables"] = tables  # Store the table list in session for later use (e.g., LLM, DDL)
+
+                    chatgpt = llm.get_llm_query_for_query_analyze(
+                        db_config=session,
+                        sql_query=sql_query_analyze,
+                        rows=rows,
+                        database=session['db_name'],
+                        host=session["db_host"],
+                        user=session["db_user"],
+                        port=session["db_port"],
+                        password=session["db_password"],
+                        table_genius=tables
+                    )
+
+                    # generate mermaid code
+                    mermaid_code, err = graph.build_mermaid_erd_from_explain_stats(statistics, session)
+                elif request.form.get('action') == 'chatgpt':
+
+                    sql_query = session.get("full_query", sql_query)  # Use the full query with parameters if available
+                    sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
+
+                    rows = database.generic_select_with_sql(session, sql_query_analyze)
+                    statistics = dbanalyze.decode_explain_json_with_buffers(
+                        rows[0]["QUERY PLAN"],
+                        include_top_nodes=True,
+                        top_n=20
+                    )
+
+                    # Use tables derived from the last ANALYZE (if available), otherwise fall back to SQL parsing
+                    tables_from_analyze = dbanalyze.tables_from_decode_stats(statistics)
+                    tables_from_sql = sqlhelper.get_tables(sql_query)
+                    tables_for_llm = dbanalyze.union_tables(tables_from_analyze, tables_from_sql)                  
+
+                    chatgpt = llm.get_llm_query_for_query_analyze(
+                        db_config=session,
+                        sql_query=sql_query_analyze,
+                        rows=rows,
+                        database=session['db_name'],
+                        host=session["db_host"],
+                        user=session["db_user"],
+                        port=session["db_port"],
+                        password=session["db_password"],
+                        table_genius=tables_for_llm
+                    )
+
+                    try:
+                        chatgpt_response = llm.query_chatgpt(chatgpt)
+                        return render_template(
+                            'home/chatgpt.html',
+                            chatgpt_response=chatgpt_response,
+                            chatgpt_query=llm.render_markdown(chatgpt)
+                        )
+                    except Exception as e1:
+                        tb = traceback.format_exc()
+                        print(tb)
+                        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+
+                elif request.form.get('action') == 'ddl':
+                    # ✅ Use the same table list as the LLM (derived from ANALYZE if available)
+                    tables_from_analyze = session.get("analyze_tables")
+                    tables_from_sql = sqlhelper.get_tables(sql_query)
+                    tables = dbanalyze.union_tables(tables_from_analyze, tables_from_sql)
+
+                    sql_text = ddl.generate_tables_ddl(
+                        tables=tables,
+                        database=session['db_name'],
+                        host=session["db_host"],
+                        user=session["db_user"],
+                        port=session["db_port"],
+                        password=session["db_password"]
+                    )
+                    sql_text = ddl.sql_to_html(sql_text)
                     return render_template('home/ddl.html', sql_text=sql_text, tables=tables, query=sql_query)
+
             else:
                 # try to extract parameters from query
-                genius_parameters=sqlhelper.get_genius_parameters(sql_query,session)
+                try:
+                    genius_parameters = sqlhelper.get_genius_parameters(sql_query, session)
+                    #print("Genius parameters extracted:", genius_parameters)
+                except Exception:
+                    genius_parameters = []
 
-            return render_template('home/analyze.html', parameters=parameters, query=sql_query, rows=rows, description='Analyze query',chatgpt=chatgpt, tables=tables, genius_parameters=genius_parameters, analyze_explain_row=sqlhelper.analyze_explain_row, coverage_info=tables_and_columns )
+            def fmt_ms(x):
+                if x is None:
+                    return "—"
+                return f"{x:.2f} ms" if x < 1000 else f"{x/1000:.2f} s"
+
+            def fmt_pct(x):
+                if x is None:
+                    return "—"
+                return f"{x:.2f}%"
+
+            def fmt_int(x):
+                if x is None:
+                    return "—"
+                # self_rows can be float in EXPLAIN ANALYZE
+                if isinstance(x, (int, float)) and not math.isnan(x):
+                    return str(int(round(x)))
+                return str(x)
+
+            return render_template(
+                'home/analyze.html',
+                parameters=parameters,
+                query=sql_query,
+                rows=rows,
+                description='Analyze query',
+                chatgpt=chatgpt,
+                tables=tables,
+                genius_parameters=genius_parameters,
+                analyze_explain_row=sqlhelper.analyze_explain_row,
+                result=statistics,
+                fmt_ms=fmt_ms,
+                fmt_pct=fmt_pct,
+                fmt_int=fmt_int,
+                mermaid_code=mermaid_code,
+                advisor_result=advisor_result,
+                queryplan=plan_text
+            )
         else:
-            dbinfo= {}
+            dbinfo = {}
             return redirect("/database.html")
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
     except Exception as e1:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=e1), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
 @blueprint.route("/execute", methods=["POST"])
 def execute_sql():
@@ -452,6 +600,25 @@ def api_database_report():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@blueprint.route("/dba_report", methods=["GET"])
+def dba_database_report():
+    try:
+        # Generate report
+        database_reports = reporting.get_database_report(
+            session,
+            report_yaml_definition_file="./reporting.yml",
+            template_folder="db_report_templates"
+        )
+        if not database_reports:
+            raise Exception("No report generated")
+        html_report = llm.render_markdown(database_reports)
+        return render_template('home/report.html', report=html_report, segment='dba_report')
+
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
     
 @blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
 def api_reset_stats():
@@ -558,6 +725,16 @@ def api_apply_recommendations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@blueprint.route('/global/advisor', methods=['GET'])
+def global_advisor_route():
+    try:
+        
+        result = global_advisor.run_global_advisor(session, yaml_path="advisor.yml")
+        return render_template('home/advisor.html', segment='global_advisor.html', recommendations=result["recommendations"])
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"error": str(e1), "traceback": tb}), 500
 
 @blueprint.route('/<template>', methods=['GET', 'POST'])
 def route_template(template: str):
@@ -596,7 +773,7 @@ def route_template(template: str):
             return handle_myqueries_get()
         elif segment == "primary_key.html" and request.method == 'GET':
             return handle_primarykey_get(template, segment)
-        elif segment == "table_rfc.html"  and request.method == 'GET':
+        elif segment == "tables_cards.html"  and request.method == 'GET':
             return handle_table_rfc_get(template, segment)
         elif segment == "cache_table.html" and request.method == 'GET':
             return handle_cache_table_get(template, segment)
@@ -621,9 +798,15 @@ def route_template(template: str):
         return render_template(f"home/{template}", segment=segment, dbinfo={})
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404
-    except Exception as e:
-        traceback.print_exc()
-        return render_template('home/page-500.html', err=str(e)), 500
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+
+@blueprint.route("/tools")
+def tools():
+    selected_category = request.args.get("cat")  # e.g. /tools?cat=database
+    return render_template("home/tools.html", selected_category=selected_category)
 
 @blueprint.route('/primary_key_llm/<schema>/<tablename>', methods=['GET','POST'])
 def llm_primary_key(schema: str, tablename:str):
@@ -634,8 +817,13 @@ def llm_primary_key(schema: str, tablename:str):
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', segment='primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Find a primary key for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt))        
 
 @blueprint.route('/table_llm/<schema>/<tablename>', methods=['GET','POST'])
 def llm_table(schema: str, tablename:str):
@@ -644,10 +832,16 @@ def llm_table(schema: str, tablename:str):
     ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_table_format(ddl=ddl_str)
     if request.method == 'GET':
-        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze table definition for {schema}.{tablename}")
+        mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
+        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, mermaid_code=mermaid_graph, title=f"Analyze table definition for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt), title=f"Analyze table definition for {schema}.{tablename}") 
 
 @blueprint.route('/table_llm_guidelines/<schema>/<tablename>', methods=['GET','POST'])
 def llm_table_guidelines(schema: str, tablename:str):
@@ -656,12 +850,54 @@ def llm_table_guidelines(schema: str, tablename:str):
     ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_with_sql_quide(ddl=ddl_str, guidelines=config.get_config_value("LLM_SQL_GUIDELINES"))
     if request.method == 'GET':
-        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
+        mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
+        return render_template('home/primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", mermaid_code=mermaid_graph, llm_prompt=llm_prompt, title=f"Analyze SQL conventions for {schema}.{tablename}")
     else:
-        chatgpt_response=llm.query_chatgpt(llm_prompt)
-        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response)        
+        try:
+            chatgpt_response=llm.query_chatgpt(llm_prompt)
+        except Exception as e1:
+            tb = traceback.format_exc()
+            print(tb)
+            return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+        return render_template('home/chatgpt.html', chatgpt_response=chatgpt_response, chatgpt_query=llm.render_markdown(llm_prompt), title=f"Analyze SQL conventions for {schema}.{tablename}")        
 
-
+@blueprint.route('/table_tetris/<schema>/<tablename>', methods=['GET'])
+def tetris_table(schema: str, tablename:str):
+    try:
+        tables = []
+        tables.append (f"{schema}.{tablename}")
+        ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+        
+        tetris_sql = database.get_query_by_id('tetris_play')
+        tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
+        tetris_result = database.generic_select_with_sql(session, tetris_sql)
+        tetris_result_sql = "-- Create Tetris table DDL and copy source data\n" +tetris_result[0]['create_table_tetris_ddl']
+        tetris_result_sql = tetris_result_sql.replace("\\n", "\n")
+        tetris_result_sql += "\n\n" + "-- Alter table with constraints and indexes\n" + tetris.extract_post_create_ddl(ddl_str, schema, tablename)
+        tetris_result_sql += "\n\n" + """
+    -- pgAssistant notice:
+    -- The final table swap (dropping the original table and renaming the _tetris table)
+    -- is NOT automatically generated.
+    --
+    -- Renaming a table may NOT have the expected effect:
+    -- dependencies such as foreign keys, views, or application references
+    -- may still point to the original table (renamed), not the new one.
+    --
+    -- You may need to:
+    --   - drop and recreate foreign keys
+    --   - drop and recreate dependent views
+    --   - validate application dependencies
+    --
+    -- Please review and execute the final migration steps manually.
+    """
+        tetris_result_sql=ddl.sql_to_html(tetris_result_sql)
+        
+        return render_template('home/tetris.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", tetris=tetris_result_sql, title=f"Postgres column Tetris for {schema}.{tablename}")
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
+        
 # Helper - Extract current page name from request
 def get_segment(request):
     try:

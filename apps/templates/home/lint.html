@@ -1,56 +1,191 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Settings {% endblock %} 
+{% block title %}Format SQL{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .format-page-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .format-muted {
+    color: #6c757d;
+  }
+
+  .format-summary-card,
+  .format-section-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+  }
+
+  .format-kpi {
+    border-radius: 0.85rem;
+    background: #f8f9fa;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .format-kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+  }
+
+  .format-kpi-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0;
+  }
+
+  .format-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .format-subtle-box {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.85rem;
+    padding: 1rem;
+  }
+
+  .format-code-area {
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-size: 0.92rem;
+    white-space: pre;
+    resize: vertical;
+  }
+
+  .format-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .format-copy-status {
+    font-size: 0.875rem;
+    color: #198754;
+    display: none;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
+<div class="container-fluid py-4">
 
-        <div class="row">
-        <div class="col-12 col-xl-8">
-            <div class="card card-body border-0 shadow mb-4">
-                <h2 class="h5 mb-4">Lint my SQL with Sqlfluff</h2>
-                <form method="POST">
-                    <div class="row">
-                        <div class="mb-3">
-                            <label class="form-label">SQL Code to lint</label>
-                            <textarea class="form-control" name="sqlo" id="sqlo" rows="5">{{ sqlo }}</textarea>
-                        </div>
-                    {%if linted %}  
-                    <div>
-                            <div class="mb-3">
-                                <label class="form-label">SQL Code After lint</label>
-                                <textarea class="form-control" name="sqllint" id="sqllint" rows="5">{{ linted }}</textarea>
-                                
-                            </div>
-                            <button onclick="copy()" type="button" class="btn btn-info d-inline-flex align-items-center">
-                                Copy
-                                <svg class="icon icon-xs ms-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" clip-rule="evenodd" /></svg>
-                            </button>
-                            
-                    <div>
-                    {% endif %}   
-                    <div class="mt-3">
-                        <button class="btn btn-gray-800 mt-2 animate-up-2" type="submit">Lint it !</button>
-                    </div>
-                                     
-                </form>
+  <div class="format-page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">Format SQL</h1>
+        <p class="format-muted mb-0">
+          Reformat SQL for better readability with cleaner indentation and layout.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+
+      <div class="card format-summary-card mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <div class="format-kpi">
+                <div class="format-kpi-label">Action</div>
+                <p class="format-kpi-value mb-0">Pretty print SQL</p>
+              </div>
             </div>
-            
+            <div class="col-12 col-md-6">
+              <div class="format-kpi">
+                <div class="format-kpi-label">Goal</div>
+                <p class="format-kpi-value mb-0">Improve readability</p>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div class="card format-section-card">
+        <div class="card-body p-4">
+          <h2 class="h5 mb-4">Pretty print SQL</h2>
+
+          <form method="POST">
+            <div class="mb-4">
+              <div class="format-section-title">Input SQL</div>
+              <div class="format-subtle-box">
+                <label class="form-label" for="sqlo">SQL Code</label>
+                <textarea class="form-control format-code-area" name="sqlo" id="sqlo" rows="8">{{ sqlo }}</textarea>
+              </div>
+            </div>
+
+            {% if linted %}
+            <div class="mb-4">
+              <div class="format-section-title">Formatted output</div>
+              <div class="format-subtle-box">
+                <label class="form-label" for="sqllint">Pretty print</label>
+                <textarea class="form-control format-code-area" name="sqllint" id="sqllint" rows="8" readonly>{{ linted }}</textarea>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="format-actions pt-2">
+              <button class="btn btn-primary" type="submit">Format SQL</button>
+
+              {% if linted %}
+              <button onclick="copyFormattedSql()" type="button" class="btn btn-outline-secondary d-inline-flex align-items-center">
+                Copy
+                <svg class="icon icon-xs ms-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" clip-rule="evenodd" />
+                </svg>
+              </button>
+              <span id="copyStatus" class="format-copy-status">Copied to clipboard</span>
+              {% endif %}
+            </div>
+          </form>
+
+        </div>
+      </div>
 
     </div>
-
-<script>
-    function copy() {
-        let textarea = document.getElementById("sqllint");
-        textarea.select();
-        document.execCommand("copy");
-      }
-</script>
-
+  </div>
+</div>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+  async function copyFormattedSql() {
+    const textarea = document.getElementById("sqllint");
+    const status = document.getElementById("copyStatus");
+    if (!textarea) return;
+
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      if (status) {
+        status.style.display = "inline";
+        setTimeout(() => {
+          status.style.display = "none";
+        }, 1500);
+      }
+    } catch (err) {
+      textarea.select();
+      document.execCommand("copy");
+      if (status) {
+        status.style.display = "inline";
+        setTimeout(() => {
+          status.style.display = "none";
+        }, 1500);
+      }
+    }
+  }
+</script>
+{% endblock javascripts %}

@@ -1,0 +1,365 @@
+{# templates/tools.html #}
+{% extends "layouts/base.html" %}
+
+{% block title %}Tools{% endblock %}
+
+{% block stylesheets %}
+
+
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+  .tool-icon {
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.08);
+    background: rgba(255,255,255,.7);
+  }
+  .tool-card .card { transition: transform .12s ease, box-shadow .12s ease; }
+  .tool-card .card:hover { transform: translateY(-2px); box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.10) !important; }
+  .tool-tags .badge { font-weight: 500; }
+
+  :root {
+    --pg-blue: #336791;
+    --pg-blue-dark: #2b5a7a;
+    --pg-blue-light: #e7f0f7;
+
+    --pg-monitoring: #3c7fb1;
+    --pg-performance: #2f5d88;
+
+    --pg-index: #4b5d6b;
+    --pg-table: #d39e00;
+
+    --pg-dba: #2e7d32;
+    --pg-docs: #4aa3df;
+  }
+
+  /* PostgreSQL main */
+  .badge-pg { background-color: var(--pg-blue); color: #fff; }
+  .btn-pg { background-color: var(--pg-blue); border-color: var(--pg-blue); color: #fff; }
+  .btn-pg:hover { background-color: var(--pg-blue-dark); border-color: var(--pg-blue-dark); color: #fff; }
+
+  /* Monitoring */
+  .badge-monitoring { background-color: var(--pg-monitoring); color: #fff; }
+  .btn-monitoring { background-color: var(--pg-monitoring); border-color: var(--pg-monitoring); color: #fff; }
+
+  /* Performance */
+  .badge-performance { background-color: var(--pg-performance); color: #fff; }
+  .btn-performance { background-color: var(--pg-performance); border-color: var(--pg-performance); color: #fff; }
+
+  /* Indexes */
+  .badge-index { background-color: var(--pg-index); color: #fff; }
+  .btn-index { background-color: var(--pg-index); border-color: var(--pg-index); color: #fff; }
+
+  /* Tables */
+  .badge-table { background-color: var(--pg-table); color: #212529; }
+  .btn-table { background-color: var(--pg-table); border-color: var(--pg-table); color: #212529; }
+
+  /* DBA */
+  .badge-dba { background-color: var(--pg-dba); color: #fff; }
+  .btn-dba { background-color: var(--pg-dba); border-color: var(--pg-dba); color: #fff; }
+
+  /* Docs */
+  .badge-docs { background-color: var(--pg-docs); color: #fff; }
+  .btn-docs { background-color: var(--pg-docs); border-color: var(--pg-docs); color: #fff; }
+
+  /* ----- FIX: category pills with guaranteed contrast on light background ----- */
+  .pill-cat {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .22rem .55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.10);
+    font-size: .85rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .pill-primary   { background: rgba(13,110,253,.12); border-color: rgba(13,110,253,.25); color: #0a58ca; }
+  .pill-secondary { background: rgba(108,117,125,.14); border-color: rgba(108,117,125,.25); color: #495057; }
+  .pill-success   { background: rgba(25,135,84,.12);  border-color: rgba(25,135,84,.25);  color: #146c43; }
+  .pill-danger    { background: rgba(220,53,69,.12);  border-color: rgba(220,53,69,.25);  color: #b02a37; }
+  .pill-warning   { background: rgba(255,193,7,.18);  border-color: rgba(255,193,7,.30);  color: #8a6d00; }
+  .pill-info      { background: rgba(13,202,240,.16); border-color: rgba(13,202,240,.30); color: #087990; }
+  .pill-light     { background: rgba(248,249,250,.95); border-color: rgba(0,0,0,.10); color: #495057; }
+  .pill-dark      { background: rgba(33,37,41,.12);   border-color: rgba(33,37,41,.25);   color: #212529; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  {# Optional: pre-selected category passed from Flask as selected_category (e.g. "database") #}
+  {% set selected_category = selected_category|default('all') %}
+  {% set selected_category = selected_category|lower %}
+
+  {# ---------------- Category pill / button mapping ---------------- #}
+  {# NOTE: CAT_BADGE now maps to pill classes (not Bootstrap text-bg*) to avoid white-on-white. #}
+  {% set CAT_BADGE = {
+    'performance': 'pill-cat pill-primary',
+    'sql': 'pill-cat pill-success',
+    'catalog': 'pill-cat pill-warning',
+    'core': 'pill-cat pill-secondary',
+    'monitoring': 'pill-cat pill-info',
+    'database': 'pill-cat pill-primary',
+    'tables': 'pill-cat pill-warning',
+    'indexes': 'pill-cat pill-secondary',
+    'issues': 'pill-cat pill-danger',
+    'dba': 'pill-cat pill-success',
+    'docs': 'pill-cat pill-info',
+    'auth': 'pill-cat pill-light'
+  } %}
+
+  {% set BTN_CLASS = {
+    'performance': 'btn-performance',
+    'sql': 'btn-success',
+    'catalog': 'btn-warning',
+    'core': 'btn-secondary',
+    'monitoring': 'btn-monitoring',
+    'database': 'btn-pg',
+    'tables': 'btn-table',
+    'indexes': 'btn-index',
+    'issues': 'btn-danger',
+    'dba': 'btn-dba',
+    'docs': 'btn-docs',
+    'auth': 'btn-outline-danger'
+  } %}
+
+  {# ---------------- Macro: premium card ---------------- #}
+  {% macro tool_card(title, href, cat, icon, subtitle='', badges=[], tags=[], keywords='', target_blank=false) -%}
+    {% set cat_l = cat|lower %}
+    <div class="col-12 col-md-6 col-xl-4 tool-card"
+         data-name="{{ keywords|e }}"
+         data-cat="{{ cat_l|e }}">
+
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+
+          <div class="d-flex align-items-start justify-content-between gap-3">
+            <div class="flex-grow-1">
+              <h2 class="h5 mt-2 mb-1">{{ title }}</h2>
+              {% if subtitle %}
+                <p class="text-muted mb-0">{{ subtitle }}</p>
+              {% endif %}
+            </div>
+
+            <div class="tool-icon text-muted flex-shrink-0" aria-hidden="true" title="{{ title }}">
+              <i class="{{ icon }} fs-4"></i>
+            </div>
+          </div>
+
+          {% if (tags and tags|length > 0) or cat_l %}
+          <div class="mt-3 d-flex gap-2 flex-wrap tool-tags">
+            <span class="{{ CAT_BADGE.get(cat_l, 'pill-cat pill-secondary') }}">{{ cat_l|capitalize }}</span>
+            {% for t in tags %}
+              <span class="badge rounded-pill text-bg-light border text-muted">{{ t }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
+            <a class="btn btn-sm {{ BTN_CLASS.get(cat_l, 'btn-secondary') }}"
+               href="{{ href }}"
+               {% if target_blank %}target="_blank"{% endif %}>
+              Open <i class="bi bi-arrow-right-short ms-1"></i>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  {%- endmacro %}
+
+  <!-- Header -->
+  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
+    <div>
+      <div class="text-muted small">Quick access to built-in utilities</div>
+    </div>
+
+    <!-- Search / filters -->
+    <form class="d-flex flex-column flex-sm-row gap-2" role="search" onsubmit="return false;">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input id="toolsSearch" class="form-control" type="search" placeholder="Search tools…" aria-label="Search">
+      </div>
+
+      <select id="toolsFilter" class="form-select" style="min-width: 220px;">
+        <option value="all" {% if selected_category == 'all' %}selected{% endif %}>All categories</option>
+        <option value="performance" {% if selected_category == 'performance' %}selected{% endif %}>Performance</option>
+        <option value="sql" {% if selected_category == 'sql' %}selected{% endif %}>SQL</option>
+        <option value="catalog" {% if selected_category == 'catalog' %}selected{% endif %}>Catalog</option>
+        <option value="core" {% if selected_category == 'core' %}selected{% endif %}>Core</option>
+        <option value="monitoring" {% if selected_category == 'monitoring' %}selected{% endif %}>Monitoring</option>
+        <option value="database" {% if selected_category == 'database' %}selected{% endif %}>Database</option>
+        <option value="tables" {% if selected_category == 'tables' %}selected{% endif %}>Tables</option>
+        <option value="indexes" {% if selected_category == 'indexes' %}selected{% endif %}>Indexes</option>
+        <option value="issues" {% if selected_category == 'issues' %}selected{% endif %}>Issues</option>
+        <option value="dba" {% if selected_category == 'dba' %}selected{% endif %}>DBA Corner</option>
+        <option value="docs" {% if selected_category == 'docs' %}selected{% endif %}>Docs</option>
+        <option value="auth" {% if selected_category == 'auth' %}selected{% endif %}>Auth</option>
+      </select>
+    </form>
+  </div>
+
+  <!-- Tools grid -->
+  <div class="row g-3" id="toolsGrid">
+
+    {# --------------- Top tools --------------- #}
+    {{ tool_card(
+      'pgTune', '/pgtune.html', 'performance', 'bi bi-speedometer2',
+      'Generate Postgres configuration suggestions based on hardware and workload assumptions.',
+      badges=['Recommended'],
+      tags=['shared_buffers','work_mem','effective_cache_size','maintenance_work_mem'],
+      keywords='pgtune tuning postgres configuration performance'
+    ) }}
+
+    {{ tool_card(
+      'Lint my SQL', '/lint.html', 'sql', 'bi bi-code-slash',
+      'Format messy SQL into clean, readable queries.',
+      badges=['Static checks'],
+      tags=['sql-formatter'],
+      keywords='lint my sql linter rules anti-patterns'
+    ) }}
+
+    {{ tool_card(
+      'myQueries', '/myqueries.html', 'catalog', 'bi bi-journal-text',
+      'Manage your saved SQL snippets, custom diagnostics queries, and quick actions.',
+      badges=['Personal'],
+      tags=['snippets','favorites','share'],
+      keywords='myqueries saved queries snippets library favorites'
+    ) }}
+
+    {# --------------- Always visible --------------- #}
+    {{ tool_card(
+      'Connexion Settings', '/database.html', 'core', 'bi bi-sliders',
+      'Configure connection to your PostgreSQL instance.',
+      tags=['host','port','user','ssl'],
+      keywords='connexion settings database connection'
+    ) }}
+
+    {{ tool_card(
+      'Documentation', 'https://beh74.github.io/pgassistant-blog/', 'docs', 'bi bi-book',
+      'Open the pgAssistant documentation website.',
+      tags=['guides','how-to','blog'],
+      keywords='documentation docs blog help guide',
+      target_blank=true
+    ) }}
+
+    {# --------------- Connected-only --------------- #}
+    {% if session['db_host'] %}
+
+      {{ tool_card(
+        'Dashboard', '/dashboard.html', 'monitoring', 'bi bi-graph-up',
+        'Global overview of the connected database.',
+        tags=['overview','health','metrics'],
+        keywords='dashboard overview metrics'
+      ) }}
+
+      {{ tool_card(
+        'Table definition helper', '/tables_cards.html', 'tables', 'bi bi-table',
+        'Helper to design/validate table definitions.',
+        tags=['conventions','rfc','tetris'],
+        keywords='table definition helper rfc ddl'
+      ) }}
+
+      {{ tool_card(
+        'Top queries', '/topqueries.html', 'monitoring', 'bi bi-trophy',
+        'Analyze most impactful queries.',
+        tags=['pg_stat_statements','latency','calls'],
+        keywords='top queries pg_stat_statements slow queries'
+      ) }}
+
+      {{ tool_card(
+        'Rank queries', '/rankqueries.html', 'monitoring', 'bi bi-award',
+        'Rank queries by multiple criteria.',
+        tags=['scoring','ranking','insights'],
+        keywords='rank queries scoring'
+      ) }}
+
+      {{ tool_card(
+        'Statistics', '/stats.html', 'monitoring', 'bi bi-bar-chart',
+        'General stats and activity insights.',
+        tags=['sessions','locks','io'],
+        keywords='statistics stats activity'
+      ) }}
+
+      {% set db_items = [
+        ('Modules', '/generic/database_modules', 'modules extensions', 'bi bi-boxes', 'Database modules/extensions view.', ['extensions','modules','preload']),
+        ('All Settings', '/generic/database_settings', 'settings parameters', 'bi bi-gear', 'Browse all settings.', ['parameters','config']),
+        ('Archive Settings', '/generic/database_archive_settings', 'archive wal', 'bi bi-archive', 'WAL/archive settings overview.', ['archive','wal']),
+        ('Activity', '/generic/database_activity', 'activity sessions', 'bi bi-activity', 'Sessions, locks, waits.', ['sessions','locks','waits']),
+        ('Schemas', '/generic/database_schemas', 'schemas namespaces', 'bi bi-diagram-3', 'Schemas inventory & owners.', ['schemas','owners']),
+        ('Conflicts', '/generic/database_conflicts', 'conflicts', 'bi bi-exclamation-octagon', 'Conflicts.', ['conflicts'])
+      ] %}
+      {% for label, href, kw, icon, subtitle, tags in db_items %}
+        {{ tool_card('Database · ' ~ label, href, 'database', icon, subtitle, tags=tags, keywords='database ' ~ label|lower ~ ' ' ~ kw) }}
+      {% endfor %}
+
+      {% set table_items = [
+        ('Tables statistics', '/generic/table_io', 'io stats', 'bi bi-hdd-network', 'I/O statistics per table.', ['io','reads','writes']),
+        ('Tables size', '/generic/table_size', 'size bloat', 'bi bi-arrows-fullscreen', 'Size, TOAST and bloat indicators.', ['size','toast','bloat']),
+        ('Tables columns stats', '/generic/table_columns_stats', 'columns stats ndistinct', 'bi bi-list-columns', 'Column stats (ndistinct, null_frac…).', ['columns','stats','ndistinct'])
+      ] %}
+      {% for label, href, kw, icon, subtitle, tags in table_items %}
+        {{ tool_card('Tables · ' ~ label, href, 'tables', icon, subtitle, tags=tags, keywords='tables ' ~ label|lower ~ ' ' ~ kw) }}
+      {% endfor %}
+
+      {% set index_items = [
+        ('All indexes', '/generic/index_definition', 'definition ddl', 'bi bi-journal-code', 'Inventory of indexes & definitions.', ['definition','ddl','btree']),
+        ('Sequential scans', '/generic/index_seqscan', 'seq scan', 'bi bi-lightning-charge', 'Identify seq-scan hotspots.', ['seqscan','hotspots','opportunity']),
+        ('Unused indexes', '/generic/index_unused', 'unused idx', 'bi bi-trash', 'Candidate indexes to drop.', ['unused','idx_scan','cleanup']),
+        ('Indexes usage', '/generic/index_usage', 'usage', 'bi bi-pie-chart', 'Usage & efficiency indicators.', ['usage','hit ratio','scans']),
+        ('Indexes IO', '/generic/index_io', 'io', 'bi bi-hdd', 'I/O profile for indexes.', ['io','reads','writes'])
+      ] %}
+      {% for label, href, kw, icon, subtitle, tags in index_items %}
+        {{ tool_card('Indexes · ' ~ label, href, 'indexes', icon, subtitle, tags=tags, keywords='indexes ' ~ label|lower ~ ' ' ~ kw) }}
+      {% endfor %}
+
+      {% set issue_items = [
+        ('Tables without PK', '/primary_key.html', 'no pk primary key', 'bi bi-key', 'Find tables missing a primary key.', ['primary key','schema','risk']),
+        ('Redundant Indexes', '/generic/issue_idx_redundant', 'duplicate redundant', 'bi bi-layers', 'Detect duplicated/overlapping indexes.', ['redundant','duplicate','waste']),
+        ('Wrong data types on FK', '/generic/issue_idx_fk_datatype', 'fk datatype', 'bi bi-intersect', 'Spot FK datatype mismatches.', ['fk','datatype','integrity']),
+        ('Missing indexes on FK', '/generic/issue_idx_fk_missing', 'fk missing index', 'bi bi-link-45deg', 'Find FKs missing supporting indexes.', ['fk','missing','performance'])
+      ] %}
+      {% for label, href, kw, icon, subtitle, tags in issue_items %}
+        {{ tool_card('Issues · ' ~ label, href, 'issues', icon, subtitle, tags=tags, keywords='issues ' ~ label|lower ~ ' ' ~ kw) }}
+      {% endfor %}
+
+      {% set dba_items = [
+        ('Tables Needing Analyze', '/generic/dba_action_table_analyze', 'analyze autovacuum', 'bi bi-clipboard-data', 'Tables where ANALYZE is recommended.', ['analyze','planner','stats']),
+        ('Database report', '/dba_report', 'report summary', 'bi bi-file-earmark-text', 'Generate a consolidated database report.', ['report','summary','health'])
+      ] %}
+      {% for label, href, kw, icon, subtitle, tags in dba_items %}
+        {{ tool_card('DBA Corner · ' ~ label, href, 'dba', icon, subtitle, tags=tags, keywords='dba ' ~ label|lower ~ ' ' ~ kw) }}
+      {% endfor %}
+
+      {{ tool_card('Logout', '/logout', 'auth', 'bi bi-box-arrow-right', 'End the current session.', tags=['session','sign out'], keywords='logout sign out') }}
+
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (function () {
+    const search = document.getElementById("toolsSearch");
+    const filter = document.getElementById("toolsFilter");
+    const cards = Array.from(document.querySelectorAll(".tool-card"));
+
+    function apply() {
+      const q = (search.value || "").toLowerCase().trim();
+      const cat = filter.value;
+
+      cards.forEach(card => {
+        const hay = (card.getAttribute("data-name") || "").toLowerCase();
+        const c = (card.getAttribute("data-cat") || "all").toLowerCase();
+        card.style.display = ((!q || hay.includes(q)) && (cat === "all" || c === cat)) ? "" : "none";
+      });
+    }
+
+    search.addEventListener("input", apply);
+    filter.addEventListener("change", apply);
+    apply();
+  })();
+</script>
+{% endblock %}

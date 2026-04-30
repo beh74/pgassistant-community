@@ -24,3 +24,5 @@ pymdown-extensions>=10.0
 pygments>=2.19.2
 sqlparse
 sqlglot
+hvac
+pyyaml

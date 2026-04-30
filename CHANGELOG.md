@@ -1,4 +1,212 @@
+
+
+
 # Change Log
+
+## [2.8.0] - 2026-04-28
+
+## Improvements
+
+- Introduced **Global Advisor (initial version)**  
+  A first implementation of a global analysis engine that aggregates multiple database signals (queries, schema, statistics) to provide higher-level recommendations.  
+  This feature is experimental and will evolve in future releases with more advanced diagnostics and prioritization logic.
+
+- Improved issue detection and accuracy:
+  - **Datatype mismatch on foreign keys**  
+    Enhanced detection logic to better identify inconsistencies between referencing and referenced columns, reducing false positives and improving recommendation relevance.
+  
+  - **Missing indexes on foreign keys**  
+    Optimized analysis to more reliably detect absent indexes on foreign key columns, with clearer and more actionable recommendations.
+
+## [2.7.5] - 2026-21-04
+
+## Bug Fix
+
+- Bundle Mermaid.js locally to eliminate external CDN dependency
+- Bundle Bootstrap Icons locally to eliminate external CDN dependency
+
+## [2.7.4] - 2026-20-04
+
+## Improvements
+
+- UI/UX refinements across the application.
+
+
+## [2.7.3] - 2026-15-04
+
+## Improvements
+
+- Improved **Rank Queries** scoring by taking workload share into account:
+  - ranking now gives more weight to queries representing a large share of total execution time
+  - call frequency and I/O share are better reflected in the priority score
+- Added new **Rank Queries** workload metrics in query cards:
+  - load share
+  - calls share
+  - I/O share
+- Improved **Rank Queries** UI with a more adaptive card layout for wide screens
+
+
+## [2.7.2] - 2026-09-04
+
+## Improvements
+
+- Refactored Rank Queries
+- Improved query parameter detection, including better type inference from PostgreSQL
+- Enhanced SQL Advisor: Automatically orders multi-column index candidates using pg_stats (cardinality-aware) ; Displays column statistics systematically when candidate columns are detected
+- Continued UI/UX refinements across the application.
+
+
+## [2.7.1] - 2026-09-04
+
+## Improvements
+
+- Continued UI/UX refinements across the application.
+
+## Bug Fixes
+
+- Fixed a search issue in the Table Definition Helper that prevented some tables from being found correctly.
+
+## [2.7] - 2026-05-04
+
+## Improvements
+
+- Many UI/UX improvements : We’ve hidden a bunch of “Easter eggs” in this release… except they’re all actual features and improvements. Happy hunting!
+- Advisor code refactor
+- Play tetris is now handling numeric data types
+
+
+## [2.6.1] - 2026-03-04
+
+## Improvements
+- Major improvements on Advisor:
+  - Added support for detecting and reporting actual access paths (Seq Scan, Index Scan, Bitmap, etc.)
+  - Display of used index name and full index definition when applicable
+  - Detection of planner misestimation (gap between estimated vs actual rows)
+  - Improved visibility of filters and candidate columns extracted from execution plans
+  - Systematic inclusion of column statistics (n_distinct, null_frac, MCV, histogram)
+  - More robust handling of predicates without requiring full SQL parsing
+  - Enhanced recommendations with better contextual explanations
+  - UI improvements: clearer grouping of information (access path, filter, stats, index usage)
+  - Recommendations are now sorted by confidence (SAFE > REVIEW > NONE) for better prioritization
+
+## Bug Fixes
+- On top queries, reset pg_stat_statements produces an error
+
+## [2.6] - 2026-28-03
+
+### Added
+- Introduced **SQL Advisor**, a new **safe-by-design** advisor focused on SQL query analysis and guidance.
+  It is designed to provide helpful recommendations while staying conservative and avoiding risky automated actions.
+
+### Improved
+- Top queries are now displayed as **cards**, making them easier to scan, compare, and review visually.
+
+## [2.5.3] - 2026-16-03
+
+## Improvements
+-	Improved the accuracy of SQL query parameter discovery, leading to better detection and typing of query parameters.
+
+## Bug Fixes
+-	Fixed pagination issues in the Table Pagination Helper view where all tables could be displayed instead of the selected page.
+-	Improved DDL extraction by properly quoting schema and table names when calling pg_dump
+
+## User Interface
+-	Added a modal dialog when executing a SQL suggestion. The dialog now displays:
+- the SQL query being executed,
+-	the execution status,
+- the execution time,
+-	and the execution result.
+
+
+## [2.5.2] - 2026-28-02
+
+### Features
+
+- Added a [full menu](media/tools.png?raw=1) (click on the pgAssistant menu to open it)
+- Optimized some queries
+- Menu refactoring : no more submenus / using the main menu with filter
+- Review the Table definition helper with card, table size and table rows (estimated)
+
+### Bug fixes
+
+- On analyze form, lookup on column values are not unique ;
+
+## [2.5.1] - 2026-26-02
+
+### Features
+
+### Improved Analyze Query – Extended DDL Scope
+
+The **analyze query** logic has been deeply reworked to improve schema context resolution.
+
+The DDL provided to the LLM now includes:
+
+- All tables detected through SQL syntactic analysis  
+- **Plus** all tables effectively used during query execution by the `ANALYZE` query  
+
+In particular, when a query references views, the system now also includes:
+
+- The view definitions  
+- The underlying tables used by those views  
+
+This extended DDL scope ensures the LLM receives a complete structural representation of the effective data model involved in the query, significantly improving analysis accuracy for queries involving views and indirect dependencies.
+
+### Analyze Query UI Improvements
+
+The **Analyze Query** form has been redesigned to improve readability and navigation.  
+It now includes three dedicated tabs:
+
+- **Query Plan Insights**
+- **Relational View**
+- **Statistics**
+
+This tab-based layout provides clearer separation of concerns and enhances the overall analysis workflow.
+
+## [2.5.0] - 2026-18-02
+
+### Features
+
+- On analyze query form, added a **Relational View** between the tables involved in the query.
+- On analyze query form, added a link to explain.dalibo.com (PEV2 tool)
+- On analyze query form, classifies a dominant factor:
+      - planner dominated
+      - execution dominated
+      - io dominated
+      - cpu dominated
+- Added a **Relational View** to the Table Definition Helpers to visualize foreign key dependencies.
+
+### Bug fixes
+
+- get_genius_parameters fails sometimes if the query is using ARRAY expression.
+
+## [2.4.1] - 2026-08-02
+
+### Features
+
+- Introduced adaptive LLM context handling. pgAssistant now estimates prompt size and automatically selects safe context limits and output budgets depending on the LLM model family. This optimizes large query-analysis prompts (DDL, statistics, EXPLAIN JSON), avoids silent truncation on long inputs, and improves compatibility with both Ollama and OpenAI-compatible providers.
+- Added "LLM Query" on all LLM forms
+
+
+### Bug fixes
+
+- Menu DBA Corner / Database report : menu is not selected after report generation.
+
+
+## [2.4.0] - 2026-07-02
+
+### Features
+
+- Added a **DBA Corner** menu (initial feature: tables requiring ANALYZE and database report)
+- Reporting API: added a **Tables requiring ANALYZE** section
+- ANALYZE query: refactored with execution plan insights (by node type, table, index, and top-cost nodes)
+- Table Definition Helper: added **Column Tetris** support. Column Tetris is a physical row layout optimization technique in PostgreSQL that reorders table columns to minimize internal padding caused by alignment constraints in heap tuples.
+- Foreign key missing index detection is now stricter: only fully matching indexes are considered valid.
+- Updated the LLM Analyze form to display the query sent to the LLM in an accordion layout.
+
+### Bug fixes
+
+- When LLM API calls fails, http 500 error. Display the error.
+
 
 ## [2.3.1] - 2026-23-01
 

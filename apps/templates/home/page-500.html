@@ -1,38 +1,229 @@
 {% extends "layouts/base-fullscreen.html" %}
 
-{% block title %} Error 500 {% endblock %} 
+{% block title %}Error 500{% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .error-traceback-box {
+    background: #f8f9fa;
+  }
+
+  .error-traceback {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #374151;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow: auto;
+    font-family: var(--bs-font-monospace, monospace);
+  }
+  
+  .error-page-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 2rem 0;
+    background: #f8f9fa;
+  }
+
+  .error-card {
+    border: 0;
+    box-shadow: 0 0.125rem 0.75rem rgba(17, 24, 39, 0.10);
+    border-radius: 1.25rem;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .error-code-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(220, 53, 69, 0.10);
+    color: #dc3545;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .error-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+    color: #1f2937;
+  }
+
+  .error-lead {
+    font-size: 1rem;
+    color: #6b7280;
+    line-height: 1.65;
+    margin-bottom: 1.25rem;
+  }
+
+  .error-box {
+    background: #f8f9fa;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.9rem;
+    padding: 1rem;
+  }
+
+  .error-box-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+  }
+
+  .error-box-message {
+    margin-bottom: 0;
+    color: #374151;
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .error-side-panel {
+    height: 100%;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    border-left: 1px solid rgba(17, 24, 39, 0.06);
+  }
+
+  .error-side-icon {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    color: #336791;
+    margin-bottom: 1rem;
+  }
+
+  .error-side-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+
+  .error-side-text {
+    color: #6b7280;
+    line-height: 1.6;
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 991.98px) {
+    .error-side-panel {
+      border-left: 0;
+      border-top: 1px solid rgba(17, 24, 39, 0.06);
+    }
+
+    .error-title {
+      font-size: 1.7rem;
+    }
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
+<main class="error-page-shell">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-xl-10">
+        <div class="card error-card">
+          <div class="row g-0">
 
-    <main>
-        <section class="vh-100 d-flex align-items-center justify-content-center">
-            <div class="container">
-                <div class="row align-items-center ">
-                    <div class="col-12 col-lg-5 order-2 order-lg-1 text-center text-lg-left">
-                        <h1 class="mt-5">Something has gone <span class="text-primary">seriously</span> wrong</h1>
-                        
-                        <p class="lead my-4"><b>{{ err }}</b></p>
-                        <a href="/database.html" class="btn btn-gray-800 d-inline-flex align-items-center justify-content-center mb-4">
-                            <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
-                            Back to homepage
-                        </a>
-                        <a href="https://github.com/nexsol-technologies/pgassistant/issues" class="btn btn-gray-800 d-inline-flex align-items-center justify-content-center mb-4">
-                            <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
-                            Report an issue
-                        </a>
-                    </div>
-                    <div class="col-12 col-lg-7 order-1 order-lg-2 text-center d-flex align-items-center justify-content-center">
-                        <img class="img-fluid w-75" src="{{ config.ASSETS_ROOT }}/img/illustrations/500.svg" alt="500 Server Error">
-                    </div>
+            <div class="col-12 col-lg-7">
+              <div class="card-body p-4 p-lg-5">
+                <div class="error-code-badge mb-3">Error 500</div>
+
+                <h1 class="error-title">
+                  Something went seriously wrong.
+                </h1>
+
+                <p class="error-lead">
+                  pgAssistant encountered an unexpected server-side error while processing your request.
+                </p>
+
+                <div class="error-box mb-4">
+                  <div class="error-box-label">Technical message</div>
+                  <p class="error-box-message">{{ err }}</p>
                 </div>
-            </div>
-        </section>
-    </main>
 
+                {% if traceback_text %}
+                <div class="error-box error-traceback-box mb-4">
+                  <div class="error-box-label">Traceback</div>
+                  <pre class="error-traceback">{{ traceback_text }}</pre>
+                </div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button"
+                          class="btn btn-primary d-inline-flex align-items-center justify-content-center"
+                          onclick="goBack()">
+                    <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                            d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z"
+                            clip-rule="evenodd">
+                      </path>
+                    </svg>
+                    Go back
+                  </button>
+                  <a href="https://github.com/beh74/pgassistant-community/issues/new?title={{ ('Bug report: ' ~ err)|urlencode }}&body={{ ('## Error message%0A' ~ err ~ '%0A%0A## Traceback%0A```%0A' ~ (traceback_text or 'No traceback available') ~ '%0A```')|urlencode }}"
+                    class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                    target="_blank"
+                    rel="noopener">
+                    <svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M10 1.5a8.5 8.5 0 0 0-2.688 16.564c.425.078.58-.185.58-.41 0-.203-.008-.87-.012-1.577-2.36.513-2.858-1-2.858-1-.385-.98-.94-1.24-.94-1.24-.768-.525.058-.514.058-.514.85.06 1.297.873 1.297.873.755 1.294 1.98.92 2.462.704.076-.547.295-.92.536-1.132-1.884-.214-3.866-.942-3.866-4.192 0-.926.331-1.684.872-2.278-.088-.214-.378-1.076.083-2.244 0 0 .711-.228 2.33.87A8.1 8.1 0 0 1 10 5.588c.723.003 1.452.098 2.134.288 1.618-1.098 2.328-.87 2.328-.87.462 1.168.172 2.03.084 2.244.542.594.87 1.352.87 2.278 0 3.258-1.985 3.975-3.874 4.185.303.262.574.776.574 1.564 0 1.129-.01 2.039-.01 2.317 0 .227.153.492.584.408A8.5 8.5 0 0 0 10 1.5Z" clip-rule="evenodd"></path>
+                    </svg>
+                    Report an issue
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+              <div class="error-side-panel d-flex flex-column justify-content-center h-100 p-4 p-lg-5 text-center text-lg-start">
+                <div class="error-side-icon mx-auto mx-lg-0">
+                  <svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008Z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86 1.82 18a1.875 1.875 0 0 0 1.607 2.813h16.946A1.875 1.875 0 0 0 21.98 18L13.51 3.86a1.875 1.875 0 0 0-3.22 0Z"/>
+                  </svg>
+                </div>
+
+                <div class="error-side-title">What you can do</div>
+                <p class="error-side-text">
+                  Retry the action, go back to the database home page, or report the issue if it persists.
+                  Including the technical message above will make troubleshooting easier.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+function goBack() {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = "/database.html";
+  }
+}
+</script>
+
+{% endblock javascripts %}

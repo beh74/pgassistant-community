@@ -64,6 +64,12 @@
     enabled: true
     template: generic_select_with_sql.md  
 
+  - chapter_name: Table that need to be analyzed
+    query_id: dba_action_table_analyze
+    description: Lists tables that need to be analyzed
+    enabled: true
+    template: generic_issue.md
+
   - chapter_name: Top queries by total time
     query_id: reporting_top_queries_by_time
     description: Top queries by total time
@@ -76,9 +82,15 @@
     enabled: true
     template: generic_select_with_sql.md    
 
-  - chapter_name: Unused indexes (excluding those supporting primary keys, unique constraints)
-    query_id: reporting_unused_indexes
+  - chapter_name: TOP 20 Unused indexes (excluding those supporting primary keys, unique constraints ordered by index size)
+    query_id: index_unused
     description: Unused indexes (excluding those supporting primary keys, unique constraints)
+    enabled: true
+    template: generic_issue.md
+
+  - chapter_name: Tables that need to be analyzed
+    query_id: action_table_analyze
+    description: Tables requiring statistics refresh (HIGH / MEDIUM priority). Lists user tables where PostgreSQL statistics are missing, outdated, or potentially inaccurate due to table size or data churn. 
     enabled: true
     template: generic_issue.md
 

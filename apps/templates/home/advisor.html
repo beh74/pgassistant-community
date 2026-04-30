@@ -1,0 +1,780 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Global Advisor {% endblock %}
+
+{% block stylesheets %}
+<style>
+.global-advisor-page {
+  padding: 1.5rem;
+}
+
+.ga-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ga-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.ga-subtitle {
+  color: #64748b;
+  margin: .25rem 0 0 0;
+}
+
+.ga-toolbar {
+  display: grid;
+  grid-template-columns: 2fr repeat(5, minmax(150px, 1fr));
+  gap: .75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .ga-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .ga-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-count {
+  font-size: .9rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+.ga-empty-state {
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  padding: 2rem;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.ga-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.ga-card.hidden {
+  display: none;
+}
+
+.ga-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.ga-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ga-title-line {
+  margin-top: .25rem;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.ga-rank {
+  border-radius: 999px;
+  padding: .45rem .75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ga-rank-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ga-rank-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ga-rank-low {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ga-note {
+  background: #f8fafc;
+  border-left: 4px solid #94a3b8;
+  padding: .6rem .8rem;
+  border-radius: .5rem;
+  font-size: .85rem;
+  color: #334155;
+  margin-bottom: 1rem;
+}
+
+.ga-target-list {
+  display: grid;
+  gap: .35rem;
+  margin-bottom: 1rem;
+}
+
+.ga-target-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: .75rem;
+  align-items: baseline;
+  padding: .35rem 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.ga-target-row:last-child {
+  border-bottom: 0;
+}
+
+.ga-target-key {
+  color: #64748b;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.ga-target-value {
+  color: #111827;
+  font-weight: 700;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.ga-target-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 992px) {
+  .ga-target-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .ga-target-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-target-item {
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: .85rem;
+  padding: .65rem .75rem;
+}
+
+.ga-target-key {
+  display: block;
+  color: #64748b;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: .2rem;
+}
+
+.ga-target-value {
+  color: #111827;
+  font-weight: 700;
+  font-family: monospace;
+  word-break: break-word;
+}
+
+.ga-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: 1rem;
+}
+
+.ga-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: .3rem .6rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.ga-badge-category {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ga-badge-source {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ga-badge-rows {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.ga-badge-review {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.ga-badge-safe {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ga-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .ga-score-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-score {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: .85rem;
+  padding: .7rem .8rem;
+}
+
+.ga-score-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: .4rem;
+}
+
+.ga-score-bar {
+  height: .45rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ga-score-fill {
+  height: 100%;
+  background: #64748b;
+}
+
+.ga-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: .75rem;
+  color: #475569;
+  font-size: .9rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 992px) {
+  .ga-details {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ga-detail strong {
+  color: #334155;
+}
+
+.ga-sql-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1rem;
+  margin-bottom: .5rem;
+}
+
+.ga-sql-title {
+  font-weight: 700;
+  color: #111827;
+}
+
+.ga-sql-block {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-radius: .85rem;
+  padding: .85rem 1rem;
+  font-size: .85rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.ga-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  .ga-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1700px) {
+  .ga-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ga-card {
+  margin-bottom: 0;
+  height: fit-content;
+}
+
+</style>
+{% endblock stylesheets %}
+
+
+{% block content %}
+
+{% macro human_rows(n) %}
+  {%- if n is none -%}
+    Unknown rows
+  {%- elif n >= 1000000000 -%}
+    {{ "%.1fB"|format(n / 1000000000) }} rows
+  {%- elif n >= 1000000 -%}
+    {{ "%.1fM"|format(n / 1000000) }} rows
+  {%- elif n >= 1000 -%}
+    {{ "%.1fK"|format(n / 1000) }} rows
+  {%- else -%}
+    {{ n }} rows
+  {%- endif -%}
+{% endmacro %}
+
+<div class="global-advisor-page">
+
+  <div class="ga-header">
+    <div>
+      <h3 class="ga-title">Global Advisor</h3>
+      <p class="ga-subtitle">
+        Consolidated recommendations from pgAssistant checks.
+      </p>
+    </div>
+
+    <span class="badge bg-primary">
+      {{ recommendations|length }} recommendations
+    </span>
+  </div>
+
+  {% if errors %}
+    <div class="alert alert-warning">
+      <strong>Some checks failed.</strong>
+      <ul class="mb-0 mt-2">
+        {% for err in errors %}
+          <li>
+            <code>{{ err.recommendation_id }}</code> — {{ err.error }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="ga-toolbar">
+
+    <div>
+      <label class="form-label">Search</label>
+      <input
+        id="gaSearch"
+        type="text"
+        class="form-control"
+        placeholder="Search schema, table, index, SQL..."
+      >
+    </div>
+
+    <div>
+      <label class="form-label">Label</label>
+      <select id="gaLabelFilter" class="form-select">
+        <option value="">All labels</option>
+        {% for label in recommendations | map(attribute='label') | select | unique | sort %}
+          <option value="{{ label }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Table</label>
+      <select id="gaTableFilter" class="form-select">
+        <option value="">All tables</option>
+        {% for table in recommendations | map(attribute='table_name') | select | unique | sort %}
+          <option value="{{ table }}">{{ table }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Category</label>
+      <select id="gaCategoryFilter" class="form-select">
+        <option value="">All categories</option>
+        {% for category in recommendations | map(attribute='category_id.value') | select | unique | sort %}
+          <option value="{{ category }}">{{ category }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Source</label>
+      <select id="gaSourceFilter" class="form-select">
+        <option value="">All sources</option>
+        {% for source in recommendations | map(attribute='source') | select | unique | sort %}
+          <option value="{{ source }}">{{ source }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Minimum rank</label>
+      <select id="gaRankFilter" class="form-select">
+        <option value="0">All</option>
+        <option value="80">80+</option>
+        <option value="60">60+</option>
+        <option value="40">40+</option>
+      </select>
+    </div>
+
+  </div>
+
+  <div class="ga-count">
+    Showing <span id="gaVisibleCount">{{ recommendations|length }}</span>
+    of {{ recommendations|length }} recommendations.
+  </div>
+
+  <div id="gaEmptyState" class="ga-empty-state d-none">
+    No recommendation matches the selected filters.
+  </div>
+
+  <div id="gaRecommendations" class="ga-card-grid">
+
+    {% for rec in recommendations %}
+      {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
+      {% set object_type = rec.object_type.value if rec.object_type.value is defined else rec.object_type %}
+      {% set label = rec.label or rec.source or category %}
+
+      {% if rec.rank >= 80 %}
+        {% set rank_class = "ga-rank-high" %}
+      {% elif rec.rank >= 60 %}
+        {% set rank_class = "ga-rank-medium" %}
+      {% else %}
+        {% set rank_class = "ga-rank-low" %}
+      {% endif %}
+
+      <div
+        class="ga-card"
+        data-label="{{ label or '' }}"
+        data-table="{{ rec.table_name or '' }}"
+        data-schema="{{ rec.schema_name or '' }}"
+        data-category="{{ category or '' }}"
+        data-source="{{ rec.source or '' }}"
+        data-rank="{{ rec.rank }}"
+        data-search="
+          {{ label or '' }}
+          {{ rec.title or '' }}
+          {{ rec.description or '' }}
+          {{ rec.schema_name or '' }}
+          {{ rec.table_name or '' }}
+          {{ rec.index_name or '' }}
+          {{ rec.column_name or '' }}
+          {{ rec.object_name or '' }}
+          {{ rec.improvement_sql or '' }}
+        "
+      >
+
+        <div class="ga-card-header">
+          <div>
+            <div class="ga-label">{{ label }}</div>
+
+            {% if rec.title and rec.title != label %}
+              <div class="ga-title-line">{{ rec.title }}</div>
+            {% endif %}
+          </div>
+
+          <span class="ga-rank {{ rank_class }}">
+            Rank {{ rec.rank }}
+          </span>
+        </div>
+
+        <div class="ga-target-list">
+        {% if rec.schema_name %}
+            <div class="ga-target-row">
+            <span class="ga-target-key">Schema</span>
+            <span class="ga-target-value">{{ rec.schema_name }}</span>
+            </div>
+        {% endif %}
+
+        {% if rec.table_name %}
+            <div class="ga-target-row">
+            <span class="ga-target-key">Table</span>
+            <span class="ga-target-value">{{ rec.table_name }}</span>
+            </div>
+        {% endif %}
+
+        {% if rec.index_name %}
+            <div class="ga-target-row">
+            <span class="ga-target-key">Index</span>
+            <span class="ga-target-value">{{ rec.index_name }}</span>
+            </div>
+        {% endif %}
+
+        {% if rec.column_name %}
+            <div class="ga-target-row">
+            <span class="ga-target-key">Column</span>
+            <span class="ga-target-value">{{ rec.column_name }}</span>
+            </div>
+        {% endif %}
+        </div>
+
+        <div class="ga-badges">
+          <span class="ga-badge ga-badge-category">{{ category }}</span>
+          <span class="ga-badge ga-badge-source">{{ rec.source }}</span>
+
+            {% if rec.estimated_rows is not none %}
+            <span
+                class="ga-badge ga-badge-rows"
+                title="{{ '{:,}'.format(rec.estimated_rows) }} estimated rows"
+            >
+                {{ human_rows(rec.estimated_rows) }}
+            </span>
+            {% endif %}
+
+            {% if rec.manual_review_required %}
+            <span class="ga-badge ga-badge-review">
+                Needs review
+            </span>
+            {% else %}
+            <span class="ga-badge ga-badge-safe">
+                Safe to apply
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="ga-score-grid">
+          <div class="ga-score">
+            <div class="ga-score-header">
+              <span>Confidence</span>
+              <span>{{ rec.confidence if rec.confidence is not none else 'N/A' }}</span>
+            </div>
+            <div class="ga-score-bar">
+              <div
+                class="ga-score-fill"
+                style="width: {{ rec.confidence if rec.confidence is not none else 0 }}%;"
+              ></div>
+            </div>
+          </div>
+
+          <div class="ga-score">
+            <div class="ga-score-header">
+              <span>Impact</span>
+              <span>{{ rec.impact if rec.impact is not none else 'N/A' }}</span>
+            </div>
+            <div class="ga-score-bar">
+              <div
+                class="ga-score-fill"
+                style="width: {{ rec.impact if rec.impact is not none else 0 }}%;"
+              ></div>
+            </div>
+          </div>
+
+          <div class="ga-score">
+            <div class="ga-score-header">
+              <span>Effort</span>
+              <span>{{ rec.effort if rec.effort is not none else 'N/A' }}</span>
+            </div>
+            <div class="ga-score-bar">
+              <div
+                class="ga-score-fill"
+                style="width: {{ rec.effort if rec.effort is not none else 0 }}%;"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        {% if rec.recommendation_note %}
+        <div class="ga-note">
+            {{ rec.recommendation_note }}
+        </div>
+        {% endif %}
+
+        {% if rec.description
+            and "Object:" not in rec.description
+            and rec.description != rec.title %}
+        <p class="text-muted mb-3">{{ rec.description }}</p>
+        {% endif %}
+
+        <div class="ga-details">
+          {% if rec.object_id is not none %}
+            <div class="ga-detail">
+              <strong>Object ID:</strong> {{ rec.object_id }}
+            </div>
+          {% endif %}
+
+          {% if rec.schema_id is not none %}
+            <div class="ga-detail">
+              <strong>Schema ID:</strong> {{ rec.schema_id }}
+            </div>
+          {% endif %}
+
+          {% if rec.table_id is not none %}
+            <div class="ga-detail">
+              <strong>Table ID:</strong> {{ rec.table_id }}
+            </div>
+          {% endif %}
+
+          {% if rec.query_id %}
+            <div class="ga-detail">
+              <strong>Query ID:</strong> {{ rec.query_id }}
+            </div>
+          {% endif %}
+        </div>
+
+        {% if rec.improvement_sql %}
+          <div class="ga-sql-header">
+            <div class="ga-sql-title">Suggested SQL</div>
+
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary copy-sql-btn"
+              data-sql="{{ rec.improvement_sql | e }}"
+            >
+              Copy
+            </button>
+          </div>
+
+          <pre class="ga-sql-block"><code>{{ rec.improvement_sql }}</code></pre>
+        {% endif %}
+
+      </div>
+    {% endfor %}
+
+  </div>
+
+</div>
+
+{% endblock content %}
+
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const searchInput = document.getElementById("gaSearch");
+  const labelFilter = document.getElementById("gaLabelFilter");
+  const tableFilter = document.getElementById("gaTableFilter");
+  const categoryFilter = document.getElementById("gaCategoryFilter");
+  const sourceFilter = document.getElementById("gaSourceFilter");
+  const rankFilter = document.getElementById("gaRankFilter");
+
+  const cards = Array.from(document.querySelectorAll(".ga-card"));
+  const visibleCount = document.getElementById("gaVisibleCount");
+  const emptyState = document.getElementById("gaEmptyState");
+
+  function normalize(value) {
+    return (value || "").toString().toLowerCase().trim();
+  }
+
+  function applyFilters() {
+    const search = normalize(searchInput.value);
+    const label = normalize(labelFilter.value);
+    const table = normalize(tableFilter.value);
+    const category = normalize(categoryFilter.value);
+    const source = normalize(sourceFilter.value);
+    const minRank = parseInt(rankFilter.value || "0", 10);
+
+    let count = 0;
+
+    cards.forEach(function (card) {
+      const cardSearch = normalize(card.dataset.search);
+      const cardLabel = normalize(card.dataset.label);
+      const cardTable = normalize(card.dataset.table);
+      const cardCategory = normalize(card.dataset.category);
+      const cardSource = normalize(card.dataset.source);
+      const cardRank = parseInt(card.dataset.rank || "0", 10);
+
+      const visible =
+        (!search || cardSearch.includes(search)) &&
+        (!label || cardLabel === label) &&
+        (!table || cardTable === table) &&
+        (!category || cardCategory === category) &&
+        (!source || cardSource === source) &&
+        cardRank >= minRank;
+
+      card.classList.toggle("hidden", !visible);
+
+      if (visible) {
+        count += 1;
+      }
+    });
+
+    visibleCount.textContent = count;
+    emptyState.classList.toggle("d-none", count > 0);
+  }
+
+  [
+    searchInput,
+    labelFilter,
+    tableFilter,
+    categoryFilter,
+    sourceFilter,
+    rankFilter
+  ].forEach(function (el) {
+    el.addEventListener("input", applyFilters);
+    el.addEventListener("change", applyFilters);
+  });
+
+  document.querySelectorAll(".copy-sql-btn").forEach(function (button) {
+    button.addEventListener("click", async function () {
+      const sql = button.dataset.sql || "";
+
+      try {
+        await navigator.clipboard.writeText(sql);
+
+        const previousText = button.textContent;
+        button.textContent = "Copied";
+        button.classList.remove("btn-outline-secondary");
+        button.classList.add("btn-success");
+
+        setTimeout(function () {
+          button.textContent = previousText;
+          button.classList.remove("btn-success");
+          button.classList.add("btn-outline-secondary");
+        }, 1200);
+      } catch (err) {
+        alert("Unable to copy SQL to clipboard.");
+      }
+    });
+  });
+});
+</script>
+{% endblock javascripts %}
