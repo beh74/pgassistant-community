@@ -60,6 +60,19 @@
   .connect-info-alert {
     border-radius: 0.85rem;
   }
+
+  .form-control.no-validate:valid {
+    border-color: #ced4da;
+    padding-right: .75rem;
+    background: white;
+  }
+
+  .form-control.no-validate:valid:focus {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.07), 0 0 0 0.18rem rgba(31, 41, 55, 0.25);
+    border-color: #ced4da;
+    padding-right: .75rem;
+    background: white;
+  }
 </style>
 {% endblock stylesheets %}
 
@@ -97,13 +110,13 @@
             </div>
           </div>
 
-          <form method="POST" id="form_connect" novalidate>
+          <form method="POST" id="form_connect" class="needs-validation" novalidate>
             <div class="mb-4">
               <div class="connect-section-title">Connection URI</div>
               <div class="connect-subtle-box">
                 <label for="db_uri" class="form-label">Connection URI (optional)</label>
                 <input
-                  class="form-control"
+                  class="form-control no-validate"
                   id="db_uri"
                   name="db_uri"
                   type="text"
@@ -143,7 +156,7 @@
                       type="number"
                       min="1"
                       max="65535"
-                      placeholder="DB port"
+                      placeholder="Enter database port"
                       required
                     >
                   </div>
@@ -198,19 +211,19 @@
                 </svg>
               </button>
             </div>
-
-            {% if dbinfo['error'] %}
-            <div id="database-error" class="alert alert-danger d-flex align-items-start mt-4" role="alert">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-diamond me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
-                <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
-                <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
-              </svg>
-              <div>{{ dbinfo['error'] }}</div>
-            </div>
-            {% endif %}
           </form>
         </div>
       </div>
+
+        {% if dbinfo['error'] %}
+        <div id="database-error" class="alert alert-danger d-flex align-items-start mt-4" role="alert">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-diamond me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
+            <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
+            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+          </svg>
+          <div>{{ dbinfo['error'] }}</div>
+        </div>
+        {% endif %}
 
     </div>
   </div>
@@ -262,7 +275,9 @@ function myButtonCircle() {
   }
 
   if (!form.checkValidity()) {
-    form.reportValidity();
+    event.preventDefault()
+    event.stopPropagation()
+    form.classList.add('was-validated');
     return;
   }
 

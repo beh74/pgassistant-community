@@ -375,10 +375,6 @@
         Scores and priority levels are computed relative to workload intensity and may be less relevant on low-activity systems.
       </p>
     </div>
-
-    <span class="badge text-bg-secondary" id="rank-count-badge">
-      {{ ranked_queries|length if ranked_queries is defined else 0 }} ranked queries
-    </span>
   </div>
 
   {% if ranked_queries is defined and ranked_queries %}
@@ -392,8 +388,8 @@
             data-bs-placement="top"
             title="Number of queries currently included in this ranking view."
           ></i>
+          <span class="rankqueries-summary-value ">{{ ranked_queries|length }}</span>
         </span>
-        <span class="rankqueries-summary-value">{{ ranked_queries|length }}</span>
       </div>
 
       <div class="rankqueries-summary-card">
@@ -405,9 +401,9 @@
             data-bs-placement="top"
             title="Queries with the highest priority score based on workload contribution, execution cost, cache efficiency, and other ranking signals."
           ></i>
-        </span>
-        <span class="rankqueries-summary-value">
-          {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
+          <span class="rankqueries-summary-value">
+            {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
+          </span>
         </span>
       </div>
 
@@ -420,9 +416,9 @@
             data-bs-placement="top"
             title="Queries considered important to review, but below the Critical threshold."
           ></i>
-        </span>
-        <span class="rankqueries-summary-value">
-          {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
+          <span class="rankqueries-summary-value">
+            {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
+          </span>
         </span>
       </div>
 
@@ -435,15 +431,15 @@
             data-bs-placement="top"
             title="Percentage of total execution time represented by the first 10 ranked queries."
           ></i>
-        </span>
-        <span class="rankqueries-summary-value">
-          {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
-          {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
-          {% if total_all > 0 %}
-            {{ "%.1f"|format((total_top10 / total_all) * 100) }}%
-          {% else %}
-            0.0%
-          {% endif %}
+          <span class="rankqueries-summary-value">
+            {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
+            {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
+            {% if total_all > 0 %}
+              {{ "%.1f"|format((total_top10 / total_all) * 100) }}%
+            {% else %}
+              0.0%
+            {% endif %}
+          </span>
         </span>
       </div>
     </div>
