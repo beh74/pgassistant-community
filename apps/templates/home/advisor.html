@@ -28,7 +28,7 @@
 
 .ga-toolbar {
   display: grid;
-  grid-template-columns: 2fr repeat(5, minmax(150px, 1fr));
+  grid-template-columns: 2fr repeat(4, minmax(150px, 1fr));
   gap: .75rem;
   align-items: end;
   margin-bottom: 1rem;
@@ -386,9 +386,20 @@
       </p>
     </div>
 
-    <span class="badge bg-primary">
-      {{ recommendations|length }} recommendations
-    </span>
+    <div class="d-flex align-items-center gap-2">
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm"
+        data-bs-toggle="modal"
+        data-bs-target="#gaAllSqlModal"
+      >
+        View all suggested SQL
+      </button>
+
+      <span class="badge bg-primary">
+        {{ recommendations|length }} recommendations
+      </span>
+    </div>
   </div>
 
   {% if errors %}
@@ -446,15 +457,6 @@
       </select>
     </div>
 
-    <div>
-      <label class="form-label">Source</label>
-      <select id="gaSourceFilter" class="form-select">
-        <option value="">All sources</option>
-        {% for source in recommendations | map(attribute='source') | select | unique | sort %}
-          <option value="{{ source }}">{{ source }}</option>
-        {% endfor %}
-      </select>
-    </div>
 
     <div>
       <label class="form-label">Minimum rank</label>
@@ -498,7 +500,6 @@
         data-table="{{ rec.table_name or '' }}"
         data-schema="{{ rec.schema_name or '' }}"
         data-category="{{ category or '' }}"
-        data-source="{{ rec.source or '' }}"
         data-rank="{{ rec.rank }}"
         data-search="
           {{ label or '' }}
@@ -517,9 +518,7 @@
           <div>
             <div class="ga-label">{{ label }}</div>
 
-            {% if rec.title and rec.title != label %}
-              <div class="ga-title-line">{{ rec.title }}</div>
-            {% endif %}
+
           </div>
 
           <span class="ga-rank {{ rank_class }}">
@@ -559,7 +558,7 @@
 
         <div class="ga-badges">
           <span class="ga-badge ga-badge-category">{{ category }}</span>
-          <span class="ga-badge ga-badge-source">{{ rec.source }}</span>
+          
 
             {% if rec.estimated_rows is not none %}
             <span
@@ -634,31 +633,7 @@
         <p class="text-muted mb-3">{{ rec.description }}</p>
         {% endif %}
 
-        <div class="ga-details">
-          {% if rec.object_id is not none %}
-            <div class="ga-detail">
-              <strong>Object ID:</strong> {{ rec.object_id }}
-            </div>
-          {% endif %}
 
-          {% if rec.schema_id is not none %}
-            <div class="ga-detail">
-              <strong>Schema ID:</strong> {{ rec.schema_id }}
-            </div>
-          {% endif %}
-
-          {% if rec.table_id is not none %}
-            <div class="ga-detail">
-              <strong>Table ID:</strong> {{ rec.table_id }}
-            </div>
-          {% endif %}
-
-          {% if rec.query_id %}
-            <div class="ga-detail">
-              <strong>Query ID:</strong> {{ rec.query_id }}
-            </div>
-          {% endif %}
-        </div>
 
         {% if rec.improvement_sql %}
           <div class="ga-sql-header">
@@ -683,17 +658,58 @@
 
 </div>
 
+<div class="modal fade" id="gaAllSqlModal" tabindex="-1" aria-labelledby="gaAllSqlModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="gaAllSqlModalLabel">
+          All suggested SQL
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          This export includes all recommendations with suggested SQL, independently of the current search and filters.
+        </p>
+
+        <pre class="ga-sql-block" style="max-height: 65vh;"><code id="gaAllSqlContent">{% for rec in recommendations if rec.improvement_sql %}{% if rec.recommendation_note %}-- {{ rec.recommendation_note | replace('\n', '\n-- ') }}
+{% endif %}{{ rec.improvement_sql }}
+
+{% endfor %}</code></pre>
+      </div>
+
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          id="copyAllSqlBtn"
+        >
+          Copy all SQL
+        </button>
+
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
 {% endblock content %}
 
 
 {% block javascripts %}
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const searchInput = document.getElementById("gaSearch");
   const labelFilter = document.getElementById("gaLabelFilter");
   const tableFilter = document.getElementById("gaTableFilter");
   const categoryFilter = document.getElementById("gaCategoryFilter");
-  const sourceFilter = document.getElementById("gaSourceFilter");
   const rankFilter = document.getElementById("gaRankFilter");
 
   const cards = Array.from(document.querySelectorAll(".ga-card"));
@@ -704,12 +720,56 @@ document.addEventListener("DOMContentLoaded", function () {
     return (value || "").toString().toLowerCase().trim();
   }
 
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    return new Promise(function (resolve, reject) {
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        if (successful) {
+          resolve();
+        } else {
+          reject(new Error("Copy command failed"));
+        }
+      } catch (err) {
+        document.body.removeChild(textarea);
+        reject(err);
+      }
+    });
+  }
+
+  function markCopied(button, originalClass) {
+    const previousText = button.textContent;
+
+    button.textContent = "Copied";
+    button.classList.remove(originalClass);
+    button.classList.add("btn-success");
+
+    setTimeout(function () {
+      button.textContent = previousText;
+      button.classList.remove("btn-success");
+      button.classList.add(originalClass);
+    }, 1200);
+  }
+
   function applyFilters() {
     const search = normalize(searchInput.value);
     const label = normalize(labelFilter.value);
     const table = normalize(tableFilter.value);
     const category = normalize(categoryFilter.value);
-    const source = normalize(sourceFilter.value);
     const minRank = parseInt(rankFilter.value || "0", 10);
 
     let count = 0;
@@ -719,7 +779,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const cardLabel = normalize(card.dataset.label);
       const cardTable = normalize(card.dataset.table);
       const cardCategory = normalize(card.dataset.category);
-      const cardSource = normalize(card.dataset.source);
       const cardRank = parseInt(card.dataset.rank || "0", 10);
 
       const visible =
@@ -727,7 +786,6 @@ document.addEventListener("DOMContentLoaded", function () {
         (!label || cardLabel === label) &&
         (!table || cardTable === table) &&
         (!category || cardCategory === category) &&
-        (!source || cardSource === source) &&
         cardRank >= minRank;
 
       card.classList.toggle("hidden", !visible);
@@ -746,35 +804,54 @@ document.addEventListener("DOMContentLoaded", function () {
     labelFilter,
     tableFilter,
     categoryFilter,
-    sourceFilter,
     rankFilter
   ].forEach(function (el) {
+    if (!el) return;
     el.addEventListener("input", applyFilters);
     el.addEventListener("change", applyFilters);
   });
 
   document.querySelectorAll(".copy-sql-btn").forEach(function (button) {
-    button.addEventListener("click", async function () {
+    button.addEventListener("click", function () {
       const sql = button.dataset.sql || "";
 
-      try {
-        await navigator.clipboard.writeText(sql);
-
-        const previousText = button.textContent;
-        button.textContent = "Copied";
-        button.classList.remove("btn-outline-secondary");
-        button.classList.add("btn-success");
-
-        setTimeout(function () {
-          button.textContent = previousText;
-          button.classList.remove("btn-success");
-          button.classList.add("btn-outline-secondary");
-        }, 1200);
-      } catch (err) {
-        alert("Unable to copy SQL to clipboard.");
-      }
+      copyTextToClipboard(sql)
+        .then(function () {
+          markCopied(button, "btn-outline-secondary");
+        })
+        .catch(function () {
+          alert("Unable to copy SQL to clipboard.");
+        });
     });
   });
+
+  const copyAllSqlBtn = document.getElementById("copyAllSqlBtn");
+
+  if (copyAllSqlBtn) {
+    copyAllSqlBtn.addEventListener("click", function () {
+      const allSqlContent = document.getElementById("gaAllSqlContent");
+
+      if (!allSqlContent) {
+        alert("No SQL content found.");
+        return;
+      }
+
+      const sql = allSqlContent.innerText || allSqlContent.textContent || "";
+
+      if (!sql.trim()) {
+        alert("No SQL to copy.");
+        return;
+      }
+
+      copyTextToClipboard(sql)
+        .then(function () {
+          markCopied(copyAllSqlBtn, "btn-outline-secondary");
+        })
+        .catch(function () {
+          alert("Unable to copy SQL to clipboard.");
+        });
+    });
+  }
 });
 </script>
 {% endblock javascripts %}

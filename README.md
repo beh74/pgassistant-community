@@ -36,7 +36,7 @@ pgAssistant is an open-source tool designed to help developers and DBAs **unders
 It combines:
 
 - Deterministic database analysis  
-- **Global Advisor (deterministic, database-wide analysis)**  
+- [Global Advisor](advisor.md) (deterministic, database-wide analysis)**  
 - Query-level advisor based on real execution plans (`EXPLAIN ANALYZE`)  
 - Full schema inspection (DDL) with automatic relational graph visualization to reveal table dependencies and structural issues  
 - Structural issue detection (missing indexes, redundant indexes, missing foreign keys, datatype inconsistencies)  

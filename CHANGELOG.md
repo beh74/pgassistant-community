@@ -3,6 +3,25 @@
 
 # Change Log
 
+
+## [2.8.2] - 2026-02-03
+
+## Improvements
+
+- Added recommandations to [Global Advisor](advisor.md).
+- Global Advisor : Added a button to view all suggested recommendations and copy them in one click.
+
+## [2.8.1] - 2026-04-29
+
+## Bug Fixes
+
+- Fixed missing `re` import causing a `NameError` when extracting query parameters using regular expressions.
+
+- Fixed connection form validation when using **Connection URI**:  
+  the browser native validation was preventing form submission before URI parsing.  
+  The form now correctly fills connection fields from the URI before validation, allowing a seamless one-click connection.
+
+
 ## [2.8.0] - 2026-04-28
 
 ## Improvements

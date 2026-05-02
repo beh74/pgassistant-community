@@ -1,0 +1,8 @@
+.DS_STORE
+/vendor
+/node_modules
+
+# Python Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
