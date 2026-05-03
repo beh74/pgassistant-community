@@ -168,6 +168,14 @@ This is a design-oriented heuristic. Some workloads intentionally avoid foreign 
 
 ---
 
+## 14. Autovacuum dead tuple cleanup urgency
+
+Tables with a vacuum urgency have exceeded the effective autovacuum dead tuple cleanup threshold. 
+
+**Suggested action:** vacuum table. Dead tuples greatly exceed the effective autovacuum threshold. Autovacuum may be blocked, too slow, under-provisioned, or failing.
+
+---
+
 # Notes and Limitations
 
 ## PostgreSQL statistics reset

@@ -8,8 +8,9 @@
 
 ## Improvements
 
-- Added recommandations to [Global Advisor](advisor.md).
+- Added recommandations to [Global Advisor](advisor.md) - Total of 14 differents recommandations
 - Global Advisor : Added a button to view all suggested recommendations and copy them in one click.
+- Global Advisor : Added a summary 
 
 ## [2.8.1] - 2026-04-29
 

@@ -1,0 +1,1480 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Global Advisor {% endblock %}
+
+{% block stylesheets %}
+<style>
+.global-advisor-page {
+  padding: 1.5rem;
+}
+
+.ga-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ga-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.ga-subtitle {
+  color: #64748b;
+  margin: .25rem 0 0 0;
+}
+
+.ga-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ga-tabs {
+  display: flex;
+  gap: .5rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 1rem;
+}
+
+.ga-tab-btn {
+  border: 0;
+  background: transparent;
+  padding: .85rem 1rem;
+  font-weight: 700;
+  color: #64748b;
+  border-bottom: 3px solid transparent;
+}
+
+.ga-tab-btn.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.ga-tab-panel {
+  display: none;
+}
+
+.ga-tab-panel.active {
+  display: block;
+}
+
+.ga-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 1400px) {
+  .ga-summary-grid {
+    grid-template-columns: repeat(3, minmax(130px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .ga-header {
+    flex-direction: column;
+  }
+
+  .ga-actions {
+    justify-content: flex-start;
+  }
+
+  .ga-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ga-summary-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.ga-summary-value {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.ga-summary-label {
+  margin-top: .35rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.ga-summary-hint {
+  margin-top: .35rem;
+  color: #64748b;
+  font-size: .82rem;
+}
+
+.ga-summary-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .ga-summary-section-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-summary-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  margin-bottom: 1rem;
+}
+
+.ga-summary-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: start;
+  margin-bottom: .85rem;
+}
+
+.ga-summary-panel-title {
+  font-weight: 800;
+  color: #111827;
+  font-size: 1.02rem;
+}
+
+.ga-summary-panel-subtitle {
+  color: #64748b;
+  font-size: .86rem;
+  margin-top: .15rem;
+}
+
+.ga-mini-list {
+  display: grid;
+  gap: .65rem;
+}
+
+.ga-mini-item {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: .85rem;
+  padding: .75rem;
+}
+
+.ga-mini-title {
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: .25rem;
+}
+
+.ga-mini-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.ga-empty-mini {
+  border: 1px dashed #cbd5e1;
+  border-radius: .85rem;
+  padding: 1rem;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.ga-dist-list {
+  display: grid;
+  gap: .55rem;
+}
+
+.ga-dist-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) 48px;
+  gap: .7rem;
+  align-items: center;
+  font-size: .88rem;
+}
+
+.ga-dist-label {
+  font-weight: 700;
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.ga-dist-bar {
+  height: .55rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ga-dist-fill {
+  height: 100%;
+  background: #64748b;
+}
+
+.ga-dist-count {
+  text-align: right;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ga-toolbar {
+  display: grid;
+  grid-template-columns: 2fr repeat(7, minmax(130px, 1fr));
+  gap: .75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 1500px) {
+  .ga-toolbar {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .ga-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .ga-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-count {
+  font-size: .9rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+.ga-empty-state {
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  padding: 2rem;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.ga-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  height: fit-content;
+}
+
+.ga-card.hidden {
+  display: none;
+}
+
+.ga-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.ga-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ga-title-line {
+  margin-top: .25rem;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.ga-rank {
+  border-radius: 999px;
+  padding: .45rem .75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ga-rank-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ga-rank-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ga-rank-low {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ga-note,
+.ga-advisor-text {
+  background: #f8fafc;
+  border-left: 4px solid #94a3b8;
+  padding: .65rem .85rem;
+  border-radius: .5rem;
+  font-size: .85rem;
+  color: #334155;
+  margin-bottom: .75rem;
+}
+
+.ga-advisor-text strong {
+  color: #111827;
+}
+
+.ga-advisor-stack {
+  margin-bottom: 1rem;
+}
+
+.ga-target-list {
+  display: grid;
+  gap: .35rem;
+  margin-bottom: 1rem;
+}
+
+.ga-target-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: .75rem;
+  align-items: baseline;
+  padding: .35rem 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.ga-target-row:last-child {
+  border-bottom: 0;
+}
+
+.ga-target-key {
+  color: #64748b;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.ga-target-value {
+  color: #111827;
+  font-weight: 700;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.ga-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: 1rem;
+}
+
+.ga-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: .3rem .6rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.ga-badge-category {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ga-badge-source {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ga-badge-rows {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.ga-badge-review {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.ga-badge-safe {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ga-badge-risk-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ga-badge-risk-medium {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.ga-badge-risk-low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ga-badge-outcome {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.ga-badge-action {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ga-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .ga-score-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-score {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: .85rem;
+  padding: .7rem .8rem;
+}
+
+.ga-score-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: .4rem;
+}
+
+.ga-score-bar {
+  height: .45rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ga-score-fill {
+  height: 100%;
+  background: #64748b;
+}
+
+.ga-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: .75rem;
+  color: #475569;
+  font-size: .9rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 992px) {
+  .ga-details {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ga-detail strong {
+  color: #334155;
+}
+
+.ga-sql-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1rem;
+  margin-bottom: .5rem;
+}
+
+.ga-sql-title {
+  font-weight: 700;
+  color: #111827;
+}
+
+.ga-sql-block {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-radius: .85rem;
+  padding: .85rem 1rem;
+  font-size: .85rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.ga-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  .ga-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1700px) {
+  .ga-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+{% macro human_rows(n) %}
+  {%- if n is none -%}
+    Unknown rows
+  {%- elif n >= 1000000000 -%}
+    {{ "%.1fB"|format(n / 1000000000) }} rows
+  {%- elif n >= 1000000 -%}
+    {{ "%.1fM"|format(n / 1000000) }} rows
+  {%- elif n >= 1000 -%}
+    {{ "%.1fK"|format(n / 1000) }} rows
+  {%- else -%}
+    {{ n }} rows
+  {%- endif -%}
+{% endmacro %}
+
+{% macro value_or_na(value) %}
+  {{ value if value is not none and value != '' else 'N/A' }}
+{% endmacro %}
+
+{% macro enum_value(value) %}
+  {%- if value.value is defined -%}{{ value.value }}{%- else -%}{{ value }}{%- endif -%}
+{% endmacro %}
+
+{% set ns = namespace(
+  high=0,
+  medium=0,
+  low=0,
+  high_risk=0,
+  medium_risk=0,
+  low_risk=0,
+  manual_review=0,
+  auto_apply=0,
+  quick_wins=0
+) %}
+
+{% for rec in recommendations %}
+  {% set priority = rec.priority or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
+  {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+  {% if priority == 'HIGH' %}{% set ns.high = ns.high + 1 %}{% endif %}
+  {% if priority == 'MEDIUM' %}{% set ns.medium = ns.medium + 1 %}{% endif %}
+  {% if priority == 'LOW' %}{% set ns.low = ns.low + 1 %}{% endif %}
+  {% if risk == 'HIGH' %}{% set ns.high_risk = ns.high_risk + 1 %}{% endif %}
+  {% if risk == 'MEDIUM' %}{% set ns.medium_risk = ns.medium_risk + 1 %}{% endif %}
+  {% if risk == 'LOW' %}{% set ns.low_risk = ns.low_risk + 1 %}{% endif %}
+  {% if rec.manual_review_required %}{% set ns.manual_review = ns.manual_review + 1 %}{% endif %}
+  {% if rec.can_auto_apply %}{% set ns.auto_apply = ns.auto_apply + 1 %}{% endif %}
+  {% if rec.impact is not none and rec.effort is not none and rec.impact >= 60 and rec.effort <= 30 and risk != 'HIGH' %}
+    {% set ns.quick_wins = ns.quick_wins + 1 %}
+  {% endif %}
+{% endfor %}
+
+<div class="global-advisor-page">
+
+  <div class="ga-header">
+    <div>
+      <h3 class="ga-title">Global Advisor</h3>
+      <p class="ga-subtitle">
+        Prioritized database recommendations from pgAssistant checks.
+      </p>
+    </div>
+
+    <div class="ga-actions">
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm"
+        data-bs-toggle="modal"
+        data-bs-target="#gaAllSqlModal"
+      >
+        View all suggested SQL
+      </button>
+
+      <span class="badge bg-primary">
+        {{ recommendations|length }} recommendations
+      </span>
+    </div>
+  </div>
+
+  {% if errors %}
+    <div class="alert alert-warning">
+      <strong>Some checks failed.</strong>
+      <ul class="mb-0 mt-2">
+        {% for err in errors %}
+          <li>
+            <code>{{ err.recommendation_id }}</code> — {{ err.error }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="ga-tabs" role="tablist" aria-label="Global Advisor views">
+    <button type="button" class="ga-tab-btn active" data-ga-tab="summary" role="tab" aria-selected="true">
+      Summary
+    </button>
+    <button type="button" class="ga-tab-btn" data-ga-tab="recommendations" role="tab" aria-selected="false">
+      Recommendations
+    </button>
+  </div>
+
+  <section id="gaTabSummary" class="ga-tab-panel active" role="tabpanel">
+
+    <div class="ga-summary-grid">
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ recommendations|length }}</div>
+        <div class="ga-summary-label">Total recommandations</div>
+        <div class="ga-summary-hint">Detected across enabled checks.</div>
+      </div>
+
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ ns.high }}</div>
+        <div class="ga-summary-label">High priority</div>
+        <div class="ga-summary-hint">Start here first.</div>
+      </div>
+
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ ns.quick_wins }}</div>
+        <div class="ga-summary-label">Quick wins</div>
+        <div class="ga-summary-hint">High impact, low effort.</div>
+      </div>
+
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ ns.high_risk }}</div>
+        <div class="ga-summary-label">High risk</div>
+        <div class="ga-summary-hint">Needs careful planning.</div>
+      </div>
+
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ ns.manual_review }}</div>
+        <div class="ga-summary-label">Manual review</div>
+        <div class="ga-summary-hint">Do not blindly apply.</div>
+      </div>
+
+      <div class="ga-summary-card">
+        <div class="ga-summary-value">{{ errors|length if errors else 0 }}</div>
+        <div class="ga-summary-label">Failed checks</div>
+        <div class="ga-summary-hint">Review check execution errors.</div>
+      </div>
+    </div>
+
+    <div class="ga-summary-section-grid">
+      <div class="ga-summary-panel">
+        <div class="ga-summary-panel-header">
+          <div>
+            <div class="ga-summary-panel-title">High priority</div>
+            <div class="ga-summary-panel-subtitle">Highest priority recommendations to review first.</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary ga-open-recommendations" data-min-rank="80">
+            View high priority
+          </button>
+        </div>
+
+        <div class="ga-mini-list">
+          {% set hp = namespace(count=0) %}
+          {% for rec in recommendations %}
+            {% set priority = rec.priority.value or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
+            {% if hp.count < 5 and priority == 'HIGH' %}
+              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
+              {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+              {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
+              {% set hp.count = hp.count + 1 %}
+              <div class="ga-mini-item">
+                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
+                <div class="ga-mini-meta">
+                  <span class="ga-badge ga-rank-high">Rank {{ rec.rank }}</span>
+                  {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
+                  {% if risk %}<span class="ga-badge ga-badge-risk-{{ risk|lower }}">Risk {{ risk }}</span>{% endif %}
+                  {% if rec.object_name %}<span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>{% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if hp.count == 0 %}
+            <div class="ga-empty-mini">No high priority recommendation detected.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ga-summary-panel">
+        <div class="ga-summary-panel-header">
+          <div>
+            <div class="ga-summary-panel-title">Quick wins</div>
+            <div class="ga-summary-panel-subtitle">Good candidates for early review.</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary ga-open-recommendations" data-quick-wins="true">
+            View quick wins
+          </button>
+        </div>
+
+        <div class="ga-mini-list">
+          {% set qw = namespace(count=0) %}
+          {% for rec in recommendations %}
+            {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+            {% if qw.count < 5 and rec.impact is not none and rec.effort is not none and rec.impact >= 60 and rec.effort <= 30 and risk != 'HIGH' %}
+              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
+              {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
+              {% set qw.count = qw.count + 1 %}
+              <div class="ga-mini-item">
+                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
+                <div class="ga-mini-meta">
+                  <span class="ga-badge ga-badge-safe">Impact {{ rec.impact }}</span>
+                  <span class="ga-badge ga-badge-safe">Effort {{ rec.effort }}</span>
+                  {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
+                  {% if rec.object_name %}<span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>{% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if qw.count == 0 %}
+            <div class="ga-empty-mini">No quick win detected with the current scoring.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ga-summary-panel">
+        <div class="ga-summary-panel-header">
+          <div>
+            <div class="ga-summary-panel-title">High-risk changes</div>
+            <div class="ga-summary-panel-subtitle">Plan these changes carefully.</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary ga-open-recommendations" data-risk="HIGH">
+            View high risk
+          </button>
+        </div>
+
+        <div class="ga-mini-list">
+          {% set hr = namespace(count=0) %}
+          {% for rec in recommendations %}
+            {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+            {% if hr.count < 5 and risk == 'HIGH' %}
+              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
+              {% set action = rec.action_type.value if rec.action_type.value is defined else rec.action_type %}
+              {% set hr.count = hr.count + 1 %}
+              <div class="ga-mini-item">
+                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
+                <div class="ga-mini-meta">
+                  <span class="ga-badge ga-badge-risk-high">Risk HIGH</span>
+                  {% if action %}<span class="ga-badge ga-badge-action">{{ action }}</span>{% endif %}
+                  {% if rec.schema_name and rec.table_name %}
+                    <span class="ga-badge ga-badge-rows">{{ rec.schema_name }}.{{ rec.table_name }}</span>
+                  {% elif rec.object_name %}
+                    <span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>
+                  {% endif %}
+                  {% if rec.requires_maintenance_window %}<span class="ga-badge ga-badge-review">Maintenance window</span>{% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if hr.count == 0 %}
+            <div class="ga-empty-mini">No high-risk recommendation detected.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ga-summary-panel">
+        <div class="ga-summary-panel-header">
+          <div>
+            <div class="ga-summary-panel-title">Priority distribution</div>
+            <div class="ga-summary-panel-subtitle">How recommendations are distributed.</div>
+          </div>
+        </div>
+
+        <div class="ga-dist-list">
+          {% set total = recommendations|length if recommendations|length > 0 else 1 %}
+          <div class="ga-dist-row">
+            <div class="ga-dist-label">High</div>
+            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.high * 100 / total)|round(0, 'floor') }}%;"></div></div>
+            <div class="ga-dist-count">{{ ns.high }}</div>
+          </div>
+          <div class="ga-dist-row">
+            <div class="ga-dist-label">Medium</div>
+            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.medium * 100 / total)|round(0, 'floor') }}%;"></div></div>
+            <div class="ga-dist-count">{{ ns.medium }}</div>
+          </div>
+          <div class="ga-dist-row">
+            <div class="ga-dist-label">Low</div>
+            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.low * 100 / total)|round(0, 'floor') }}%;"></div></div>
+            <div class="ga-dist-count">{{ ns.low }}</div>
+          </div>
+        </div>
+
+        <div class="ga-summary-panel-subtitle" style="margin-top: 1rem; margin-bottom: .6rem;">Recommendations by outcome</div>
+        <div class="ga-dist-list">
+          {% for outcome_item in recommendations | map(attribute='outcome_id') | select | unique | sort %}
+            {% set outcome_value = outcome_item.value if outcome_item.value is defined else outcome_item %}
+            {% set outcome_counter = namespace(count=0) %}
+            {% for rec in recommendations %}
+              {% set rec_outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
+              {% if rec_outcome == outcome_value %}
+                {% set outcome_counter.count = outcome_counter.count + 1 %}
+              {% endif %}
+            {% endfor %}
+            <div class="ga-dist-row">
+              <div class="ga-dist-label">{{ outcome_value }}</div>
+              <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (outcome_counter.count * 100 / total)|round(0, 'floor') }}%;"></div></div>
+              <div class="ga-dist-count">{{ outcome_counter.count }}</div>
+            </div>
+          {% else %}
+            <div class="ga-empty-mini">No outcome metadata available.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <section id="gaTabRecommendations" class="ga-tab-panel" role="tabpanel">
+
+    <div class="ga-toolbar">
+
+      <div>
+        <label class="form-label">Search</label>
+        <input
+          id="gaSearch"
+          type="text"
+          class="form-control"
+          placeholder="Search schema, table, index, SQL..."
+        >
+      </div>
+
+      <div>
+        <label class="form-label">Label</label>
+        <select id="gaLabelFilter" class="form-select">
+          <option value="">All labels</option>
+          {% for label in recommendations | map(attribute='label') | select | unique | sort %}
+            <option value="{{ label }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Table</label>
+        <select id="gaTableFilter" class="form-select">
+          <option value="">All tables</option>
+          {% for table in recommendations | map(attribute='table_name') | select | unique | sort %}
+            <option value="{{ table }}">{{ table }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Category</label>
+        <select id="gaCategoryFilter" class="form-select">
+          <option value="">All categories</option>
+          {% for category in recommendations | map(attribute='category_id.value') | select | unique | sort %}
+            <option value="{{ category }}">{{ category }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Outcome</label>
+        <select id="gaOutcomeFilter" class="form-select">
+          <option value="">All outcomes</option>
+          {% for outcome in recommendations | map(attribute='outcome_id') | select | unique | sort %}
+            {% set outcome_value = outcome.value if outcome.value is defined else outcome %}
+            <option value="{{ outcome_value }}">{{ outcome_value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Risk</label>
+        <select id="gaRiskFilter" class="form-select">
+          <option value="">All risks</option>
+          <option value="HIGH">HIGH</option>
+          <option value="MEDIUM">MEDIUM</option>
+          <option value="LOW">LOW</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Action</label>
+        <select id="gaActionFilter" class="form-select">
+          <option value="">All actions</option>
+          {% for action in recommendations | map(attribute='action_type') | select | unique | sort %}
+            {% set action_value = action.value if action.value is defined else action %}
+            <option value="{{ action_value }}">{{ action_value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Minimum rank</label>
+        <select id="gaRankFilter" class="form-select">
+          <option value="0">All</option>
+          <option value="80">80+</option>
+          <option value="60">60+</option>
+          <option value="40">40+</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="ga-count">
+      Showing <span id="gaVisibleCount">{{ recommendations|length }}</span>
+      of {{ recommendations|length }} recommendations.
+    </div>
+
+    <div id="gaEmptyState" class="ga-empty-state d-none">
+      No recommendation matches the selected filters.
+    </div>
+
+    <div id="gaRecommendations" class="ga-card-grid">
+
+      {% for rec in recommendations %}
+        {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
+        {% set object_type = rec.object_type.value if rec.object_type.value is defined else rec.object_type %}
+        {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
+        {% set advisor_group = rec.advisor_group.value if rec.advisor_group.value is defined else rec.advisor_group %}
+        {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+        {% set action = rec.action_type.value if rec.action_type.value is defined else rec.action_type %}
+        {% set action_safety = rec.action_safety.value if rec.action_safety.value is defined else rec.action_safety %}
+        {% set priority = rec.priority.value or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
+        {% set label = rec.label or rec.source or category %}
+
+        {% if priority == 'HIGH' %}
+          {% set rank_class = "ga-rank-high" %}
+        {% elif priority == 'MEDIUM' %}
+          {% set rank_class = "ga-rank-medium" %}
+        {% else %}
+          {% set rank_class = "ga-rank-low" %}
+        {% endif %}
+
+        <div
+          class="ga-card"
+          data-label="{{ label or '' }}"
+          data-table="{{ rec.table_name or '' }}"
+          data-schema="{{ rec.schema_name or '' }}"
+          data-category="{{ category or '' }}"
+          data-outcome="{{ outcome or '' }}"
+          data-risk="{{ risk or '' }}"
+          data-action="{{ action or '' }}"
+          data-priority="{{ priority or '' }}"
+          data-rank="{{ rec.rank }}"
+          data-impact="{{ rec.impact if rec.impact is not none else 0 }}"
+          data-effort="{{ rec.effort if rec.effort is not none else 100 }}"
+          data-quick-win="{{ 'true' if rec.impact is not none and rec.effort is not none and rec.impact >= 60 and rec.effort <= 30 and risk != 'HIGH' else 'false' }}"
+          data-search="
+            {{ label or '' }}
+            {{ rec.title or '' }}
+            {{ rec.description or '' }}
+            {{ rec.schema_name or '' }}
+            {{ rec.table_name or '' }}
+            {{ rec.index_name or '' }}
+            {{ rec.column_name or '' }}
+            {{ rec.object_name or '' }}
+            {{ rec.improvement_sql or '' }}
+            {{ rec.recommendation_note or '' }}
+            {{ rec.why_it_matters or '' }}
+            {{ rec.fix_strategy or '' }}
+            {{ rec.expected_benefit or '' }}
+            {{ outcome or '' }}
+            {{ advisor_group or '' }}
+            {{ action or '' }}
+            {{ risk or '' }}
+          "
+        >
+
+          <div class="ga-card-header">
+            <div>
+              <div class="ga-label">{{ label }}</div>
+              {% if advisor_group %}
+                <div class="ga-title-line">{{ advisor_group }}</div>
+              {% endif %}
+            </div>
+
+            <span class="ga-rank {{ rank_class }}">
+              {{ priority }} · Rank {{ rec.rank }}
+            </span>
+          </div>
+
+          <div class="ga-target-list">
+          {% if rec.schema_name %}
+              <div class="ga-target-row">
+              <span class="ga-target-key">Schema</span>
+              <span class="ga-target-value">{{ rec.schema_name }}</span>
+              </div>
+          {% endif %}
+
+          {% if rec.table_name %}
+              <div class="ga-target-row">
+              <span class="ga-target-key">Table</span>
+              <span class="ga-target-value">{{ rec.table_name }}</span>
+              </div>
+          {% endif %}
+
+          {% if rec.index_name %}
+              <div class="ga-target-row">
+              <span class="ga-target-key">Index</span>
+              <span class="ga-target-value">{{ rec.index_name }}</span>
+              </div>
+          {% endif %}
+
+          {% if rec.column_name %}
+              <div class="ga-target-row">
+              <span class="ga-target-key">Column</span>
+              <span class="ga-target-value">{{ rec.column_name }}</span>
+              </div>
+          {% endif %}
+          </div>
+
+          <div class="ga-badges">
+            <span class="ga-badge ga-badge-category">{{ category }}</span>
+            {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
+            {% if action %}<span class="ga-badge ga-badge-action">{{ action }}</span>{% endif %}
+            {% if risk %}<span class="ga-badge ga-badge-risk-{{ risk|lower }}">Risk {{ risk }}</span>{% endif %}
+
+            {% if rec.estimated_rows is not none %}
+              <span
+                  class="ga-badge ga-badge-rows"
+                  title="{{ '{:,}'.format(rec.estimated_rows) }} estimated rows"
+              >
+                  {{ human_rows(rec.estimated_rows) }}
+              </span>
+            {% endif %}
+
+            {% if rec.requires_maintenance_window %}
+              <span class="ga-badge ga-badge-review">Maintenance window</span>
+            {% endif %}
+
+            {% if rec.manual_review_required %}
+              <span class="ga-badge ga-badge-review">Needs review</span>
+            {% else %}
+              <span class="ga-badge ga-badge-safe">Low review</span>
+            {% endif %}
+
+            {% if action_safety %}
+              <span class="ga-badge ga-badge-source">{{ action_safety }}</span>
+            {% endif %}
+          </div>
+
+          <div class="ga-score-grid">
+            <div class="ga-score">
+              <div class="ga-score-header">
+                <span>Confidence</span>
+                <span>{{ rec.confidence if rec.confidence is not none else 'N/A' }}</span>
+              </div>
+              <div class="ga-score-bar">
+                <div
+                  class="ga-score-fill"
+                  style="width: {{ rec.confidence if rec.confidence is not none else 0 }}%;"
+                ></div>
+              </div>
+            </div>
+
+            <div class="ga-score">
+              <div class="ga-score-header">
+                <span>Impact</span>
+                <span>{{ rec.impact if rec.impact is not none else 'N/A' }}</span>
+              </div>
+              <div class="ga-score-bar">
+                <div
+                  class="ga-score-fill"
+                  style="width: {{ rec.impact if rec.impact is not none else 0 }}%;"
+                ></div>
+              </div>
+            </div>
+
+            <div class="ga-score">
+              <div class="ga-score-header">
+                <span>Effort</span>
+                <span>{{ rec.effort if rec.effort is not none else 'N/A' }}</span>
+              </div>
+              <div class="ga-score-bar">
+                <div
+                  class="ga-score-fill"
+                  style="width: {{ rec.effort if rec.effort is not none else 0 }}%;"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ga-advisor-stack">
+            {% if rec.recommendation_note %}
+              <div class="ga-note">
+                {{ rec.recommendation_note }}
+              </div>
+            {% endif %}
+
+            {% if rec.why_it_matters %}
+              <div class="ga-advisor-text">
+                <strong>Why it matters.</strong> {{ rec.why_it_matters }}
+              </div>
+            {% endif %}
+
+            {% if rec.fix_strategy %}
+              <div class="ga-advisor-text">
+                <strong>Fix strategy.</strong> {{ rec.fix_strategy }}
+              </div>
+            {% endif %}
+
+            {% if rec.expected_benefit %}
+              <div class="ga-advisor-text">
+                <strong>Expected benefit.</strong> {{ rec.expected_benefit }}
+              </div>
+            {% endif %}
+          </div>
+
+          {% if rec.description
+              and "Object:" not in rec.description
+              and rec.description != rec.title %}
+            <p class="text-muted mb-3">{{ rec.description }}</p>
+          {% endif %}
+
+          {% if rec.improvement_sql %}
+            <div class="ga-sql-header">
+              <div class="ga-sql-title">Suggested SQL</div>
+
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary copy-sql-btn"
+                data-sql="{{ rec.improvement_sql | e }}"
+              >
+                Copy
+              </button>
+            </div>
+
+            <pre class="ga-sql-block"><code>{{ rec.improvement_sql }}</code></pre>
+          {% endif %}
+
+        </div>
+      {% endfor %}
+
+    </div>
+  </section>
+
+</div>
+
+<div class="modal fade" id="gaAllSqlModal" tabindex="-1" aria-labelledby="gaAllSqlModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="gaAllSqlModalLabel">
+          All suggested SQL
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          This export includes all recommendations with suggested SQL, independently of the current search and filters.
+        </p>
+
+        <pre class="ga-sql-block" style="max-height: 65vh;"><code id="gaAllSqlContent">{% for rec in recommendations if rec.improvement_sql %}{% if rec.recommendation_note %}-- {{ rec.recommendation_note | replace('\n', '\n-- ') }}
+{% endif %}{{ rec.improvement_sql }}
+
+{% endfor %}</code></pre>
+      </div>
+
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          id="copyAllSqlBtn"
+        >
+          Copy all SQL
+        </button>
+
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const searchInput = document.getElementById("gaSearch");
+  const labelFilter = document.getElementById("gaLabelFilter");
+  const tableFilter = document.getElementById("gaTableFilter");
+  const categoryFilter = document.getElementById("gaCategoryFilter");
+  const outcomeFilter = document.getElementById("gaOutcomeFilter");
+  const riskFilter = document.getElementById("gaRiskFilter");
+  const actionFilter = document.getElementById("gaActionFilter");
+  const rankFilter = document.getElementById("gaRankFilter");
+
+  const cards = Array.from(document.querySelectorAll(".ga-card"));
+  const visibleCount = document.getElementById("gaVisibleCount");
+  const emptyState = document.getElementById("gaEmptyState");
+  const tabButtons = Array.from(document.querySelectorAll(".ga-tab-btn"));
+  const tabPanels = {
+    summary: document.getElementById("gaTabSummary"),
+    recommendations: document.getElementById("gaTabRecommendations")
+  };
+
+  function normalize(value) {
+    return (value || "").toString().toLowerCase().trim();
+  }
+
+  function showTab(tabName) {
+    tabButtons.forEach(function (button) {
+      const active = button.dataset.gaTab === tabName;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    Object.keys(tabPanels).forEach(function (key) {
+      if (!tabPanels[key]) return;
+      tabPanels[key].classList.toggle("active", key === tabName);
+    });
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    return new Promise(function (resolve, reject) {
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        if (successful) {
+          resolve();
+        } else {
+          reject(new Error("Copy command failed"));
+        }
+      } catch (err) {
+        document.body.removeChild(textarea);
+        reject(err);
+      }
+    });
+  }
+
+  function markCopied(button, originalClass) {
+    const previousText = button.textContent;
+
+    button.textContent = "Copied";
+    button.classList.remove(originalClass);
+    button.classList.add("btn-success");
+
+    setTimeout(function () {
+      button.textContent = previousText;
+      button.classList.remove("btn-success");
+      button.classList.add(originalClass);
+    }, 1200);
+  }
+
+  function setSelectValue(select, value) {
+    if (!select) return;
+    select.value = value || "";
+    select.dispatchEvent(new Event("change"));
+  }
+
+  function resetFilters(apply) {
+    if (searchInput) searchInput.value = "";
+    if (labelFilter) labelFilter.value = "";
+    if (tableFilter) tableFilter.value = "";
+    if (categoryFilter) categoryFilter.value = "";
+    if (outcomeFilter) outcomeFilter.value = "";
+    if (riskFilter) riskFilter.value = "";
+    if (actionFilter) actionFilter.value = "";
+    if (rankFilter) rankFilter.value = "0";
+
+    if (apply !== false) {
+      applyFilters();
+    }
+  }
+
+  function applyFilters() {
+    const search = normalize(searchInput ? searchInput.value : "");
+    const label = normalize(labelFilter ? labelFilter.value : "");
+    const table = normalize(tableFilter ? tableFilter.value : "");
+    const category = normalize(categoryFilter ? categoryFilter.value : "");
+    const outcome = normalize(outcomeFilter ? outcomeFilter.value : "");
+    const risk = normalize(riskFilter ? riskFilter.value : "");
+    const action = normalize(actionFilter ? actionFilter.value : "");
+    const minRank = parseInt((rankFilter && rankFilter.value) || "0", 10);
+
+    let count = 0;
+
+    cards.forEach(function (card) {
+      const cardSearch = normalize(card.dataset.search);
+      const cardLabel = normalize(card.dataset.label);
+      const cardTable = normalize(card.dataset.table);
+      const cardCategory = normalize(card.dataset.category);
+      const cardOutcome = normalize(card.dataset.outcome);
+      const cardRisk = normalize(card.dataset.risk);
+      const cardAction = normalize(card.dataset.action);
+      const cardRank = parseInt(card.dataset.rank || "0", 10);
+
+      const visible =
+        (!search || cardSearch.includes(search)) &&
+        (!label || cardLabel === label) &&
+        (!table || cardTable === table) &&
+        (!category || cardCategory === category) &&
+        (!outcome || cardOutcome === outcome) &&
+        (!risk || cardRisk === risk) &&
+        (!action || cardAction === action) &&
+        cardRank >= minRank;
+
+      card.classList.toggle("hidden", !visible);
+
+      if (visible) {
+        count += 1;
+      }
+    });
+
+    if (visibleCount) visibleCount.textContent = count;
+    if (emptyState) emptyState.classList.toggle("d-none", count > 0);
+  }
+
+  tabButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      const tabName = button.dataset.gaTab;
+
+      if (tabName === "summary") {
+        resetFilters(true);
+      }
+
+      showTab(tabName);
+    });
+  });
+
+  document.querySelectorAll(".ga-open-recommendations").forEach(function (button) {
+    button.addEventListener("click", function () {
+      showTab("recommendations");
+      resetFilters(false);
+
+      if (button.dataset.minRank) {
+        setSelectValue(rankFilter, button.dataset.minRank);
+      }
+
+      if (button.dataset.risk) {
+        setSelectValue(riskFilter, button.dataset.risk);
+      }
+
+      if (button.dataset.quickWins === "true") {
+        resetFilters(false);
+
+        let count = 0;
+        cards.forEach(function (card) {
+          const visible = card.dataset.quickWin === "true";
+          card.classList.toggle("hidden", !visible);
+          if (visible) count += 1;
+        });
+        if (visibleCount) visibleCount.textContent = count;
+        if (emptyState) emptyState.classList.toggle("d-none", count > 0);
+        return;
+      }
+
+      applyFilters();
+    });
+  });
+
+  [
+    searchInput,
+    labelFilter,
+    tableFilter,
+    categoryFilter,
+    outcomeFilter,
+    riskFilter,
+    actionFilter,
+    rankFilter
+  ].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener("input", applyFilters);
+    el.addEventListener("change", applyFilters);
+  });
+
+  document.querySelectorAll(".copy-sql-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      const sql = button.dataset.sql || "";
+
+      copyTextToClipboard(sql)
+        .then(function () {
+          markCopied(button, "btn-outline-secondary");
+        })
+        .catch(function () {
+          alert("Unable to copy SQL to clipboard.");
+        });
+    });
+  });
+
+  const copyAllSqlBtn = document.getElementById("copyAllSqlBtn");
+
+  if (copyAllSqlBtn) {
+    copyAllSqlBtn.addEventListener("click", function () {
+      const allSqlContent = document.getElementById("gaAllSqlContent");
+
+      if (!allSqlContent) {
+        alert("No SQL content found.");
+        return;
+      }
+
+      const sql = allSqlContent.innerText || allSqlContent.textContent || "";
+
+      if (!sql.trim()) {
+        alert("No SQL to copy.");
+        return;
+      }
+
+      copyTextToClipboard(sql)
+        .then(function () {
+          markCopied(copyAllSqlBtn, "btn-outline-secondary");
+        })
+        .catch(function () {
+          alert("Unable to copy SQL to clipboard.");
+        });
+    });
+  }
+
+  applyFilters();
+});
+</script>
+{% endblock javascripts %}

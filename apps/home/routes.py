@@ -27,7 +27,7 @@ from . import pgstat_helper
 from . import analyze_advisor
 from . import tetris
 from . import ranking
-from . import global_advisor 
+from . import global_advisor
 import requests
 import json
 
@@ -729,8 +729,8 @@ def api_apply_recommendations():
 def global_advisor_route():
     try:
         
-        result = global_advisor.run_global_advisor(session, yaml_path="advisor.yml")
-        return render_template('home/advisor.html', segment='global_advisor.html', recommendations=result["recommendations"])
+        result = global_advisor.run_global_advisor(session, yaml_path="advisor_enriched.yml")
+        return render_template('home/advisor_summary_tabs.html', segment='global_advisor.html', recommendations=result["recommendations"])
     except Exception as e1:
         tb = traceback.format_exc()
         print(tb)

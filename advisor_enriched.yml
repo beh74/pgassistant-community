@@ -1,0 +1,1807 @@
+recommendations:
+  - id: foreign_key_columns_different_data_types
+    label: Foreign key columns with different data types
+    source: design_checks
+    category_id: DESIGN
+    object_type: COLUMN
+    outcome_id: RELIABILITY
+    advisor_group: DATA_MODEL_ISSUES
+    risk_level: HIGH
+    action_type: ALTER_TABLE
+    action_safety: MANUAL_ONLY
+    requires_lock: true
+    requires_maintenance_window: true
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - foreign-key
+      - data-model
+      - implicit-cast
+      - index-usage
+    why_it_matters: >
+      Foreign key columns using different data types may cause implicit casts,
+      prevent efficient index usage, and produce suboptimal join plans.
+    fix_strategy: >
+      Align the foreign key column data type with the referenced column type.
+      Review existing data first and apply the change during a maintenance window.
+    expected_benefit: >
+      More predictable joins, better index usage, and cleaner relational design.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 100
+    impact: 100
+    effort: 60
+
+    sql: |
+      WITH foreign_key_columns AS (
+          SELECT
+              c.oid AS object_id,
+              c.conname AS fk_name,
+              ns_fk.nspname AS schema_name,
+              fk_table.relname AS table_name,
+              ref_table.relname AS referenced_table_name,
+              fk_col.attname AS column_name,
+              ref_col.attname AS referenced_column_name,
+              pg_catalog.format_type(fk_col.atttypid, fk_col.atttypmod) AS fk_column_type,
+              pg_catalog.format_type(ref_col.atttypid, ref_col.atttypmod) AS referenced_column_type
+          FROM pg_constraint c
+          JOIN pg_class fk_table ON fk_table.oid = c.conrelid
+          JOIN pg_namespace ns_fk ON ns_fk.oid = fk_table.relnamespace
+          JOIN pg_class ref_table ON ref_table.oid = c.confrelid
+          JOIN unnest(c.conkey) WITH ORDINALITY AS fk_keys(attnum, ord) ON true
+          JOIN unnest(c.confkey) WITH ORDINALITY AS ref_keys(attnum, ord)
+            ON ref_keys.ord = fk_keys.ord
+          JOIN pg_attribute fk_col
+            ON fk_col.attrelid = c.conrelid
+           AND fk_col.attnum = fk_keys.attnum
+          JOIN pg_attribute ref_col
+            ON ref_col.attrelid = c.confrelid
+           AND ref_col.attnum = ref_keys.attnum
+          WHERE c.contype = 'f'
+            AND ns_fk.nspname = 'public'
+      ),
+      mismatched_types AS (
+          SELECT
+              object_id,
+              fk_name,
+              schema_name,
+              table_name,
+              column_name,
+              referenced_table_name,
+              referenced_column_name,
+              fk_column_type,
+              referenced_column_type,
+              schema_name || '.' || table_name || '.' || column_name AS object_name,
+              'ALTER TABLE '
+              || format('%I.%I', schema_name, table_name)
+              || ' ALTER COLUMN '
+              || quote_ident(column_name)
+              || ' TYPE '
+              || referenced_column_type
+              || ' USING '
+              || quote_ident(column_name)
+              || '::'
+              || referenced_column_type
+              || ';' AS improvement_sql
+          FROM foreign_key_columns
+          WHERE fk_column_type <> referenced_column_type
+      )
+      SELECT
+          object_id,
+          object_name,
+          fk_name,
+          schema_name,
+          table_name,
+          column_name,
+          referenced_table_name,
+          referenced_column_name,
+          fk_column_type,
+          referenced_column_type,
+            'Column '
+            || format('%I.%I.%I', schema_name, table_name, column_name)
+            || ' (' || fk_column_type || ') differs from '
+            || format('%I.%I.%I', schema_name, referenced_table_name, referenced_column_name)
+            || ' (' || referenced_column_type || '). '
+            || 'Foreign key columns should use the same data type to avoid implicit casts and ensure index usage.'
+            AS recommendation_note,
+
+          improvement_sql
+      FROM mismatched_types
+      ORDER BY schema_name, table_name, fk_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      schema_name: schema_name
+      table_name: table_name
+      column_name: column_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+
+  - id: missing_useful_foreign_key_indexes
+    label: Missing useful foreign key indexe
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: PERFORMANCE
+    advisor_group: INDEX_OPPORTUNITIES
+    risk_level: LOW
+    action_type: CREATE_INDEX
+    action_safety: SAFE_TO_REVIEW
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - foreign-key
+      - missing-index
+      - joins
+      - delete-update-performance
+    why_it_matters: >
+      Missing indexes on foreign key columns can slow down joins and can make
+      parent table UPDATE or DELETE operations more expensive.
+    fix_strategy: >
+      Create the suggested index concurrently, then monitor whether the workload
+      actually uses it before considering further index changes.
+    expected_benefit: >
+      Faster joins and lookups involving the foreign key, with lower locking risk
+      because the generated SQL uses CREATE INDEX CONCURRENTLY.
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 85
+    impact: 75
+    effort: 30
+
+    sql: |
+        WITH fks AS (
+            SELECT
+                c.oid AS fk_oid,
+                n.nspname AS schema_name,
+                child.oid AS table_oid,
+                child.relname AS table_name,
+                c.conname AS fk_name,
+                c.conkey AS fk_cols,
+                c.confrelid AS referenced_table_oid,
+                ref_ns.nspname AS referenced_schema_name,
+                ref.relname AS referenced_table_name
+            FROM pg_constraint c
+            JOIN pg_class child ON child.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = child.relnamespace
+            JOIN pg_class ref ON ref.oid = c.confrelid
+            JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+            WHERE c.contype = 'f'
+            AND n.nspname = 'public'
+        ),
+        fkeys_without_indexes AS (
+            SELECT f.*
+            FROM fks f
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_index i
+                WHERE i.indrelid = f.table_oid
+                AND i.indisvalid
+                AND i.indisready
+                AND i.indpred IS NULL
+                AND i.indkey[0:array_length(f.fk_cols, 1)-1] = f.fk_cols
+            )
+        ),
+        table_stats AS (
+            SELECT
+                relid,
+                n_live_tup
+            FROM pg_stat_user_tables
+        ),
+        fk_columns AS (
+            SELECT
+                f.fk_oid,
+                string_agg(quote_ident(a.attname), ', ' ORDER BY u.ord) AS fk_columns
+            FROM fkeys_without_indexes f
+            JOIN unnest(f.fk_cols) WITH ORDINALITY AS u(attnum, ord) ON true
+            JOIN pg_attribute a
+            ON a.attrelid = f.table_oid
+            AND a.attnum = u.attnum
+            GROUP BY f.fk_oid
+        )
+        SELECT
+            f.fk_oid AS object_id,
+            f.schema_name,
+            f.table_name,
+            f.fk_name,
+            fc.fk_columns,
+            f.schema_name || '.' || f.table_name || ' (' || fc.fk_columns || ')' AS object_name,
+            f.referenced_schema_name || '.' || f.referenced_table_name AS referenced_table,
+            child_stats.n_live_tup AS estimated_rows,
+            ref_stats.n_live_tup AS referenced_estimated_rows,
+            CASE
+                WHEN GREATEST(
+                        COALESCE(child_stats.n_live_tup, 0),
+                        COALESCE(ref_stats.n_live_tup, 0)
+                    ) >= 100000 THEN 'HIGH'
+                WHEN GREATEST(
+                        COALESCE(child_stats.n_live_tup, 0),
+                        COALESCE(ref_stats.n_live_tup, 0)
+                    ) >= 10000 THEN 'MEDIUM'
+                ELSE 'LOW'
+            END AS index_importance,
+            CASE
+                WHEN COALESCE(child_stats.n_live_tup, 0) >= 1000
+                AND COALESCE(ref_stats.n_live_tup, 0) >= 1000 THEN
+                    'Table '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' and referenced table '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' are both significant; creating an index on the foreign key is likely beneficial.'
+
+                WHEN COALESCE(child_stats.n_live_tup, 0) >= 1000 THEN
+                    'Table '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' is significant; an index on the foreign key may improve joins and lookups.'
+
+                WHEN COALESCE(ref_stats.n_live_tup, 0) >= 1000 THEN
+                    'Referenced table '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' is significant; an index on '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' may improve UPDATE/DELETE performance on the parent side.'
+
+                ELSE
+                    'Tables '
+                    || format('%I.%I', f.schema_name, f.table_name)
+                    || ' and '
+                    || format('%I.%I', f.referenced_schema_name, f.referenced_table_name)
+                    || ' are small; index usefulness should be reviewed.'
+            END AS recommendation_note,
+            'CREATE INDEX CONCURRENTLY IF NOT EXISTS '
+            || quote_ident('pga_idx_fk_' || f.table_name || '_' || f.fk_name)
+            || ' ON '
+            || format('%I.%I', f.schema_name, f.table_name)
+            || ' ('
+            || fc.fk_columns
+            || ');' AS improvement_sql
+        FROM fkeys_without_indexes f
+        JOIN fk_columns fc ON fc.fk_oid = f.fk_oid
+        LEFT JOIN table_stats child_stats ON child_stats.relid = f.table_oid
+        LEFT JOIN table_stats ref_stats ON ref_stats.relid = f.referenced_table_oid
+        WHERE
+            COALESCE(child_stats.n_live_tup, 0) >= 1000
+            OR COALESCE(ref_stats.n_live_tup, 0) >= 1000
+        ORDER BY
+            GREATEST(
+                COALESCE(child_stats.n_live_tup, 0),
+                COALESCE(ref_stats.n_live_tup, 0)
+            ) DESC,
+            f.schema_name,
+            f.table_name,
+            f.fk_name;
+
+    result_mapping:
+      object_name: object_name
+      schema_name: schema_name
+      table_name: table_name
+      index_name: object_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+  - id: redundant_non_unique_indexes_covered_by_unique
+    label: Non-unique indexe covered by unique indexe
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: STORAGE
+    advisor_group: INDEX_CLEANUP
+    risk_level: LOW
+    action_type: DROP_INDEX
+    action_safety: SAFE_TO_REVIEW
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - redundant-index
+      - unique-index
+      - write-overhead
+      - quick-win
+    why_it_matters: >
+      A redundant non-unique index increases storage usage and write overhead
+      while an equivalent unique index can satisfy the same lookup pattern.
+    fix_strategy: >
+      Drop the redundant non-unique index after confirming it is not referenced
+      by application-specific tooling, monitoring, or operational procedures.
+    expected_benefit: >
+      Lower storage usage, reduced write amplification, and simpler index maintenance.
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 95
+    impact: 70
+    effort: 10
+
+    sql: |
+        WITH indexes AS (
+            SELECT
+                ix.indexrelid,
+                ix.indrelid,
+                ix.indkey,
+                ix.indclass,
+                ix.indcollation,
+                ix.indoption,
+                ix.indnkeyatts,
+                ix.indnatts,
+                ix.indexprs,
+                ix.indpred,
+                ix.indisunique,
+                ix.indisprimary,
+                ix.indisexclusion,
+                idx.relam,
+                ns.nspname AS schema_name,
+                tbl.relname AS table_name,
+                tbl.oid AS table_id,
+                idx.relname AS index_name,
+                idx.oid AS object_id,
+                pg_get_indexdef(idx.oid) AS index_definition,
+                COALESCE(stat.idx_scan, 0) AS idx_scan,
+                pg_relation_size(idx.oid) AS index_size_bytes
+            FROM pg_index ix
+            JOIN pg_class idx ON idx.oid = ix.indexrelid
+            JOIN pg_class tbl ON tbl.oid = ix.indrelid
+            JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+            LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
+            WHERE ns.nspname = 'public'
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisexclusion
+        )
+        SELECT
+            ni.object_id,
+            ni.schema_name || '.' || ni.index_name AS object_name,
+            ni.schema_name,
+            ni.table_name,
+            ni.table_id,
+            ni.index_name,
+            ui.index_name AS duplicate_of_index_name,
+            ni.idx_scan,
+            ni.index_size_bytes,
+            ni.index_definition,
+            ui.index_definition AS covering_index_definition,
+            'Index '
+            || format('%I.%I', ni.schema_name, ni.index_name)
+            || ' on table '
+            || format('%I.%I', ni.schema_name, ni.table_name)
+            || ' is redundant because it is covered by unique index '
+            || format('%I.%I', ui.schema_name, ui.index_name)
+            || '. Both indexes use the same column set, so the unique index can handle all lookup operations.'
+            AS recommendation_note,
+            'DROP INDEX CONCURRENTLY IF EXISTS '
+            || format('%I.%I', ni.schema_name, ni.index_name)
+            || ';' AS improvement_sql
+        FROM indexes ni
+        JOIN indexes ui
+        ON ui.indrelid = ni.indrelid
+        AND ui.relam = ni.relam
+        AND ui.indkey = ni.indkey
+        AND ui.indclass = ni.indclass
+        AND ui.indcollation = ni.indcollation
+        AND ui.indoption = ni.indoption
+        AND ui.indnkeyatts = ni.indnkeyatts
+        AND ui.indnatts = ni.indnatts
+        AND COALESCE(ui.indexprs::text, '') = COALESCE(ni.indexprs::text, '')
+        AND COALESCE(ui.indpred::text, '') = COALESCE(ni.indpred::text, '')
+        WHERE ni.indisunique = false
+        AND ni.indisprimary = false
+        AND ui.indisunique = true
+        AND ni.idx_scan = 0
+        ORDER BY
+            ni.schema_name,
+            ni.table_name,
+            ni.index_size_bytes DESC,
+            ni.index_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+  - id: strictly_duplicate_unused_indexes
+    label: Strictly duplicate unused indexe
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: STORAGE
+    advisor_group: INDEX_CLEANUP
+    risk_level: LOW
+    action_type: DROP_INDEX
+    action_safety: SAFE_TO_REVIEW
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - duplicate-index
+      - unused-index
+      - write-overhead
+      - quick-win
+    why_it_matters: >
+      Strict duplicate indexes waste disk space and add unnecessary overhead to
+      INSERT, UPDATE, DELETE, VACUUM, and autovacuum work.
+    fix_strategy: >
+      Keep one index from each duplicate group and drop the unused duplicate
+      indexes concurrently after reviewing recent statistics reset history.
+    expected_benefit: >
+      Reduced storage usage and write overhead without removing index coverage.
+
+    enabled_by_default: true
+    manual_review_required: false
+
+    confidence: 98
+    impact: 75
+    effort: 15
+
+    sql: |
+      WITH duplicate_groups AS (
+          SELECT
+              ix.indrelid,
+              ix.indkey,
+              ix.indclass,
+              ix.indcollation,
+              ix.indoption,
+              ix.indnkeyatts,
+              ix.indnatts,
+              ix.indexprs,
+              ix.indpred,
+              idx.relam,
+              array_agg(ix.indexrelid ORDER BY ix.indexrelid) AS index_oids,
+              COUNT(*) AS duplicate_count
+          FROM pg_index ix
+          JOIN pg_class idx ON idx.oid = ix.indexrelid
+          JOIN pg_class tbl ON tbl.oid = ix.indrelid
+          JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+          WHERE ns.nspname = 'public'
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisprimary
+            AND NOT ix.indisunique
+            AND NOT ix.indisexclusion
+          GROUP BY
+              ix.indrelid,
+              ix.indkey,
+              ix.indclass,
+              ix.indcollation,
+              ix.indoption,
+              ix.indnkeyatts,
+              ix.indnatts,
+              ix.indexprs,
+              ix.indpred,
+              idx.relam
+          HAVING COUNT(*) > 1
+      ),
+      duplicate_indexes AS (
+          SELECT
+              unnest(index_oids[2:array_length(index_oids, 1)]) AS index_oid,
+              index_oids[1] AS kept_index_oid
+          FROM duplicate_groups
+      )
+      SELECT
+          idx.oid AS object_id,
+          ns.nspname || '.' || idx.relname AS object_name,
+          ns.nspname AS schema_name,
+          tbl.relname AS table_name,
+          tbl.oid AS table_id,
+          idx.relname AS index_name,
+          kept_idx.relname AS duplicate_of_index_name,
+          COALESCE(stat.idx_scan, 0) AS idx_scan,
+          pg_relation_size(idx.oid) AS index_size_bytes,
+          pg_get_indexdef(idx.oid) AS index_definition,
+          'DROP INDEX CONCURRENTLY IF EXISTS '
+          || format('%I.%I', ns.nspname, idx.relname)
+          || ';' AS improvement_sql
+      FROM duplicate_indexes d
+      JOIN pg_class idx ON idx.oid = d.index_oid
+      JOIN pg_class kept_idx ON kept_idx.oid = d.kept_index_oid
+      JOIN pg_index ix ON ix.indexrelid = idx.oid
+      JOIN pg_class tbl ON tbl.oid = ix.indrelid
+      JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+      LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
+      WHERE COALESCE(stat.idx_scan, 0) = 0
+      ORDER BY
+          ns.nspname,
+          tbl.relname,
+          pg_relation_size(idx.oid) DESC,
+          idx.relname;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+
+  - id: unused_non_constraint_indexes
+    label: Unused indexe not supporting constraints
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: STORAGE
+    advisor_group: INDEX_CLEANUP
+    risk_level: MEDIUM
+    action_type: DROP_INDEX
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - unused-index
+      - write-overhead
+      - storage
+      - requires-review
+    why_it_matters: >
+      Unused indexes consume storage and increase write overhead, but usage
+      counters may be misleading after statistics resets or for rare queries.
+    fix_strategy: >
+      Review the statistics reset date and application workload before dropping.
+      Prefer dropping concurrently and keep a rollback plan to recreate the index.
+    expected_benefit: >
+      Lower write cost and storage usage when the index is truly unused.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 75
+    impact: 65
+    effort: 20
+
+    sql: |
+        WITH index_columns AS (
+            SELECT
+                i.indexrelid,
+                array_agg(k.attnum ORDER BY k.ord) AS index_key_attnums
+            FROM pg_index i
+            JOIN unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+            ON k.ord <= i.indnkeyatts
+            GROUP BY i.indexrelid
+        ),
+        fk_columns AS (
+            SELECT
+                c.conrelid,
+                c.oid AS constraint_oid,
+                c.conname AS constraint_name,
+                c.conkey AS fk_attnums
+            FROM pg_constraint c
+            WHERE c.contype = 'f'
+        ),
+        candidate_indexes AS (
+            SELECT
+                s.schemaname AS schema_name,
+                s.relname AS table_name,
+                s.relid AS table_id,
+                s.indexrelname AS index_name,
+                s.indexrelid AS object_id,
+                s.idx_scan,
+                pg_relation_size(s.indexrelid) AS index_size_bytes,
+                pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size_pretty,
+                pg_get_indexdef(s.indexrelid) AS index_definition,
+                ix.indrelid,
+                ix.indisunique,
+                ix.indisprimary,
+                ix.indisexclusion,
+                ix.indpred,
+                ix.indexprs,
+                ic.index_key_attnums
+            FROM pg_stat_user_indexes s
+            JOIN pg_index ix ON ix.indexrelid = s.indexrelid
+            JOIN index_columns ic ON ic.indexrelid = s.indexrelid
+            WHERE s.schemaname = 'public'
+            AND s.idx_scan = 0
+            AND ix.indisvalid
+            AND ix.indisready
+            AND NOT ix.indisprimary
+            AND NOT ix.indisunique
+            AND NOT ix.indisexclusion
+            AND NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint c
+                WHERE c.conindid = ix.indexrelid
+                    AND c.contype IN ('p', 'u', 'x')
+            )
+        )
+        SELECT
+            ci.object_id,
+            ci.schema_name || '.' || ci.index_name AS object_name,
+            ci.schema_name,
+            ci.table_name,
+            ci.table_id,
+            ci.index_name,
+            ci.idx_scan,
+            ci.index_size_bytes,
+            ci.index_size_pretty,
+            ci.index_definition,
+
+            'Index has not been used according to pg_stat_user_indexes (idx_scan = 0) since the last PostgreSQL statistics reset. It is not required by a primary key, unique constraint, exclusion constraint, or foreign key support. Dropping it may reduce storage usage and write overhead.' 
+            AS recommendation_note,
+
+            'DROP INDEX CONCURRENTLY IF EXISTS '
+            || format('%I.%I', ci.schema_name, ci.index_name)
+            || ';' AS improvement_sql
+
+        FROM candidate_indexes ci
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM fk_columns fk
+            WHERE fk.conrelid = ci.indrelid
+            AND ci.index_key_attnums[1:array_length(fk.fk_attnums, 1)] = fk.fk_attnums
+        )
+        ORDER BY
+            ci.index_size_bytes DESC,
+            ci.schema_name,
+            ci.table_name,
+            ci.index_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+
+  - id: Tables with potentially stale statistics
+    source: statistics_checks
+    category_id: STATISTICS
+    object_type: TABLE
+    outcome_id: PERFORMANCE
+    advisor_group: STATISTICS_HEALTH
+    risk_level: LOW
+    action_type: ANALYZE
+    action_safety: SAFE_TO_APPLY
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - statistics
+      - planner
+      - analyze
+      - query-plans
+    why_it_matters: >
+      Stale table statistics can cause PostgreSQL to choose poor execution plans,
+      especially after large data changes.
+    fix_strategy: >
+      Run ANALYZE on the affected tables and review whether autovacuum analyze
+      thresholds are appropriate for frequently modified tables.
+    expected_benefit: >
+      Better planner estimates and more reliable query execution plans.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 75
+    impact: 65
+    effort: 20
+
+    label: Table with potentially stale statistics
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH t AS (
+        SELECT
+            schemaname,
+            relname,
+            relid,
+            n_live_tup,
+            n_dead_tup,
+            n_mod_since_analyze,
+            last_analyze,
+            last_autoanalyze,
+            pg_total_relation_size(relid) AS table_size_bytes,
+            GREATEST(last_analyze, last_autoanalyze) AS last_any_analyze
+        FROM pg_stat_user_tables
+        ),
+        x AS (
+        SELECT
+            *,
+            (n_mod_since_analyze::numeric / NULLIF(n_live_tup, 0)) AS modified_since_analyze_ratio,
+            EXTRACT(EPOCH FROM (now() - last_any_analyze)) / 86400.0 AS stats_age_days
+        FROM t
+        ),
+        scored AS (
+        SELECT
+            relid AS object_id,
+            schemaname AS schema_name,
+            relname AS object_name,
+            table_size_bytes,
+            pg_size_pretty(table_size_bytes) AS table_size_pretty,
+            n_live_tup,
+            n_dead_tup,
+            n_mod_since_analyze,
+            ROUND(modified_since_analyze_ratio * 100, 2) AS modified_since_analyze_pct,
+            last_analyze,
+            last_autoanalyze,
+            ROUND(stats_age_days, 1) AS stats_age_days,
+            CASE
+            WHEN last_any_analyze IS NULL THEN 'HIGH'
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND (stats_age_days > 14 OR modified_since_analyze_ratio > 0.20) THEN 'HIGH'
+            WHEN stats_age_days > 30 OR modified_since_analyze_ratio > 0.30 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN last_any_analyze IS NULL THEN 'Table has never been analyzed'
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND stats_age_days > 14 THEN 'Large table with outdated statistics'
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND modified_since_analyze_ratio > 0.20 THEN 'Large table with significant data churn since last analyze'
+            WHEN stats_age_days > 30 THEN 'Statistics are older than 30 days'
+            WHEN modified_since_analyze_ratio > 0.30 THEN 'High proportion of data modified since last analyze'
+            ELSE 'Statistics require attention'
+            END AS recommendation_note
+        FROM x
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        'ANALYZE ' || quote_ident(schema_name) || '.' || quote_ident(object_name) || ';' AS improvement_sql,
+        table_size_bytes,
+        table_size_pretty,
+        n_live_tup,
+        n_dead_tup,
+        n_mod_since_analyze,
+        modified_since_analyze_pct,
+        last_analyze,
+        last_autoanalyze,
+        stats_age_days
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        table_size_bytes DESC,
+        schema_name,
+        object_name;
+
+  - id: Tables with estimated bloat
+    source: storage_checks
+    category_id: MAINTENANCE
+    object_type: TABLE
+    outcome_id: STORAGE
+    advisor_group: MAINTENANCE_RISKS
+    risk_level: MEDIUM
+    action_type: VACUUM
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - bloat
+      - vacuum
+      - dead-tuples
+      - storage
+    why_it_matters: >
+      A high dead tuple ratio can increase table size, I/O, cache pressure, and
+      maintenance cost.
+    fix_strategy: >
+      Run VACUUM ANALYZE first, then review autovacuum behavior. For severe
+      physical bloat, consider stronger remediation outside this basic suggestion.
+    expected_benefit: >
+      Reduced dead tuple pressure and fresher statistics; possible storage benefits
+      depend on the type and severity of bloat.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 65
+    impact: 75
+    effort: 60
+
+    label:  Table with a high estimated amount of dead tuples and possible storage bloat.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+    sql: |
+        WITH table_stats AS (
+        SELECT
+            schemaname AS schema_name,
+            relname AS table_name,
+            relid AS object_id,
+            n_live_tup,
+            n_dead_tup,
+            pg_total_relation_size(relid) AS total_size_bytes,
+            pg_relation_size(relid) AS table_size_bytes,
+            CASE
+            WHEN n_live_tup + n_dead_tup > 0
+            THEN n_dead_tup::numeric / (n_live_tup + n_dead_tup)
+            ELSE 0
+            END AS dead_tuple_ratio
+        FROM pg_stat_user_tables
+        ),
+        scored AS (
+        SELECT
+            object_id,
+            schema_name,
+            table_name AS object_name,
+            n_live_tup,
+            n_dead_tup,
+            total_size_bytes,
+            pg_size_pretty(total_size_bytes) AS total_size_pretty,
+            table_size_bytes,
+            pg_size_pretty(table_size_bytes) AS table_size_pretty,
+            ROUND(dead_tuple_ratio * 100, 2) AS dead_tuple_pct,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND dead_tuple_ratio >= 0.20 THEN 'HIGH'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND dead_tuple_ratio >= 0.30 THEN 'HIGH'
+            WHEN dead_tuple_ratio >= 0.20 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND dead_tuple_ratio >= 0.20
+            THEN 'Large table with a high estimated dead tuple ratio. This may indicate table bloat and increased I/O.'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND dead_tuple_ratio >= 0.30
+            THEN 'Medium or large table with a very high estimated dead tuple ratio. This may indicate table bloat.'
+            WHEN dead_tuple_ratio >= 0.20
+            THEN 'Table has a significant estimated dead tuple ratio. Review vacuum activity and table maintenance.'
+            ELSE 'No significant estimated table bloat detected.'
+            END AS recommendation_note
+        FROM table_stats
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        'VACUUM (ANALYZE) '
+            || quote_ident(schema_name)
+            || '.'
+            || quote_ident(object_name)
+            || ';' AS improvement_sql,
+        total_size_bytes,
+        total_size_pretty,
+        table_size_bytes,
+        table_size_pretty,
+        n_live_tup,
+        n_dead_tup,
+        dead_tuple_pct
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        total_size_bytes DESC,
+        dead_tuple_pct DESC,
+        schema_name,
+        object_name;        
+
+  - id: Important PostgreSQL settings disabled or suboptimal
+    source: configuration_checks
+    category_id: CONFIGURATION
+    object_type: DATABASE
+    outcome_id: OPERABILITY
+    advisor_group: CONFIGURATION_ISSUES
+    risk_level: HIGH
+    action_type: CONFIG_CHANGE
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - configuration
+      - observability
+      - autovacuum
+      - checkpoints
+    why_it_matters: >
+      Suboptimal PostgreSQL settings can reduce observability, weaken maintenance
+      behavior, or increase write pressure.
+    fix_strategy: >
+      Review each suggested setting in the context of the workload, apply the
+      change, reload configuration when possible, and restart only when required.
+    expected_benefit: >
+      Better database maintenance behavior, observability, and operational stability.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 90
+    impact: 90
+    effort: 30
+
+    label: Important PostgreSQL settings disabled or suboptimal.
+
+    result_mapping:
+        object_id: object_id
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH settings AS (
+        SELECT
+            (SELECT oid FROM pg_database WHERE datname = current_database()) AS object_id,
+            current_database() AS object_name,
+            name,
+            setting,
+            unit,
+            source,
+            boot_val,
+            reset_val,
+            pending_restart
+        FROM pg_settings
+        WHERE name IN (
+            'autovacuum',
+            'track_counts',
+            'track_activities',
+            'log_checkpoints',
+            'log_autovacuum_min_duration',
+            'checkpoint_completion_target',
+            'checkpoint_timeout'
+        )
+        ),
+        checks AS (
+        SELECT
+            object_id,
+            object_name,
+            name AS setting_name,
+            setting AS current_value,
+            source,
+            pending_restart,
+            CASE
+            WHEN name = 'autovacuum' AND setting <> 'on' THEN 'HIGH'
+            WHEN name = 'track_counts' AND setting <> 'on' THEN 'HIGH'
+            WHEN name = 'track_activities' AND setting <> 'on' THEN 'MEDIUM'
+            WHEN name = 'log_checkpoints' AND setting <> 'on' THEN 'MEDIUM'
+            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1' THEN 'MEDIUM'
+            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8 THEN 'MEDIUM'
+            WHEN name = 'checkpoint_timeout' AND setting::integer < 300 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN name = 'autovacuum' AND setting <> 'on'
+            THEN 'Autovacuum is disabled. This can lead to table bloat, outdated planner statistics, degraded query performance, and transaction ID wraparound risk.'
+            WHEN name = 'track_counts' AND setting <> 'on'
+            THEN 'track_counts is disabled. PostgreSQL needs table and index statistics for autovacuum and planner-related diagnostics.'
+            WHEN name = 'track_activities' AND setting <> 'on'
+            THEN 'track_activities is disabled. This limits visibility into currently running queries and reduces troubleshooting capabilities.'
+            WHEN name = 'log_checkpoints' AND setting <> 'on'
+            THEN 'log_checkpoints is disabled. Enabling it helps diagnose checkpoint frequency, write pressure, and tuning issues.'
+            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1'
+            THEN 'Autovacuum logging is disabled. Setting log_autovacuum_min_duration helps diagnose slow or frequent autovacuum activity.'
+            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8
+            THEN 'checkpoint_completion_target is lower than commonly recommended values. A higher value usually smooths checkpoint writes over time.'
+            WHEN name = 'checkpoint_timeout' AND setting::integer < 300
+            THEN 'checkpoint_timeout is below 5 minutes. Very frequent checkpoints may increase write pressure.'
+            ELSE NULL
+            END AS recommendation_note,
+            CASE
+            WHEN name = 'autovacuum' AND setting <> 'on'
+            THEN 'ALTER SYSTEM SET autovacuum = on;' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'track_counts' AND setting <> 'on'
+            THEN 'ALTER SYSTEM SET track_counts = on;' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'track_activities' AND setting <> 'on'
+            THEN 'ALTER SYSTEM SET track_activities = on;' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'log_checkpoints' AND setting <> 'on'
+            THEN 'ALTER SYSTEM SET log_checkpoints = on;' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1'
+            THEN 'ALTER SYSTEM SET log_autovacuum_min_duration = ''5s'';' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8
+            THEN 'ALTER SYSTEM SET checkpoint_completion_target = 0.9;' || chr(10) || 'SELECT pg_reload_conf();'
+            WHEN name = 'checkpoint_timeout' AND setting::integer < 300
+            THEN 'ALTER SYSTEM SET checkpoint_timeout = ''5min'';' || chr(10) || 'SELECT pg_reload_conf();'
+            ELSE NULL
+            END AS improvement_sql
+        FROM settings
+        )
+        SELECT
+        object_id,
+        object_name,
+        setting_name,
+        current_value,
+        source,
+        pending_restart,
+        pga_recommendation_level,
+        recommendation_note,
+        improvement_sql
+        FROM checks
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        setting_name;
+
+  - id: Invalid or unusable indexes
+    source: index_checks
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: RELIABILITY
+    advisor_group: INDEX_HEALTH
+    risk_level: MEDIUM
+    action_type: DROP_INDEX
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - invalid-index
+      - index-health
+      - failed-create-index-concurrently
+      - maintenance
+    why_it_matters: >
+      Invalid or unusable indexes are not reliable for planning and often indicate
+      an interrupted or failed index operation.
+    fix_strategy: >
+      Drop the invalid index concurrently when possible, then recreate it if the
+      workload still requires that index definition.
+    expected_benefit: >
+      Cleaner schema state and removal of misleading or unusable index objects.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 95
+    impact: 70
+    effort: 40
+
+    label: Invalid or unusable indexe detected.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        SELECT
+        i.indexrelid AS object_id,
+        n.nspname AS schema_name,
+        ic.relname AS object_name,
+        t.relname AS table_name,
+        i.indrelid AS table_id,
+        i.indisvalid,
+        i.indisready,
+        i.indislive,
+        pg_relation_size(i.indexrelid) AS index_size_bytes,
+        pg_size_pretty(pg_relation_size(i.indexrelid)) AS index_size_pretty,
+        pg_get_indexdef(i.indexrelid) AS index_definition,
+        'HIGH' AS pga_recommendation_level,
+        CASE
+            WHEN i.indisvalid = false AND i.indisready = false
+            THEN 'Index is invalid and not ready. This typically indicates a failed CREATE INDEX CONCURRENTLY operation. PostgreSQL will not use this index.'
+            WHEN i.indisvalid = false
+            THEN 'Index is invalid and cannot be used by the query planner.'
+            WHEN i.indisready = false
+            THEN 'Index build is incomplete. This may indicate an interrupted CREATE INDEX CONCURRENTLY.'
+            WHEN i.indislive = false
+            THEN 'Index is not live and is likely in a transient state (being dropped or rebuilt).'
+            ELSE 'Index is in an unexpected state.'
+        END AS recommendation_note,
+        'DROP INDEX CONCURRENTLY IF EXISTS '
+            || quote_ident(n.nspname)
+            || '.'
+            || quote_ident(ic.relname)
+            || ';'
+            || chr(10)
+            || '-- Recreate the index if it is still required by the workload.'
+            AS improvement_sql
+        FROM pg_index i
+        JOIN pg_class ic ON ic.oid = i.indexrelid
+        JOIN pg_namespace n ON n.oid = ic.relnamespace
+        JOIN pg_class t ON t.oid = i.indrelid
+        WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+        AND ic.relkind = 'i'
+        AND (
+            i.indisvalid = false
+            OR i.indisready = false
+            OR i.indislive = false
+        )
+        ORDER BY
+        pg_relation_size(i.indexrelid) DESC,
+        n.nspname,
+        t.relname,
+        ic.relname;       
+
+  - id: Tables never vacuumed
+    source: maintenance_checks
+    category_id: MAINTENANCE
+    object_type: TABLE
+    outcome_id: OPERABILITY
+    advisor_group: MAINTENANCE_RISKS
+    risk_level: LOW
+    action_type: VACUUM
+    action_safety: SAFE_TO_APPLY
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - vacuum
+      - autovacuum
+      - maintenance
+      - dead-tuples
+    why_it_matters: >
+      Tables that have never been vacuumed may have dead tuples, stale visibility
+      information, or indicate that autovacuum activity should be reviewed.
+    fix_strategy: >
+      Run VACUUM ANALYZE and verify whether autovacuum is enabled and active for
+      the affected table.
+    expected_benefit: >
+      Better table maintenance state and more reliable planner statistics.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 80
+    impact: 65
+    effort: 25
+
+    label: Table never vacuumed or autovacuumed.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        table_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH table_stats AS (
+        SELECT
+            schemaname AS schema_name,
+            relname AS object_name,
+            relid AS object_id,
+            n_live_tup,
+            n_dead_tup,
+            pg_total_relation_size(relid) AS total_size_bytes,
+            pg_size_pretty(pg_total_relation_size(relid)) AS total_size_pretty,
+            last_vacuum,
+            last_autovacuum
+        FROM pg_stat_user_tables
+        ),
+        scored AS (
+        SELECT
+            object_id,
+            schema_name,
+            object_name,
+            n_live_tup,
+            n_dead_tup,
+            total_size_bytes,
+            total_size_pretty,
+            last_vacuum,
+            last_autovacuum,
+            CASE
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND total_size_bytes >= 1024 * 1024 * 1024 THEN 'HIGH'
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND n_dead_tup > 0 THEN 'MEDIUM'
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND n_live_tup > 0 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND total_size_bytes >= 1024 * 1024 * 1024
+            THEN 'Large table has never been vacuumed or autovacuumed according to pg_stat_user_tables. This may indicate missing maintenance activity or recently reset statistics.'
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND n_dead_tup > 0
+            THEN 'Table has dead tuples but has never been vacuumed or autovacuumed according to pg_stat_user_tables.'
+            WHEN last_vacuum IS NULL
+                AND last_autovacuum IS NULL
+                AND n_live_tup > 0
+            THEN 'Table contains rows but has never been vacuumed or autovacuumed according to pg_stat_user_tables.'
+            ELSE 'No vacuum concern detected.'
+            END AS recommendation_note
+        FROM table_stats
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        'VACUUM (ANALYZE) '
+            || quote_ident(schema_name)
+            || '.'
+            || quote_ident(object_name)
+            || ';' AS improvement_sql,
+        total_size_bytes,
+        total_size_pretty,
+        n_live_tup,
+        n_dead_tup,
+        last_vacuum,
+        last_autovacuum
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        total_size_bytes DESC,
+        n_dead_tup DESC,
+        schema_name,
+        object_name;
+
+  - id: Tables without primary key
+    source: schema_checks
+    category_id: DESIGN
+    object_type: TABLE
+    outcome_id: RELIABILITY
+    advisor_group: DATA_MODEL_ISSUES
+    risk_level: HIGH
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_ONLY
+    requires_lock: true
+    requires_maintenance_window: true
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - primary-key
+      - data-integrity
+      - replication
+      - schema-design
+    why_it_matters: >
+      Tables without a primary key can make data integrity, replication, row
+      identification, and application behavior harder to reason about.
+    fix_strategy: >
+      Identify a stable candidate key or create a surrogate key, validate data
+      uniqueness, then add the primary key during a controlled change window.
+    expected_benefit: >
+      Stronger data integrity and more predictable schema behavior.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 90
+    impact: 70
+    effort: 40
+
+    label: Table without primary key.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        table_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH tables AS (
+        SELECT
+            c.oid AS object_id,
+            n.nspname AS schema_name,
+            c.relname AS object_name,
+            pg_total_relation_size(c.oid) AS table_size_bytes,
+            pg_size_pretty(pg_total_relation_size(c.oid)) AS table_size_pretty
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+        ),
+        without_pk AS (
+        SELECT t.*
+        FROM tables t
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint con
+            WHERE con.conrelid = t.object_id
+                AND con.contype = 'p'
+        )
+        ),
+        scored AS (
+        SELECT
+            object_id,
+            schema_name,
+            object_name,
+            table_size_bytes,
+            table_size_pretty,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024 THEN 'HIGH'
+            WHEN table_size_bytes >= 100 * 1024 * 1024 THEN 'MEDIUM'
+            ELSE 'MEDIUM'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+            THEN 'Large table without a primary key. This can impact data integrity, indexing strategy, and application behavior. It may also limit replication and maintenance operations.'
+            ELSE 'Table does not have a primary key. This may impact data integrity, indexing strategy, and application behavior.'
+            END AS recommendation_note
+        FROM without_pk
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        '-- Review table structure before adding a primary key' || chr(10) ||
+        '-- Example (adjust column):' || chr(10) ||
+        'ALTER TABLE '
+            || quote_ident(schema_name)
+            || '.'
+            || quote_ident(object_name)
+            || ' ADD PRIMARY KEY (...);'
+            AS improvement_sql,
+        table_size_bytes,
+        table_size_pretty
+        FROM scored
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        table_size_bytes DESC,
+        schema_name,
+        object_name;        
+
+  - id: High index-to-table size ratio
+    source: storage_checks
+    category_id: INDEX
+    object_type: TABLE
+    outcome_id: STORAGE
+    advisor_group: INDEX_CLEANUP
+    risk_level: MEDIUM
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - index-bloat
+      - excessive-indexing
+      - storage
+      - write-overhead
+    why_it_matters: >
+      A high index-to-table size ratio can indicate redundant, overlapping, or
+      low-value indexes that increase storage and write costs.
+    fix_strategy: >
+      Use this as a follow-up investigation. Review unused, duplicate, redundant,
+      and overlapping indexes before dropping anything.
+    expected_benefit: >
+      Better index portfolio hygiene and potential reduction in storage and write overhead.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 75
+    impact: 65
+    effort: 45
+
+    label: Table with high index-to-table size ratio.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH table_sizes AS (
+        SELECT
+            c.oid AS object_id,
+            n.nspname AS schema_name,
+            c.relname AS object_name,
+            pg_relation_size(c.oid) AS table_size_bytes,
+            pg_indexes_size(c.oid) AS indexes_size_bytes,
+            pg_total_relation_size(c.oid) AS total_size_bytes
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+        ),
+        scored AS (
+        SELECT
+            object_id,
+            schema_name,
+            object_name,
+            table_size_bytes,
+            pg_size_pretty(table_size_bytes) AS table_size_pretty,
+            indexes_size_bytes,
+            pg_size_pretty(indexes_size_bytes) AS indexes_size_pretty,
+            total_size_bytes,
+            pg_size_pretty(total_size_bytes) AS total_size_pretty,
+            ROUND(indexes_size_bytes::numeric / NULLIF(table_size_bytes, 0), 2) AS index_to_table_ratio,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 2 THEN 'HIGH'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 3 THEN 'HIGH'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 2 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN table_size_bytes >= 1024 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 2
+            THEN 'Large table has indexes using more than twice the table size. Review redundant, overlapping, unused, or low-value indexes to reduce storage and write overhead.'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 3
+            THEN 'Table has indexes using more than three times the table size. This may indicate redundant or excessive indexing.'
+            WHEN table_size_bytes >= 100 * 1024 * 1024
+                AND indexes_size_bytes > table_size_bytes * 2
+            THEN 'Table has indexes using more than twice the table size. Review whether all indexes are still useful.'
+            ELSE 'Index size ratio is not significant.'
+            END AS recommendation_note
+        FROM table_sizes
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        '-- Review indexes on this table before dropping anything.' || chr(10) ||
+        '-- Useful follow-up checks: unused indexes, redundant indexes, duplicate indexes.' || chr(10) ||
+        'SELECT indexrelname, pg_size_pretty(pg_relation_size(indexrelid)) AS index_size, idx_scan' || chr(10) ||
+        'FROM pg_stat_user_indexes' || chr(10) ||
+        'WHERE schemaname = '
+            || quote_literal(schema_name)
+            || ' AND relname = '
+            || quote_literal(object_name)
+            || chr(10) ||
+        'ORDER BY pg_relation_size(indexrelid) DESC;' AS improvement_sql,
+        table_size_bytes,
+        table_size_pretty,
+        indexes_size_bytes,
+        indexes_size_pretty,
+        total_size_bytes,
+        total_size_pretty,
+        index_to_table_ratio
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        index_to_table_ratio DESC,
+        indexes_size_bytes DESC,
+        schema_name,
+        object_name;        
+
+  - id: Low or missing foreign key coverage
+    source: schema_checks
+    category_id: DESIGN
+    object_type: TABLE
+    outcome_id: RELIABILITY
+    advisor_group: DATA_MODEL_ISSUES
+    risk_level: HIGH
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_ONLY
+    requires_lock: true
+    requires_maintenance_window: true
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - foreign-key
+      - data-integrity
+      - schema-design
+      - review-only
+    why_it_matters: >
+      Low foreign key coverage may indicate that relational integrity is enforced
+      outside the database or not enforced consistently.
+    fix_strategy: >
+      Review application expectations and schema relationships before adding
+      constraints. Add foreign keys only where database-level integrity is desired.
+    expected_benefit: >
+      Improved data integrity and better visibility into schema relationships.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 55
+    impact: 70
+    effort: 55
+
+    label: Low or missing foreign key coverage detected.
+
+    result_mapping:
+        object_id: object_id
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH user_tables AS (
+        SELECT
+            c.oid,
+            n.nspname AS schema_name,
+            c.relname AS table_name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+        ),
+        fk_stats AS (
+        SELECT
+            COUNT(*) AS table_count,
+            (
+            SELECT COUNT(*)
+            FROM pg_constraint con
+            JOIN user_tables t ON t.oid = con.conrelid
+            WHERE con.contype = 'f'
+            ) AS fk_count
+        FROM user_tables
+        ),
+        scored AS (
+        SELECT
+            (SELECT oid FROM pg_database WHERE datname = current_database()) AS object_id,
+            current_database() AS object_name,
+            table_count,
+            fk_count,
+            ROUND(fk_count::numeric / NULLIF(table_count, 0), 2) AS fk_per_table_ratio,
+            CASE
+            WHEN table_count > 1 AND fk_count = 0 THEN 'HIGH'
+            WHEN table_count >= 50 AND fk_count::numeric / NULLIF(table_count, 0) < 0.20 THEN 'MEDIUM'
+            ELSE NULL
+            END AS pga_recommendation_level,
+            CASE
+            WHEN table_count > 1 AND fk_count = 0
+            THEN 'Database has multiple user tables but no declared foreign keys. This may indicate missing relational constraints, reduced data integrity, and limited schema relationship visibility.'
+            WHEN table_count >= 50 AND fk_count::numeric / NULLIF(table_count, 0) < 0.20
+            THEN 'Database has many user tables but very few declared foreign keys relative to the number of tables. This may indicate incomplete relational modeling, although some workloads intentionally avoid foreign keys.'
+            ELSE NULL
+            END AS recommendation_note
+        FROM fk_stats
+        )
+        SELECT
+        object_id,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        '-- Review schema relationships and add foreign keys where data integrity should be enforced.' || chr(10) ||
+        '-- Example:' || chr(10) ||
+        '-- ALTER TABLE child_table ADD CONSTRAINT fk_child_parent FOREIGN KEY (parent_id) REFERENCES parent_table(id);'
+            AS improvement_sql,
+        table_count,
+        fk_count,
+        fk_per_table_ratio
+        FROM scored
+        WHERE pga_recommendation_level IS NOT NULL
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC;        
+
+  - id: autovacuum_dead_tuple_vacuum_urgency
+    label: Autovacuum dead tuple cleanup urgency
+    source: maintenance_checks
+    category_id: MAINTENANCE
+    object_type: TABLE
+    outcome_id: OPERABILITY
+    advisor_group: AUTOVACUUM_HEALTH
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 80
+    impact: 80
+    effort: 35
+
+    risk_level: HIGH
+    change_risk: LOW
+    action_type: VACUUM
+    action_safety: REVIEW_BEFORE_APPLY
+
+    why_it_matters: >
+      Tables with a vacuum urgency greater than 1 have exceeded the effective
+      autovacuum dead tuple cleanup threshold. If the value remains high,
+      autovacuum may be unable to keep up, blocked, under-provisioned, or failing.
+
+    fix_strategy: >
+      Review autovacuum activity, long-running transactions, lock conflicts,
+      autovacuum worker capacity, and table-specific autovacuum settings before
+      applying manual maintenance or tuning autovacuum parameters.
+
+    expected_benefit: >
+      Better dead tuple cleanup, reduced table bloat, improved planner statistics,
+      and lower risk of degraded performance over time.
+
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+
+    tags:
+      - autovacuum
+      - vacuum
+      - dead-tuples
+      - bloat
+      - maintenance
+      - operability
+
+    result_mapping:
+      object_id: object_id
+      schema_name: schema_name
+      table_name: table_name
+      object_name: object_name
+      recommendation_note: recommendation_note
+      improvement_sql: improvement_sql
+      recommendation_level: pga_recommendation_level
+      vacuum_urgency: vacuum_urgency
+      n_dead_tup: n_dead_tup
+      total_rows: total_rows
+      effective_vacuum_threshold: effective_vacuum_threshold
+      last_autovacuum: last_autovacuum
+
+    sql: |
+      WITH table_autovacuum_settings AS (
+          SELECT
+              st.relid AS object_id,
+              st.schemaname AS schema_name,
+              st.relname AS table_name,
+              t.reltuples::bigint AS total_rows,
+              st.n_dead_tup,
+              st.last_autovacuum,
+              COALESCE(
+                  MIN(split_part(ro.o, '=', 2))
+                      FILTER (WHERE split_part(ro.o, '=', 1) = 'autovacuum_vacuum_scale_factor'),
+                  current_setting('autovacuum_vacuum_scale_factor')
+              )::float8 AS scale_factor,
+              COALESCE(
+                  MIN(split_part(ro.o, '=', 2))
+                      FILTER (WHERE split_part(ro.o, '=', 1) = 'autovacuum_vacuum_threshold'),
+                  current_setting('autovacuum_vacuum_threshold')
+              )::float8 AS threshold,
+              COALESCE(
+                  MIN(split_part(ro.o, '=', 2))
+                      FILTER (WHERE split_part(ro.o, '=', 1) = 'autovacuum_vacuum_max_threshold'),
+                  current_setting('autovacuum_vacuum_max_threshold', true),
+                  'Infinity'
+              )::float8 AS max_threshold
+          FROM pg_stat_all_tables st
+          JOIN pg_class t
+            ON t.oid = st.relid
+          LEFT JOIN LATERAL unnest(t.reloptions) AS ro(o)
+            ON ro.o ~~ ANY (
+                ARRAY[
+                    'autovacuum_vacuum_scale_factor=%',
+                    'autovacuum_vacuum_threshold=%',
+                    'autovacuum_vacuum_max_threshold=%'
+                ]
+            )
+          WHERE st.schemaname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+          GROUP BY
+              st.relid,
+              st.schemaname,
+              st.relname,
+              t.reltuples,
+              st.n_dead_tup,
+              st.last_autovacuum
+      ),
+      scored AS (
+          SELECT
+              object_id,
+              schema_name,
+              table_name,
+              schema_name || '.' || table_name AS object_name,
+              total_rows,
+              n_dead_tup,
+              last_autovacuum,
+              scale_factor,
+              threshold,
+              max_threshold,
+              LEAST(
+                  max_threshold,
+                  total_rows * scale_factor + threshold
+              ) AS effective_vacuum_threshold,
+              COALESCE(
+                  n_dead_tup::numeric / NULLIF(
+                      LEAST(
+                          max_threshold,
+                          total_rows * scale_factor + threshold
+                      ),
+                      0
+                  ),
+                  100.0
+              ) AS vacuum_urgency
+          FROM table_autovacuum_settings
+      ),
+      classified AS (
+          SELECT
+              *,
+              CASE
+                  WHEN vacuum_urgency >= 5 THEN 'HIGH'
+                  WHEN vacuum_urgency >= 2 THEN 'HIGH'
+                  WHEN vacuum_urgency >= 1 THEN 'MEDIUM'
+                  ELSE 'NONE'
+              END AS pga_recommendation_level,
+              CASE
+                  WHEN vacuum_urgency >= 5 THEN
+                      'Table has a very high vacuum urgency. Dead tuples greatly exceed the effective autovacuum threshold. Autovacuum may be blocked, too slow, under-provisioned, or failing.'
+                  WHEN vacuum_urgency >= 2 THEN
+                      'Table dead tuples significantly exceed the effective autovacuum threshold. Review whether autovacuum is keeping up with the workload.'
+                  WHEN vacuum_urgency >= 1 THEN
+                      'Table has reached or exceeded the effective autovacuum threshold. Autovacuum should process this table soon.'
+                  ELSE
+                      'Autovacuum dead tuple cleanup threshold has not been reached.'
+              END AS recommendation_note
+          FROM scored
+      )
+      SELECT
+          object_id,
+          schema_name,
+          table_name,
+          object_name,
+          total_rows,
+          n_dead_tup,
+          ROUND(vacuum_urgency::numeric, 2) AS vacuum_urgency,
+          ROUND(effective_vacuum_threshold::numeric, 0) AS effective_vacuum_threshold,
+          scale_factor,
+          threshold,
+          max_threshold,
+          last_autovacuum,
+          pga_recommendation_level,
+          recommendation_note,
+          '-- Review autovacuum activity before running manual VACUUM.' || chr(10) ||
+          '-- Possible causes: long-running transactions, lock conflicts, too few autovacuum workers, workload generating dead tuples too fast, or autovacuum failures.' || chr(10) ||
+          'VACUUM (ANALYZE) '
+              || quote_ident(schema_name)
+              || '.'
+              || quote_ident(table_name)
+              || ';' AS improvement_sql
+      FROM classified
+      WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+      ORDER BY
+          CASE pga_recommendation_level
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 1
+          END DESC,
+          vacuum_urgency DESC,
+          n_dead_tup DESC,
+          schema_name,
+          table_name;        

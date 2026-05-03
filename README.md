@@ -5,8 +5,8 @@
 <h1 align="center">pgAssistant</h1>
 
 <p align="center">
-  <strong>AI-powered PostgreSQL Performance & Schema Optimization Assistant</strong><br/>
-  Diagnose, understand and optimize complex PostgreSQL workloads using real execution plans and full schema context.
+  <strong>PostgreSQL performance and schema analysis tool</strong><br/>
+  Understand and improve PostgreSQL workloads using execution plans and database context.
 </p>
 
 <p align="center">
@@ -24,155 +24,97 @@
 </p>
 
 <p align="center">
-⭐ If pgAssistant helps you, please consider starring the repository.
+⭐ If pgAssistant is useful to you, consider starring the repository.
 </p>
 
 ---
 
 # What is pgAssistant?
 
-pgAssistant is an open-source tool designed to help developers and DBAs **understand and optimize PostgreSQL databases** beyond traditional metric dashboards.
+pgAssistant is an open-source tool that helps developers **analyze and improve PostgreSQL databases**.
 
-It combines:
+It focuses on combining **database introspection** with **practical recommendations**, rather than just displaying metrics.
 
-- Deterministic database analysis  
-- [Global Advisor](advisor.md) (deterministic, database-wide analysis)**  
-- Query-level advisor based on real execution plans (`EXPLAIN ANALYZE`)  
-- Full schema inspection (DDL) with automatic relational graph visualization to reveal table dependencies and structural issues  
-- Structural issue detection (missing indexes, redundant indexes, missing foreign keys, datatype inconsistencies)  
-- Naming convention and RFC(s) validation  
-- Database parameters & statistics  
-- Optional AI-assisted reasoning  
+Main capabilities:
 
-The goal: turn raw PostgreSQL internals into **actionable optimization decisions**.
+- **Global Advisor**: database-wide deterministic analysis  
+- Query analysis based on real execution plans (`EXPLAIN ANALYZE`)  
+- Schema inspection (DDL) with relational visualization  
+- Detection of common structural issues (indexes, foreign keys, data types)  
+- Database configuration and statistics checks  
+- Optional AI-assisted analysis  
+
+---
+
+## Deterministic analysis
+
+Since version 2.8, pgAssistant introduces the **Global Advisor**.
+
+It runs a set of checks directly against PostgreSQL system catalogs and produces a list of recommendations.
+
+Each recommendation includes:
+
+- A **rank** (priority)
+- A **confidence level**
+- An estimated **impact**
+- An estimated **effort**
+- A suggested SQL statement when relevant
+
+Typical findings include:
+
+- Missing or unused indexes  
+- Redundant indexes  
+- Foreign key issues  
+- Outdated statistics  
+- Table bloat or missing maintenance  
+- Configuration problems  
+
+This analysis is deterministic: given the same database state, it produces the same results.
+
+---
+
+## Query-level analysis
+
+pgAssistant can also analyze individual queries using real execution plans:
+
+- `EXPLAIN ANALYZE` parsing  
+- Index suggestions  
+- Join and execution strategy insights  
+
+This is useful for investigating specific slow queries.
+
+---
+
+## Optional AI assistance
+
+AI can be enabled as an additional layer, but is not required.
+
+It can help with:
+
+- Query rewrites  
+- Additional optimization suggestions  
+- Naming and convention checks  
+
+When used, AI is provided with database context (schema, statistics, plans) to improve relevance.
 
 ---
 
 ## Changelog
 
-Stay up to date with the latest features and improvements:  
 [View the full changelog](CHANGELOG.md)
 
-# Why pgAssistant is Different
-
-Most tools show metrics.
-
-pgAssistant provides **context-aware analysis**.
-
-When using AI-assisted features, pgAssistant injects:
-
-- Table definitions (DDL) with Index definitions
-- Database configuration parameters
-- `pg_stats` insights
-- Real execution plans (`EXPLAIN ANALYZE`)
-- Query text
-
-This drastically reduces hallucination risk and enables meaningful recommendations such as:
-
-- Composite index suggestions  
-- Join strategy improvements  
-- Parameter tuning (e.g., `work_mem`, `effective_cache_size`)  
-- Schema corrections   
-
-This is not “copy-paste your query into ChatGPT”.
-
-It is **structured, contextualized database analysis**.
-
-## Deterministic Analysis First, AI When Needed
-
-Starting with **pgAssistant v2.8**, deterministic analysis is no longer a collection of isolated checks.
-
-It is now unified into the **Global Advisor**.
-
-### Global Advisor (One-Click Analysis)
-
-The **Global Advisor** allows you to run a full database analysis **in one click**.
-
-It aggregates all deterministic checks performed directly on PostgreSQL system catalogs and turns them into **prioritized, actionable recommendations**.
-
-Each recommendation is enriched with:
-
-- **Ranking** (what to fix first)  
-- **Confidence level** (how reliable the finding is)  
-- **Impact** (expected performance or maintainability gain)  
-- **Effort** (estimated implementation cost)  
-
-Typical detected issues include:
-
-- Missing indexes on foreign keys  
-- Datatype inconsistencies in relationships  
-- Redundant or overlapping indexes  
-- Unused indexes  
-- Index coverage gaps  
-
-
-This approach is:
-
-- **Deterministic** → no randomness, no hallucination  
-- **Consistent** → same input, same output  
-- **Actionable** → directly usable in production workflows  
-
 ---
 
-### AI-Assisted Analysis (Optional Layer)
-
-AI is used as an **optional augmentation layer**, not a replacement.
-
-It helps with:
-
-- Query rewrite suggestions  
-- Context-aware optimization reasoning  
-- RFC compliance checks  
-- Naming and convention recommendations  
-
----
-
-pgAssistant’s philosophy is simple:
-
-> **Start with deterministic truth.  
-> Then use AI to go further.**
-
-# Real-World Example
-
-Complex 10-table join query.
-
-Initial execution time: **3.2 seconds**
-
-pgAssistant recommendations:
-
-- Add 2 composite indexes  
-- Rewrite a nested loop join  
-- Adjust `work_mem`  
-- Fix missing foreign key  
-
-New execution time: **420 ms**
-
-→ **7.6x improvement**
-
-(Results depend on workload, always validate in non-production environments.)
-
----
-
-# AI-Powered Database Assistance (Optional)
-
-Compatible with Ollama or any OpenAI-compatible API.
-
-- Query optimization suggestions  
-- Index recommendation  
-- SQL rewrite proposals  
-- RFC compliance checks  
-- Custom guideline validation (give a URL with your specific guidelines)  
-
-AI is optional. pgAssistant remains fully usable without it.
-
----
-
-# Screenshots
+## Screenshots
 
 ## Dashboard
 ![Dashboard](media/dashboard.png)
 
-## Global advisor
+
+## Global advisor summary
+![Global advisor](media/global_advisor_summary.png)
+
+## Global advisor recommandations
 ![Global advisor](media/global_advisor.png)
 
 ## Query Insight
@@ -187,104 +129,55 @@ AI is optional. pgAssistant remains fully usable without it.
 ## AI Query Optimization
 ![LLM Optimize Query](media/llm_optimize_query.png)
 
-## Schema Issue Detection
-![Missing FK](media/issue_fk_missing.png)
-
-(See `/media` folder for more screenshots.)
-
 ---
 
-# Quick Start
+## Quick Start
 
-## Option A — Docker (Recommended)
+### Docker (recommended)
 
-Follow the guide:  
 https://beh74.github.io/pgassistant-blog/doc/startup_docker/
 
-## Option B — Python (Local Environment)
+### Python (local setup)
 
 https://beh74.github.io/pgassistant-blog/doc/startup_python/
 
 ---
 
-# Live Demo
-
-Try the demo:
+## Live demo
 
 https://ov-004f8b.infomaniak.ch/
 
-Demo database connection: postgresql://postgres:demo@demo-db:5432/northwind
+Demo connection: postgresql://postgres:demo@demo-db:5432/northwind
 
-⚠️ The public demo does NOT use an LLM.  
-⚠️ Do not provide personal API keys in the public demo.
-
-If you want to try the new database report API coming with v2.0 :
-```
-curl -X POST https://ov-004f8b.infomaniak.ch/api/v1/report \
-  -H "Content-Type: application/json" \
-  -d '{
-    "db_config": {
-      "db_host": "demo-db",
-      "db_port": 5432,
-      "db_name": "northwind",
-      "db_user": "postgres",
-      "db_password": "demo"
-    }
-  }'
-```
+⚠️ The public demo does not use AI  
+⚠️ Do not provide personal API keys
 
 The demo database is reset daily.
 
 ---
 
-# Who is pgAssistant for?
+## Who is it for?
 
-- Backend developers working with complex SQL  
-- PostgreSQL DBAs : you can add your favorites secrets queries using the MyQueries feature 
-- DevOps engineers diagnosing performance issues  
-- Teams without dedicated DBA resources  
-- Developers wanting to understand PostgreSQL internals more deeply  
+- Developers working with SQL  
+- DevOps engineers troubleshooting performance  
+- Teams without dedicated database expertise  
 
 ---
 
-# Philosophy
 
-Traditional tools tell you *what* is slow.
+## Documentation
 
-pgAssistant helps you understand:
-
-- Why it is slow  
-- What to change  
-- How to validate the change  
-
-It combines deterministic PostgreSQL introspection with optional AI reasoning to make developers more autonomous.
-
-LLMs can make mistakes.  
-Always validate suggestions and test extensively before applying changes in production.
-
----
-
-# Documentation & Blog
-
-Full documentation:  
 https://beh74.github.io/pgassistant-blog/
 
-RSS feed:  
-https://beh74.github.io/pgassistant-blog/index.xml
+---
+
+## License
+
+MIT
 
 ---
 
-Contributions welcome.
+## Acknowledgments
 
----
-
-# License
-
-MIT License
-
----
-
-# Acknowledgments
-
-UI framework based on Volt Bootstrap 5 Dashboard:  
+UI based on Volt Bootstrap 5 Dashboard:  
 https://github.com/themesberg/volt-bootstrap-5-dashboard
