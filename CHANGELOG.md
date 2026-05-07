@@ -3,8 +3,14 @@
 
 # Change Log
 
+## [2.8.3] - 2026-05-07
 
-## [2.8.2] - 2026-02-03
+## Improvements
+
+- Added a recommandation on sequences : Sequence is close to its maximum value
+- Added support of qwen 3.6 model
+
+## [2.8.2] - 2026-05-03
 
 ## Improvements
 

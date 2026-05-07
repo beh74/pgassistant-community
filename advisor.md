@@ -176,6 +176,14 @@ Tables with a vacuum urgency have exceeded the effective autovacuum dead tuple c
 
 ---
 
+## 15. Sequences approaching maximum value
+
+Sequence is close to its maximum value. This may soon lead to insert failures.
+
+**Suggested action:** change datatype
+
+---
+
 # Notes and Limitations
 
 ## PostgreSQL statistics reset

@@ -104,7 +104,7 @@ def query_chatgpt(question):
         think_level = "low" if family.startswith("gpt-oss") else None
 
         print(
-            f"⚙️ Using native Ollama API "
+            f"Using native Ollama API "
             f"(model={model_llm}, family={family}, est_prompt_tokens={prompt_tokens}, "
             f"num_ctx={num_ctx}/{ctx_limit}, num_predict={out_budget}), mode={mode}, think={think_level}"
         )
@@ -126,6 +126,9 @@ def query_chatgpt(question):
         }
         if think_level is not None:
             payload["think"] = think_level
+        if family in ("qwen3.6", "qwen3.5"):
+            payload["think"] = False
+            payload["thinking"] = False            
 
         # 1) normal call
         data = _ollama_post(root, "/api/chat", payload, timeout=600)
@@ -143,11 +146,16 @@ def query_chatgpt(question):
                 # optional: helps confirm "thinking ate the budget" on GPT-OSS
                 "has_thinking": ("thinking" in data) or ("thinking" in (data.get("message") or {})),
             }
-            print(f"⚠️ Empty Ollama output. diag={diag}. Retrying with smaller num_predict...")
+            print(f"Empty Ollama output. diag={diag}. Retrying with smaller num_predict...")
 
             payload2 = payload.copy()
             payload2["options"] = payload["options"].copy()
-            payload2["options"]["num_predict"] = min(256, out_budget)
+            
+            if family in ("qwen3.6", "qwen3.5"):
+                payload2["options"]["num_predict"] = max(1024, out_budget)
+            else:
+                payload2["options"]["num_predict"] = min(256, out_budget)
+
             # keep think=low on retry if enabled
             if think_level is not None:
                 payload2["think"] = think_level
@@ -448,7 +456,7 @@ Additionally, provide the necessary **ALTER TABLE** SQL command(s) to implement 
 
 def analyze_table_format (ddl: str) -> str:
     llm_prompt = f"""
-# 📌 SQL Table Structure Validation Based on RFC & International Standards (PostgreSQL Compatible)
+# SQL Table Structure Validation Based on RFC & International Standards (PostgreSQL Compatible)
 
 ## **Task**  
 You are an expert in **database design**, **SQL optimization**, and **data standards**. Your goal is to **validate the structure of a SQL table (DDL)** based on relevant **RFCs, international standards, and best practices**.  

@@ -698,7 +698,7 @@ recommendations:
     result_mapping:
         object_id: object_id
         schema_name: schema_name
-        object_name: object_name
+        table_name: object_name
         recommendation_note: recommendation_note
         improvement_sql: improvement_sql
         recommendation_level: pga_recommendation_level
@@ -825,7 +825,7 @@ recommendations:
     result_mapping:
         object_id: object_id
         schema_name: schema_name
-        object_name: object_name
+        table_name: object_name
         recommendation_note: recommendation_note
         improvement_sql: improvement_sql
         recommendation_level: pga_recommendation_level
@@ -1805,3 +1805,96 @@ recommendations:
           n_dead_tup DESC,
           schema_name,
           table_name;        
+
+  - id: Sequences approaching maximum value
+    source: schema_checks
+    category_id: DESIGN
+    object_type: SEQUENCE
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 95
+    impact: 90
+    effort: 40
+
+    label: Sequences close to exhaustion.
+
+    result_mapping:
+        object_id: object_id
+        schema_name: schema_name
+        object_name: object_name
+        recommendation_note: recommendation_note
+        improvement_sql: improvement_sql
+        recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH seq AS (
+        SELECT
+            c.oid AS object_id,
+            n.nspname AS schema_name,
+            c.relname AS object_name,
+            s.last_value,
+            s.max_value,
+            s.increment_by,
+            CASE
+            WHEN s.max_value > 0
+            THEN s.last_value::numeric / s.max_value
+            ELSE NULL
+            END AS usage_ratio
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_sequences s
+            ON s.schemaname = n.nspname
+            AND s.sequencename = c.relname
+        WHERE c.relkind = 'S'
+        ),
+        scored AS (
+        SELECT
+            object_id,
+            schema_name,
+            object_name,
+            last_value,
+            max_value,
+            ROUND(usage_ratio * 100, 2) AS usage_pct,
+            CASE
+            WHEN usage_ratio >= 0.90 THEN 'HIGH'
+            WHEN usage_ratio >= 0.75 THEN 'MEDIUM'
+            ELSE 'NONE'
+            END AS pga_recommendation_level,
+            CASE
+            WHEN usage_ratio >= 0.90
+            THEN 'Sequence is close to its maximum value. This may soon lead to insert failures.'
+            WHEN usage_ratio >= 0.75
+            THEN 'Sequence is approaching its maximum value. Consider planning for extension.'
+            ELSE NULL
+            END AS recommendation_note
+        FROM seq
+        )
+        SELECT
+        object_id,
+        schema_name,
+        object_name,
+        pga_recommendation_level,
+        recommendation_note,
+        '-- Consider increasing sequence range or migrating to BIGINT' || chr(10) ||
+        '-- Example:' || chr(10) ||
+        '-- ALTER SEQUENCE '
+            || quote_ident(schema_name)
+            || '.'
+            || quote_ident(object_name)
+            || ' AS BIGINT;' 
+            AS improvement_sql,
+        last_value,
+        max_value,
+        usage_pct
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
+        ORDER BY
+        CASE pga_recommendation_level
+            WHEN 'HIGH' THEN 2
+            WHEN 'MEDIUM' THEN 1
+        END DESC,
+        usage_pct DESC,
+        schema_name,
+        object_name;          

@@ -26,6 +26,10 @@ def detect_model_family(model_llm: str | None) -> str:
     if "mistral" in m:
         return "mistral"
 
+    if "qwen3.6" in m or "qwen36" in m:
+        return "qwen3.6"
+    if "qwen3.5" in m or "qwen35" in m:
+        return "qwen3.5"
     if "qwen3" in m:
         return "qwen3"
     if "qwen2" in m:
@@ -74,6 +78,8 @@ MODEL_CTX_LIMITS = {
     "mistral": 8192,     # Base mistral builds often 8k
 
     # Qwen
+    "qwen3.6": 262144,
+    "qwen3.5": 262144,    
     "qwen3": 32768,
     "qwen2": 32768,
     "qwen": 8192,
@@ -121,7 +127,9 @@ def choose_ctx_and_output_budget(model_llm: str | None, prompt_tokens: int) -> t
 
     # Safer caps to avoid timeouts (especially 20B models)
     # Adjust according to your infrastructure
-    if family in ("gpt-oss-20b", "mixtral", "mistral3"):
+    if family in ("qwen3.6", "qwen3.5"):
+        hard_cap = 2048    
+    elif family in ("gpt-oss-20b", "mixtral", "mistral3"):
         hard_cap = 1200
     elif ctx_limit <= 8192:
         hard_cap = 800
