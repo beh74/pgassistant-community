@@ -13,9 +13,9 @@ def analyze_plan_for_safe_indexes(
     queryid: int | str | None = None,
 ) -> Dict[str, Any]:
     """
-    Analyse un plan EXPLAIN ANALYZE FORMAT JSON et propose des index "safe only".
-    Remonte aussi le chemin d'accès déjà utilisé (Seq Scan, Index Scan, etc.)
-    ainsi que l'index utilisé quand applicable.
+    Analyzes an EXPLAIN ANALYZE FORMAT JSON plan and proposes "safe only" indexes.
+    Also reports the access path already used (Seq Scan, Index Scan, etc.)
+    as well as the index used when applicable.
     """
     db_config = helpers.get_db_config_from_session(session)
     con, message = database.connectdb(db_config)
@@ -95,10 +95,24 @@ def analyze_plan_for_safe_indexes(
                     rec.candidate_columns,
                 )
 
+        actionable_recommendations = [
+            r for r in recommendations
+            if r.confidence not in {"none", "info"} and r.create_index_sql
+        ]
+        observations = [
+            r for r in recommendations
+            if r.confidence in {"none", "info"} or not r.create_index_sql
+        ]
+
         return {
             "ok": True,
             "message": "Plan analyzed successfully.",
+            # Backward compatible: keep the full list for existing UI code.
             "recommendations": [asdict(r) for r in recommendations],
+            # New preferred fields: show actionable_recommendations to users, and
+            # keep observations collapsed/debug-only to avoid noisy "no index" cards.
+            "actionable_recommendations": [asdict(r) for r in actionable_recommendations],
+            "observations": [asdict(r) for r in observations],
             "scan_findings": [asdict(f) for f in scan_findings],
             "join_findings": [asdict(j) for j in join_findings],
             "query_stats": asdict(query_stats) if query_stats else None,
@@ -164,36 +178,65 @@ def evaluate_indexed_scan_candidate(
     meta: helpers.TableMeta,
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
-    candidate_columns: List[str] = []
-    predicates: List[Dict[str, str]] = []
+    """
+    Also analyzes scans that already use an index.
+
+    Target case:
+      Index Scan using idx_a on t
+        Index Cond: (a = 42)
+        Filter: (b = 'x')
+        Rows Removed by Filter: 100000
+
+    The previous advisor stopped at "an index is already used". Here we check whether
+    a more selective composite index, for example (a, b), could reduce the number
+    of tuples visited and later filtered by the heap/executor.
+    """
+    index_predicates: List[Dict[str, str]] = []
+    filter_predicates: List[Dict[str, str]] = []
+
+    if finding.index_cond:
+        index_predicates = helpers.extract_simple_filter_predicates(
+            finding.index_cond,
+            alias=finding.alias,
+            table=finding.table,
+        )
+
+    # Bitmap Heap Scan peut porter la condition indexée dans Recheck Cond.
+    if not index_predicates and finding.recheck_cond:
+        index_predicates = helpers.extract_simple_filter_predicates(
+            finding.recheck_cond,
+            alias=finding.alias,
+            table=finding.table,
+        )
 
     if finding.filter_expr:
-        predicates = helpers.extract_simple_filter_predicates(
+        filter_predicates = helpers.extract_simple_filter_predicates(
             finding.filter_expr,
             alias=finding.alias,
             table=finding.table,
         )
 
-        if predicates:
-            candidate_columns = helpers.reorder_index_candidate_columns(
-                con,
-                finding.schema,
-                finding.table,
-                predicates,
-            )
+    all_predicates = helpers.merge_simple_predicates(index_predicates, filter_predicates)
+    candidate_columns = helpers.reorder_index_candidate_columns(
+        con,
+        finding.schema,
+        finding.table,
+        all_predicates,
+    ) if all_predicates else []
 
     stats_reason = (
         helpers.build_candidate_predicates_stats_reason(
             con,
             finding.schema,
             finding.table,
-            predicates,
+            all_predicates,
         )
-        if predicates
+        if all_predicates
         else None
     )
 
     used_index_def = helpers.find_index_definition(meta.indexes, finding.index_name)
+    used_index_columns = helpers.find_index_columns(meta.indexes, finding.index_name)
 
     row_gap_flag, row_gap_reason = helpers.has_large_row_estimation_gap(
         finding.actual_rows,
@@ -206,15 +249,150 @@ def evaluate_indexed_scan_candidate(
     else:
         reason = f"{finding.node_type} already in use."
 
-    if row_gap_flag:
-        reason += " A notable planner row-estimation gap was observed for this indexed access path."
-    else:
-        reason += " Planner row estimation for this indexed access path looks acceptable."
+    post_index_filter_fraction = helpers.estimate_post_index_filter_fraction(finding)
+    post_index_filter_reason = helpers.build_post_index_filter_reason(finding)
 
-    if finding.filter_expr:
-        reason += " No additional simple index recommendation is produced by the current advisor logic for this indexed scan."
-    else:
-        reason += " No additional simple index recommendation is produced."
+    if not finding.filter_expr:
+        reason += " No residual Filter is present, so the current index already supports the visible scan predicates."
+        if row_gap_flag:
+            reason += " A notable planner row-estimation gap was observed for this indexed access path."
+
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=reason,
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            used_index_def=used_index_def,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    if not filter_predicates:
+        reason += " A residual Filter exists, but it is not simple enough for a safe better-index recommendation."
+        if post_index_filter_reason:
+            reason += " " + post_index_filter_reason
+
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=reason,
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            used_index_def=used_index_def,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    if not candidate_columns:
+        reason += " Could not build a reliable candidate column list from Index Cond + Filter."
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=reason,
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            used_index_def=used_index_def,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    matched_index = helpers.find_equivalent_index(meta.indexes, candidate_columns)
+    if matched_index:
+        reason += (
+            f' A candidate index on ({", ".join(candidate_columns)}) is already covered '
+            f'by existing index "{matched_index}".'
+        )
+        if post_index_filter_reason:
+            reason += " " + post_index_filter_reason
+
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=reason,
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            used_index_def=used_index_def,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns,
+            existing_index_match=matched_index,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    adds_filter_columns = helpers.candidate_adds_columns_to_used_index(
+        used_index_columns,
+        candidate_columns,
+    )
+
+    filter_is_selective = (
+        post_index_filter_fraction is not None
+        and post_index_filter_fraction <= 0.30
+        and finding.rows_removed_by_filter >= max(100.0, finding.actual_rows * 2.0)
+    )
+
+    meaningful_runtime = finding.actual_total_time >= 1.0 or helpers.is_high_workload(query_stats)
+
+    if adds_filter_columns and filter_is_selective and meaningful_runtime:
+        reason += (
+            " The current index is useful, but the residual Filter is still highly selective after "
+            "the index access; a composite index that includes the filter column(s) may reduce heap "
+            "visits and improve the execution plan."
+        )
+        if post_index_filter_reason:
+            reason += " " + post_index_filter_reason
+
+        confidence = "review"
+        if len(candidate_columns) == 1:
+            confidence = "safe"
+
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence=confidence,
+            reason=reason,
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            used_index_def=used_index_def,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns,
+            create_index_sql=helpers.build_create_index_sql(
+                finding.schema,
+                finding.table,
+                candidate_columns,
+            ),
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    reason += " Existing indexed access path does not show enough residual-filter waste for a better-index recommendation."
+    if post_index_filter_reason:
+        reason += " " + post_index_filter_reason
+    if row_gap_flag:
+        reason += " A notable planner row-estimation gap was observed."
 
     return helpers.Recommendation(
         schema=finding.schema,
@@ -232,7 +410,6 @@ def evaluate_indexed_scan_candidate(
         stats_reason=stats_reason,
         row_estimation_reason=row_gap_reason,
     )
-
 
 def evaluate_seq_scan_candidate(
     con,
@@ -279,7 +456,7 @@ def evaluate_seq_scan_candidate(
             schema=finding.schema,
             table=finding.table,
             confidence="none",
-            reason="Sequential scan without filter: an index would not be a safe recommendation.",
+            reason=helpers.build_no_filter_seq_scan_reason(finding, meta),
             node_type=finding.node_type,
             access_path=finding.node_type,
             row_estimation_reason=row_gap_reason,
@@ -287,8 +464,8 @@ def evaluate_seq_scan_candidate(
             index_cond=finding.index_cond,
             recheck_cond=finding.recheck_cond,
             filter_expr=finding.filter_expr,
-            candidate_columns=candidate_columns or None,
-            stats_reason=stats_reason,
+            candidate_columns=None,
+            stats_reason=None,
         )
 
     if helpers.is_small_table(meta):
@@ -311,7 +488,17 @@ def evaluate_seq_scan_candidate(
             row_estimation_reason=row_gap_reason,
         )
 
-    if finding.actual_total_time < 1.0 and not helpers.is_high_workload(query_stats):
+    planned_but_not_executed = finding.actual_loops <= 0
+
+    # Important: a node with Actual Loops = 0 did not run because an upstream
+    # node returned no rows. Its Actual Total Time is therefore 0, but the plan
+    # can still reveal a poor access path that would hurt as soon as the outer
+    # side returns rows. Do not classify it as "already very fast".
+    if (
+        finding.actual_total_time < 1.0
+        and not planned_but_not_executed
+        and not helpers.is_high_workload(query_stats)
+    ):
         return helpers.Recommendation(
             schema=finding.schema,
             table=finding.table,
@@ -329,12 +516,38 @@ def evaluate_seq_scan_candidate(
         )
 
     selected_fraction = helpers.estimate_selected_fraction(finding)
+    selected_fraction_source = "execution stats"
+
+    if selected_fraction is None and planned_but_not_executed:
+        selected_fraction = helpers.estimate_planned_selected_fraction(finding, meta)
+        selected_fraction_source = "planner estimates because Actual Loops = 0"
+
     if selected_fraction is None:
         return helpers.Recommendation(
             schema=finding.schema,
             table=finding.table,
             confidence="none",
-            reason="Unable to estimate filter selectivity safely from execution stats.",
+            reason="Unable to estimate filter selectivity safely from execution stats or planner estimates.",
+            node_type=finding.node_type,
+            access_path=finding.node_type,
+            used_index_name=finding.index_name,
+            index_cond=finding.index_cond,
+            recheck_cond=finding.recheck_cond,
+            filter_expr=finding.filter_expr,
+            candidate_columns=candidate_columns or None,
+            stats_reason=stats_reason,
+            row_estimation_reason=row_gap_reason,
+        )
+
+    if planned_but_not_executed and not helpers.is_planned_scan_potentially_expensive(finding, meta):
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                "Scan node was planned but not executed (Actual Loops = 0), and its planned "
+                "cost is not high enough for a safe index recommendation."
+            ),
             node_type=finding.node_type,
             access_path=finding.node_type,
             used_index_name=finding.index_name,
@@ -679,6 +892,25 @@ def evaluate_join_candidate(
 
     return recommendations
 
+
+
+def get_columns_statistics(result: Dict[str, Any]) -> List[str]:
+    stats: List[str] = []
+
+    for rec in result.get("recommendations", []):
+        stats_reason = rec.get("stats_reason")
+
+        if not stats_reason:
+            continue
+
+        schema = rec.get("schema")
+        table = rec.get("table")
+
+        stats.append(
+            f"{schema}.{table}: column with statistics -> {stats_reason}"
+        )
+
+    return stats
 
 # --------------------------------------------------------------------
 # Pretty printer / debug helper

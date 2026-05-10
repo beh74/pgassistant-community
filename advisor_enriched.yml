@@ -704,86 +704,126 @@ recommendations:
         recommendation_level: pga_recommendation_level
 
     sql: |
-        WITH t AS (
-        SELECT
-            schemaname,
-            relname,
-            relid,
-            n_live_tup,
-            n_dead_tup,
-            n_mod_since_analyze,
-            last_analyze,
-            last_autoanalyze,
-            pg_total_relation_size(relid) AS table_size_bytes,
-            GREATEST(last_analyze, last_autoanalyze) AS last_any_analyze
-        FROM pg_stat_user_tables
+        WITH params AS (
+            SELECT
+                1024 * 1024::bigint AS min_table_size_bytes,
+                interval '1 day' AS min_time_since_analyze
+        ),
+        t AS (
+            SELECT
+                s.schemaname,
+                s.relname,
+                s.relid,
+                s.n_live_tup,
+                s.n_dead_tup,
+                s.n_mod_since_analyze,
+                s.last_analyze,
+                s.last_autoanalyze,
+                pg_total_relation_size(s.relid) AS total_size_bytes,
+                pg_relation_size(s.relid) AS table_size_bytes,
+                GREATEST(s.last_analyze, s.last_autoanalyze) AS last_any_analyze
+            FROM pg_stat_user_tables s
+            CROSS JOIN params p
+            WHERE pg_relation_size(s.relid) >= p.min_table_size_bytes
+            AND (
+                    GREATEST(s.last_analyze, s.last_autoanalyze) IS NULL
+                    OR GREATEST(s.last_analyze, s.last_autoanalyze)
+                        < now() - p.min_time_since_analyze
+                )
         ),
         x AS (
-        SELECT
-            *,
-            (n_mod_since_analyze::numeric / NULLIF(n_live_tup, 0)) AS modified_since_analyze_ratio,
-            EXTRACT(EPOCH FROM (now() - last_any_analyze)) / 86400.0 AS stats_age_days
-        FROM t
+            SELECT
+                *,
+                COALESCE(
+                    n_mod_since_analyze::numeric / NULLIF(n_live_tup, 0),
+                    0
+                ) AS modified_since_analyze_ratio,
+                CASE
+                    WHEN last_any_analyze IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (now() - last_any_analyze)) / 86400.0
+                END AS stats_age_days
+            FROM t
         ),
         scored AS (
+            SELECT
+                relid AS object_id,
+                schemaname AS schema_name,
+                relname AS object_name,
+                total_size_bytes,
+                pg_size_pretty(total_size_bytes) AS total_size_pretty,
+                table_size_bytes,
+                pg_size_pretty(table_size_bytes) AS table_size_pretty,
+                n_live_tup,
+                n_dead_tup,
+                n_mod_since_analyze,
+                ROUND(modified_since_analyze_ratio * 100, 2) AS modified_since_analyze_pct,
+                last_analyze,
+                last_autoanalyze,
+                last_any_analyze,
+                ROUND(stats_age_days, 1) AS stats_age_days,
+                CASE
+                    WHEN last_any_analyze IS NULL THEN 'HIGH'
+                    WHEN table_size_bytes >= 1024 * 1024 * 1024
+                        AND (
+                                stats_age_days > 14
+                                OR modified_since_analyze_ratio > 0.20
+                            )
+                    THEN 'HIGH'
+                    WHEN stats_age_days > 30
+                        OR modified_since_analyze_ratio > 0.30
+                    THEN 'MEDIUM'
+                    ELSE 'NONE'
+                END AS pga_recommendation_level,
+                CASE
+                    WHEN last_any_analyze IS NULL
+                    THEN 'Table has never been analyzed.'
+                    WHEN table_size_bytes >= 1024 * 1024 * 1024
+                        AND stats_age_days > 14
+                    THEN 'Large table with outdated statistics.'
+                    WHEN table_size_bytes >= 1024 * 1024 * 1024
+                        AND modified_since_analyze_ratio > 0.20
+                    THEN 'Large table with significant data churn since last analyze.'
+                    WHEN stats_age_days > 30
+                    THEN 'Statistics are older than 30 days.'
+                    WHEN modified_since_analyze_ratio > 0.30
+                    THEN 'High proportion of data modified since last analyze.'
+                    ELSE 'Statistics require attention.'
+                END AS recommendation_note
+            FROM x
+        )
         SELECT
-            relid AS object_id,
-            schemaname AS schema_name,
-            relname AS object_name,
+            object_id,
+            schema_name,
+            object_name,
+            pga_recommendation_level,
+            recommendation_note,
+            'ANALYZE '
+                || quote_ident(schema_name)
+                || '.'
+                || quote_ident(object_name)
+                || ';' AS improvement_sql,
+            total_size_bytes,
+            total_size_pretty,
             table_size_bytes,
-            pg_size_pretty(table_size_bytes) AS table_size_pretty,
+            table_size_pretty,
             n_live_tup,
             n_dead_tup,
             n_mod_since_analyze,
-            ROUND(modified_since_analyze_ratio * 100, 2) AS modified_since_analyze_pct,
+            modified_since_analyze_pct,
             last_analyze,
             last_autoanalyze,
-            ROUND(stats_age_days, 1) AS stats_age_days,
-            CASE
-            WHEN last_any_analyze IS NULL THEN 'HIGH'
-            WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND (stats_age_days > 14 OR modified_since_analyze_ratio > 0.20) THEN 'HIGH'
-            WHEN stats_age_days > 30 OR modified_since_analyze_ratio > 0.30 THEN 'MEDIUM'
-            ELSE 'NONE'
-            END AS pga_recommendation_level,
-            CASE
-            WHEN last_any_analyze IS NULL THEN 'Table has never been analyzed'
-            WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND stats_age_days > 14 THEN 'Large table with outdated statistics'
-            WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND modified_since_analyze_ratio > 0.20 THEN 'Large table with significant data churn since last analyze'
-            WHEN stats_age_days > 30 THEN 'Statistics are older than 30 days'
-            WHEN modified_since_analyze_ratio > 0.30 THEN 'High proportion of data modified since last analyze'
-            ELSE 'Statistics require attention'
-            END AS recommendation_note
-        FROM x
-        )
-        SELECT
-        object_id,
-        schema_name,
-        object_name,
-        pga_recommendation_level,
-        recommendation_note,
-        'ANALYZE ' || quote_ident(schema_name) || '.' || quote_ident(object_name) || ';' AS improvement_sql,
-        table_size_bytes,
-        table_size_pretty,
-        n_live_tup,
-        n_dead_tup,
-        n_mod_since_analyze,
-        modified_since_analyze_pct,
-        last_analyze,
-        last_autoanalyze,
-        stats_age_days
+            last_any_analyze,
+            stats_age_days
         FROM scored
         WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
         ORDER BY
-        CASE pga_recommendation_level
-            WHEN 'HIGH' THEN 2
-            WHEN 'MEDIUM' THEN 1
-        END DESC,
-        table_size_bytes DESC,
-        schema_name,
-        object_name;
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 1
+            END DESC,
+            table_size_bytes DESC,
+            schema_name,
+            object_name;
 
   - id: Tables with estimated bloat
     source: storage_checks
@@ -830,84 +870,99 @@ recommendations:
         improvement_sql: improvement_sql
         recommendation_level: pga_recommendation_level
     sql: |
-        WITH table_stats AS (
-        SELECT
-            schemaname AS schema_name,
-            relname AS table_name,
-            relid AS object_id,
-            n_live_tup,
-            n_dead_tup,
-            pg_total_relation_size(relid) AS total_size_bytes,
-            pg_relation_size(relid) AS table_size_bytes,
-            CASE
-            WHEN n_live_tup + n_dead_tup > 0
-            THEN n_dead_tup::numeric / (n_live_tup + n_dead_tup)
-            ELSE 0
-            END AS dead_tuple_ratio
-        FROM pg_stat_user_tables
+        WITH params AS (
+            SELECT
+                1024 * 1024::bigint AS min_table_size_bytes,
+                interval '6 days' AS min_time_since_vacuum
+        ),
+        table_stats AS (
+            SELECT
+                s.schemaname AS schema_name,
+                s.relname AS table_name,
+                s.relid AS object_id,
+                s.n_live_tup,
+                s.n_dead_tup,
+                pg_total_relation_size(s.relid) AS total_size_bytes,
+                pg_relation_size(s.relid) AS table_size_bytes,
+                GREATEST(s.last_vacuum, s.last_autovacuum) AS last_vacuum_at,
+                CASE
+                    WHEN s.n_live_tup + s.n_dead_tup > 0
+                    THEN s.n_dead_tup::numeric / (s.n_live_tup + s.n_dead_tup)
+                    ELSE 0
+                END AS dead_tuple_ratio
+            FROM pg_stat_user_tables s
+            CROSS JOIN params p
+            WHERE pg_relation_size(s.relid) >= p.min_table_size_bytes
+            AND (
+                    GREATEST(s.last_vacuum, s.last_autovacuum) IS NULL
+                    OR GREATEST(s.last_vacuum, s.last_autovacuum)
+                        < now() - p.min_time_since_vacuum
+                )
         ),
         scored AS (
+            SELECT
+                object_id,
+                schema_name,
+                table_name AS object_name,
+                n_live_tup,
+                n_dead_tup,
+                total_size_bytes,
+                pg_size_pretty(total_size_bytes) AS total_size_pretty,
+                table_size_bytes,
+                pg_size_pretty(table_size_bytes) AS table_size_pretty,
+                last_vacuum_at,
+                ROUND(dead_tuple_ratio * 100, 2) AS dead_tuple_pct,
+                CASE
+                    WHEN table_size_bytes >= 1024 * 1024 * 1024
+                        AND dead_tuple_ratio >= 0.20 THEN 'HIGH'
+                    WHEN table_size_bytes >= 100 * 1024 * 1024
+                        AND dead_tuple_ratio >= 0.30 THEN 'HIGH'
+                    WHEN dead_tuple_ratio >= 0.20 THEN 'MEDIUM'
+                    ELSE 'NONE'
+                END AS pga_recommendation_level,
+                CASE
+                    WHEN table_size_bytes >= 1024 * 1024 * 1024
+                        AND dead_tuple_ratio >= 0.20
+                    THEN 'Large table with a high estimated dead tuple ratio. This may indicate table bloat and increased I/O.'
+                    WHEN table_size_bytes >= 100 * 1024 * 1024
+                        AND dead_tuple_ratio >= 0.30
+                    THEN 'Medium or large table with a very high estimated dead tuple ratio. This may indicate table bloat.'
+                    WHEN dead_tuple_ratio >= 0.20
+                    THEN 'Table has a significant estimated dead tuple ratio. Review vacuum activity and table maintenance.'
+                    ELSE 'No significant estimated table bloat detected.'
+                END AS recommendation_note
+            FROM table_stats
+        )
         SELECT
             object_id,
             schema_name,
-            table_name AS object_name,
+            object_name,
+            pga_recommendation_level,
+            recommendation_note,
+            'VACUUM (ANALYZE) '
+                || quote_ident(schema_name)
+                || '.'
+                || quote_ident(object_name)
+                || ';' AS improvement_sql,
+            total_size_bytes,
+            total_size_pretty,
+            table_size_bytes,
+            table_size_pretty,
             n_live_tup,
             n_dead_tup,
-            total_size_bytes,
-            pg_size_pretty(total_size_bytes) AS total_size_pretty,
-            table_size_bytes,
-            pg_size_pretty(table_size_bytes) AS table_size_pretty,
-            ROUND(dead_tuple_ratio * 100, 2) AS dead_tuple_pct,
-            CASE
-            WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND dead_tuple_ratio >= 0.20 THEN 'HIGH'
-            WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND dead_tuple_ratio >= 0.30 THEN 'HIGH'
-            WHEN dead_tuple_ratio >= 0.20 THEN 'MEDIUM'
-            ELSE 'NONE'
-            END AS pga_recommendation_level,
-            CASE
-            WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND dead_tuple_ratio >= 0.20
-            THEN 'Large table with a high estimated dead tuple ratio. This may indicate table bloat and increased I/O.'
-            WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND dead_tuple_ratio >= 0.30
-            THEN 'Medium or large table with a very high estimated dead tuple ratio. This may indicate table bloat.'
-            WHEN dead_tuple_ratio >= 0.20
-            THEN 'Table has a significant estimated dead tuple ratio. Review vacuum activity and table maintenance.'
-            ELSE 'No significant estimated table bloat detected.'
-            END AS recommendation_note
-        FROM table_stats
-        )
-        SELECT
-        object_id,
-        schema_name,
-        object_name,
-        pga_recommendation_level,
-        recommendation_note,
-        'VACUUM (ANALYZE) '
-            || quote_ident(schema_name)
-            || '.'
-            || quote_ident(object_name)
-            || ';' AS improvement_sql,
-        total_size_bytes,
-        total_size_pretty,
-        table_size_bytes,
-        table_size_pretty,
-        n_live_tup,
-        n_dead_tup,
-        dead_tuple_pct
+            dead_tuple_pct,
+            last_vacuum_at
         FROM scored
         WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
         ORDER BY
-        CASE pga_recommendation_level
-            WHEN 'HIGH' THEN 2
-            WHEN 'MEDIUM' THEN 1
-        END DESC,
-        total_size_bytes DESC,
-        dead_tuple_pct DESC,
-        schema_name,
-        object_name;        
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 1
+            END DESC,
+            total_size_bytes DESC,
+            dead_tuple_pct DESC,
+            schema_name,
+            object_name;   
 
   - id: Important PostgreSQL settings disabled or suboptimal
     source: configuration_checks

@@ -33,10 +33,14 @@ class ScanFinding:
     actual_rows: float
     plan_rows: float
     actual_loops: float
+    startup_cost: float
+    total_cost: float
     rows_removed_by_filter: float
     shared_hit_blocks: int
     shared_read_blocks: int
     actual_total_time: float
+    parent_node_type: Optional[str] = None
+    parent_relationship: Optional[str] = None
     index_def: Optional[str] = None
 
 
@@ -168,6 +172,7 @@ def walk_plan_collect_findings(
     node: Dict[str, Any],
     scan_findings: List[ScanFinding],
     join_findings: List[JoinFinding],
+    parent_node_type: Optional[str] = None,
 ) -> None:
     node_type = node.get("Node Type", "")
 
@@ -189,10 +194,14 @@ def walk_plan_collect_findings(
                 actual_rows=float(node.get("Actual Rows", 0) or 0),
                 plan_rows=float(node.get("Plan Rows", 0) or 0),
                 actual_loops=float(node.get("Actual Loops", 0) or 0),
+                startup_cost=float(node.get("Startup Cost", 0) or 0),
+                total_cost=float(node.get("Total Cost", 0) or 0),
                 rows_removed_by_filter=float(node.get("Rows Removed by Filter", 0) or 0),
                 shared_hit_blocks=int(node.get("Shared Hit Blocks", 0) or 0),
                 shared_read_blocks=int(node.get("Shared Read Blocks", 0) or 0),
                 actual_total_time=float(node.get("Actual Total Time", 0) or 0),
+                parent_node_type=parent_node_type,
+                parent_relationship=node.get("Parent Relationship"),
             )
         )
 
@@ -235,7 +244,12 @@ def walk_plan_collect_findings(
         )
 
     for child in node.get("Plans", []) or []:
-        walk_plan_collect_findings(child, scan_findings, join_findings)
+        walk_plan_collect_findings(
+            child,
+            scan_findings,
+            join_findings,
+            parent_node_type=node_type,
+        )
 
 
 # --------------------------------------------------------------------
@@ -783,11 +797,86 @@ def is_small_table(meta: TableMeta) -> bool:
     return False
 
 
+
+
+def is_full_relation_scan_without_predicate(finding: ScanFinding, meta: TableMeta) -> bool:
+    """
+    True when the plan is intentionally reading most/all rows. In this case a
+    plain btree index cannot reduce the scan volume, so the advisor should stay
+    quiet instead of producing a noisy non-actionable recommendation.
+    """
+    if finding.filter_expr or finding.index_cond or finding.recheck_cond:
+        return False
+
+    if meta.reltuples <= 0:
+        return finding.rows_removed_by_filter <= 0
+
+    # Prefer actuals when the node executed; otherwise fall back to Plan Rows.
+    rows = finding.actual_rows if finding.actual_loops > 0 else finding.plan_rows
+    if rows <= 0:
+        return False
+
+    return (rows / meta.reltuples) >= 0.50
+
+
+def build_no_filter_seq_scan_reason(finding: ScanFinding, meta: TableMeta) -> str:
+    relation = f'{finding.schema}.{finding.table}'
+
+    if is_small_table(meta):
+        return (
+            f"Sequential scan on small table {relation}: no selective predicate is visible, "
+            "and scanning the table is usually cheaper than using an index."
+        )
+
+    if is_full_relation_scan_without_predicate(finding, meta):
+        parent = f" under {finding.parent_node_type}" if finding.parent_node_type else ""
+        return (
+            f"Full sequential scan on {relation}{parent}: no WHERE predicate is available "
+            "on this relation, so a normal index would not reduce the number of rows read. "
+            "This is expected for full joins/aggregations; no index recommendation is emitted "
+            "for this scan node."
+        )
+
+    return (
+        f"Sequential scan on {relation} without a visible filter. No safe index recommendation "
+        "can be derived from this scan node alone."
+    )
+
 def estimate_selected_fraction(finding: ScanFinding) -> Optional[float]:
     scanned_rows = finding.actual_rows + finding.rows_removed_by_filter
     if scanned_rows <= 0:
         return None
     return min(finding.actual_rows / scanned_rows, 1.0)
+
+
+def estimate_planned_selected_fraction(finding: ScanFinding, meta: TableMeta) -> Optional[float]:
+    """
+    Fallback when a scan node was planned but not executed, e.g. inner side of a
+    Nested Loop with Actual Loops = 0. EXPLAIN ANALYZE has no actual filtered
+    rows for that node, but Plan Rows vs reltuples still tells us whether the
+    planner expected selective predicates.
+    """
+    if meta.reltuples <= 0 or finding.plan_rows < 0:
+        return None
+    return max(0.0, min(float(finding.plan_rows) / float(meta.reltuples), 1.0))
+
+
+def is_planned_scan_potentially_expensive(finding: ScanFinding, meta: TableMeta) -> bool:
+    """
+    Cost-side guard for nodes that were not executed. This prevents the advisor
+    from saying "already fast" solely because Actual Loops = 0.
+    """
+    if finding.actual_loops > 0:
+        return False
+
+    if finding.total_cost >= 100.0:
+        return True
+
+    # Relative fallback for small databases where absolute costs are low.
+    if meta.relpages > 8 and finding.total_cost >= max(10.0, meta.relpages * 0.25):
+        return True
+
+    return False
 
 
 def strip_outer_parentheses(expr: str) -> str:
@@ -1050,11 +1139,11 @@ def reorder_index_candidate_columns(
     predicates: List[Dict[str, str]],
 ) -> List[str]:
     """
-    Réordonne les colonnes candidates pour un index composite:
-    - colonnes avec '=' d'abord
-    - puis LIKE / ~~ prefix
-    - puis ranges
-    - à l'intérieur d'un groupe: cardinalité décroissante
+    Reorders candidate columns for a composite index:
+    - equality columns first
+    - then LIKE / ~~ prefix predicates
+    - then range predicates
+    - within each group: descending cardinality
     """
     if not predicates:
         return []
@@ -1103,6 +1192,82 @@ def extract_simple_join_columns(
         m.group("right_col"),
     )
 
+
+
+def merge_simple_predicates(
+    first: List[Dict[str, str]],
+    second: List[Dict[str, str]],
+) -> List[Dict[str, str]]:
+    """
+    Merges two predicate lists while keeping the first predicate encountered
+    for each column. Useful for combining Index Cond + Filter without duplicating
+    a column already constrained by the current index.
+    """
+    merged: List[Dict[str, str]] = []
+    seen = set()
+
+    for pred in (first or []) + (second or []):
+        col = pred.get("column")
+        op = pred.get("operator")
+        if not col or not op or col in seen:
+            continue
+        merged.append({"column": col, "operator": op})
+        seen.add(col)
+
+    return merged
+
+
+def find_index_columns(indexes: List[Dict[str, Any]], index_name: Optional[str]) -> List[str]:
+    if not index_name:
+        return []
+
+    for idx in indexes:
+        if idx.get("index_name") == index_name:
+            return [c.strip('"') for c in idx.get("columns", [])]
+    return []
+
+
+def candidate_adds_columns_to_used_index(
+    used_index_columns: List[str],
+    candidate_columns: List[str],
+) -> bool:
+    """
+    Returns True if the candidate contains at least one column missing from the current index.
+    Exact column ordering is not required because reorder_index_candidate_columns
+    may intentionally move equality predicates before range predicates.
+    """
+    if not candidate_columns:
+        return False
+
+    used = {c.strip('"') for c in used_index_columns or []}
+    candidate = [c.strip('"') for c in candidate_columns]
+
+    return any(c not in used for c in candidate)
+
+
+def estimate_post_index_filter_fraction(finding: ScanFinding) -> Optional[float]:
+    """
+    Fraction de lignes conservées après le Filter résiduel d'un accès indexé.
+    Plus la valeur est basse, plus l'index courant ramène des tuples qui sont
+    ensuite jetés par l'executor.
+    """
+    visited_after_index = finding.actual_rows + finding.rows_removed_by_filter
+    if visited_after_index <= 0:
+        return None
+    return min(finding.actual_rows / visited_after_index, 1.0)
+
+
+def build_post_index_filter_reason(finding: ScanFinding) -> Optional[str]:
+    fraction = estimate_post_index_filter_fraction(finding)
+    if fraction is None:
+        return None
+
+    removed = finding.rows_removed_by_filter
+    kept = finding.actual_rows
+    return (
+        f"Residual filter kept {fraction:.1%} of tuples visited by the indexed path "
+        f"(actual_rows={kept:.0f}, rows_removed_by_filter={removed:.0f})."
+    )
 
 def looks_like_prefix_search(filter_expr: str) -> bool:
     return bool(

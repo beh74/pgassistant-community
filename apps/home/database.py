@@ -499,40 +499,59 @@ def fetch_tables_pgstat(db_config, tables: Iterable[str]) -> Dict[str, Dict[str,
 
     return rows
 
-def fetch_table_stats(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, Any]]:
-    """
-    Returns a mini-summary for each table:
-    - estimated_rows (reltuples)
-    - n_live_tup, n_dead_tup, vacuum/analyze timestamps
-    - last_vacuum/last_autovacuum/last_analyze/last_autoanalyze
-    - (optional) sizes if extensions are allowed: pg_total_relation_size
-    """
-
+def fetch_table_stats(db_config, tables):
     if not tables:
         return {}
 
     rows = {}
-    conn = None 
+
     try:
         conn, message = connectdb(db_config)
-    except Exception as e:
+    except Exception:
         return None
-    
+
+    qualified = [t for t in tables if "." in t]
+    unqualified = [t for t in tables if "." not in t]
+
+    rel_filters = []
+    rel_params = []
+
+    stat_filters = []
+    stat_params = []
+
+    if qualified:
+        rel_filters.append("(n.nspname || '.' || c.relname) = ANY(%s)")
+        rel_params.append(qualified)
+
+        stat_filters.append("(schemaname || '.' || relname) = ANY(%s)")
+        stat_params.append(qualified)
+
+    if unqualified:
+        rel_filters.append("c.relname = ANY(%s)")
+        rel_params.append(unqualified)
+
+        stat_filters.append("relname = ANY(%s)")
+        stat_params.append(unqualified)
+
+    rel_where = " OR ".join(rel_filters)
+    stat_where = " OR ".join(stat_filters)
+
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # 2.1 reltuples + taille
+
         cur.execute(
-            """
+            f"""
             SELECT n.nspname AS schemaname,
-                   c.relname  AS tablename,
+                   c.relname AS tablename,
                    c.reltuples::bigint AS estimated_rows,
                    pg_total_relation_size(c.oid) AS total_bytes
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('r','p') -- tables et partitions
-              AND (c.relname) = ANY(%s)
+            WHERE c.relkind IN ('r','p')
+              AND ({rel_where})
             """,
-            (tables,),
+            tuple(rel_params),
         )
+
         for r in cur.fetchall():
             key = f"{r['schemaname']}.{r['tablename']}"
             rows[key] = {
@@ -540,18 +559,22 @@ def fetch_table_stats(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, A
                 "total_bytes": int(r["total_bytes"]),
             }
 
-        # 2.2 pg_stat_all_tables
         cur.execute(
-            """
-            SELECT schemaname, relname,
-                   n_live_tup, n_dead_tup,
-                   last_vacuum, last_autovacuum,
-                   last_analyze, last_autoanalyze
+            f"""
+            SELECT schemaname,
+                   relname,
+                   n_live_tup,
+                   n_dead_tup,
+                   last_vacuum,
+                   last_autovacuum,
+                   last_analyze,
+                   last_autoanalyze
             FROM pg_stat_all_tables
-            WHERE (relname) = ANY(%s)
+            WHERE ({stat_where})
             """,
-            (tables,),
+            tuple(stat_params),
         )
+
         for r in cur.fetchall():
             key = f"{r['schemaname']}.{r['relname']}"
             rows.setdefault(key, {})

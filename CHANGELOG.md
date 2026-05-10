@@ -3,6 +3,21 @@
 
 # Change Log
 
+## [2.8.4] - 2026-05-10
+
+## Improvements
+
+- Index advisor: identify potentially better indexes, even when an execution plan node already uses an existing index.
+
+- Analyze query: enrich the LLM prompt with column statistics collected by the advisor.
+
+- Rank queries: improve workload prioritization by giving more weight to execution frequency and total workload impact, while reducing noise from low-impact one-off queries.
+
+## Bug Fixes
+
+- Global advisor: recommend `ANALYZE` or `VACUUM` only when the latest maintenance operation is older than 6 days. Looking to apply parameters in global advisor
+
+
 ## [2.8.3] - 2026-05-07
 
 ## Improvements

@@ -404,7 +404,17 @@
             <div class="metrics-inline mb-3">
               <div class="metric-inline-item">
                 <span class="metric-inline-label">Calls</span>
-                <span class="metric-inline-value">{{ row['calls'] }}</span>
+               
+                <span class="metric-inline-value">
+                    {% set calls = (row['calls'] | int) if row['calls'] else 0 %}
+                    {% if calls >= 1000000 %}
+                      {{ "%.1f"|format(calls / 1000000) }}M
+                    {% elif calls >= 1000 %}
+                      {{ "%.1f"|format(calls / 1000) }}k 
+                    {% else %}
+                      {{ calls }}
+                    {% endif %} 
+                </span>
               </div>
               <div class="metric-inline-item">
                 <span class="metric-inline-label">Rows/Call</span>

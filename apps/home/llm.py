@@ -260,6 +260,18 @@ def _plan_block(rows: Union[str, Dict[str, Any], Iterable[Dict[str, Any]]]) -> s
     except Exception:
         return "```\n" + str(rows) + "\n```"
 
+def format_column_statistics(column_statistics):
+    if not column_statistics:
+        return ""
+
+    if isinstance(column_statistics, str):
+        return column_statistics
+
+    lines = []
+    for stat in column_statistics:
+        lines.append(f"  - {stat}")
+
+    return "\n".join(lines)
 
 def get_llm_query_for_query_analyze(
     host: str,
@@ -272,7 +284,9 @@ def get_llm_query_for_query_analyze(
     *,
 
     db_config: Optional[Dict[str, Any]] = None,
-    table_genius: str) -> str:
+    table_genius: str,
+    column_statistics: Optional[Dict[str, Any]] = None
+    ) -> str:
     """
     Generates a robust prompt for PostgreSQL query optimization.
     Automatically integrates server parameters via get_pg_tune_parameter()
@@ -328,25 +342,6 @@ def get_llm_query_for_query_analyze(
         except Exception:
             pass
 
-    table_pg_stats = fetch_table_stats(db_config, tables) if db_config else None
-    if table_pg_stats:
-        try:
-            pg_stats_pretty = []
-            for t, stats in table_pg_stats.items():
-                pg_stats_pretty.append(f"  - {t}:")
-                for col, col_stats in stats.items():
-                    parts = []
-                    for k in ("n_distinct", "most_common_vals", "histogram_bounds"):
-                        if k in col_stats and col_stats[k] is not None:
-                            val = col_stats[k]
-                            if isinstance(val, list):
-                                val = "[" + ", ".join(str(v) for v in val) + "]"
-                            parts.append(f"{k}={val}")
-                    pg_stats_pretty.append(f"    - {col}: " + ", ".join(parts) if parts else f"    - {col}")
-            meta_lines.append("- pg_stats (subset):\n" + "\n".join(pg_stats_pretty))
-        except Exception:
-            pass
-
     #plan_section = "\n".join(row['QUERY PLAN'] for row in rows)
     plan_section = "\n".join(
         json.dumps(row['QUERY PLAN'], indent=2)
@@ -362,6 +357,9 @@ def get_llm_query_for_query_analyze(
     )
     if meta_lines:
         llm.append("\n**Context**:\n" + "\n".join(meta_lines))
+    if column_statistics:
+        llm.append("\n- Columns statistics (subset):\n" + format_column_statistics(column_statistics))
+        
     llm.append("\n**1) DDL of involved tables**\n" + ddl_block)
     llm.append("\n**2) SQL query (original, without EXPLAIN)**\n```sql\n" + original_sql.strip() + "\n```")
     llm.append(

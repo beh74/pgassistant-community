@@ -288,6 +288,7 @@ def analyze_query(querid):
             queryplan = None
             plan_text = None
             advisor_result = None
+            column_statistics = None
 
             # Clear any previous analyze-derived table list when opening a new query page (optional but recommended)
             prev_qid = session.get("analyze_querid")
@@ -355,6 +356,7 @@ def analyze_query(querid):
                                 key=lambda r: priority.get(r.get("confidence"), 99)
                             )
                         #analyze_advisor.pretty_print_analysis(advisor_result)
+                        column_statistics=analyze_advisor.get_columns_statistics(advisor_result)
 
                     except Exception as e:
                         advisor_result = None
@@ -387,7 +389,8 @@ def analyze_query(querid):
                         user=session["db_user"],
                         port=session["db_port"],
                         password=session["db_password"],
-                        table_genius=tables
+                        table_genius=tables,
+                        column_statistics=column_statistics
                     )
 
                     # generate mermaid code
