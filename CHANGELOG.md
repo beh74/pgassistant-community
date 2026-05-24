@@ -3,6 +3,12 @@
 
 # Change Log
 
+## [2.9.0] - 2026-05-24
+
+## Improvements
+
+- Adding 2 api end points used by pgassistant-collector (see https://github.com/beh74/pgassistant-collector and https://github.com/beh74/pgassistant-grafana)
+
 ## [2.8.4] - 2026-05-10
 
 ## Improvements

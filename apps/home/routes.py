@@ -28,6 +28,7 @@ from . import analyze_advisor
 from . import tetris
 from . import ranking
 from . import global_advisor
+from . import api_helper
 import requests
 import json
 
@@ -622,7 +623,38 @@ def dba_database_report():
         tb = traceback.format_exc()
         print(tb)
         return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
-    
+
+
+@blueprint.route("/api/v1/rank_top_10_queries", methods=["GET"])
+def api_rank_top_10_queries():
+    try:
+        # read JSON GET
+        data = request.get_json(force=True)
+
+        # check db_config
+        if not data or "db_config" not in data:
+            return jsonify({"error": "Missing 'db_config' in request body"}), 400
+        db_config = data["db_config"]        
+        ranked_queries = api_helper.get_rank_top_10_queries(db_config)
+        return jsonify({"ranked_queries": ranked_queries})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@blueprint.route("/api/v1/global_advisor", methods=["GET"])
+def api_global_advisor():
+    try:
+        # read JSON GET
+        data = request.get_json(force=True)
+
+        # check db_config
+        if not data or "db_config" not in data:
+            return jsonify({"error": "Missing 'db_config' in request body"}), 400
+        db_config = data["db_config"]        
+        ranked_queries = api_helper.get_top_10_global_advisor_recommendations   (db_config)
+        return jsonify({"ranked_queries": ranked_queries})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
 def api_reset_stats():
     try:
