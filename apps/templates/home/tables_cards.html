@@ -4,171 +4,273 @@
 {% block title %}Tables{% endblock %}
 
 {% block stylesheets %}
-
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
 <style>
-.tables-toolbar {
+/* ---------------------------------- */
+/* Header */
+/* ---------------------------------- */
+.tables-header-row {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
 
-.tables-search-group {
-  flex: 0 1 420px;
-  min-width: 250px;
+.tables-subtitle {
+  color: var(--bs-secondary-color);
+  margin-bottom: 0;
 }
 
-.tables-toolbar-right {
+/* ---------------------------------- */
+/* Summary cards */
+/* ---------------------------------- */
+.tables-summary {
   display: flex;
-  align-items: end;
-  gap: 1rem;
   flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
-.tables-pages-group {
-  flex: 0 0 auto;
-  min-width: 140px;
+.tables-summary-card {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  min-width: 180px;
+  box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .04);
 }
 
-.tables-search-group .form-control,
-.tables-pages-group .form-select {
-  height: 38px;
+.tables-summary-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.15rem;
 }
 
-@media (max-width: 992px) {
-  .tables-toolbar {
-    align-items: stretch;
-  }
-
-  .tables-search-group,
-  .tables-toolbar-right {
-    width: 100%;
-  }
-
-  .tables-toolbar-right {
-    justify-content: space-between;
-  }
+.tables-summary-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--bs-body-color);
 }
 
-@media (max-width: 768px) {
-  .tables-toolbar-right {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .tables-pages-group {
-    width: 100%;
-  }
+.summary-help-icon {
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+  cursor: help;
+  opacity: 0.85;
 }
 
-.tables-grid {
+.summary-help-icon:hover {
+  opacity: 1;
+}
+
+/* ---------------------------------- */
+/* Filters */
+/* ---------------------------------- */
+.tables-filters-card .card-body {
+  padding: 1.25rem;
+}
+
+.tables-toolbar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 1rem 1.25rem;
+  align-items: end;
 }
 
-@media (max-width: 992px) {
-  .tables-grid {
+.tables-field {
+  min-width: 0;
+}
+
+.tables-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.tables-field .form-control,
+.tables-field .form-select {
+  min-height: 44px;
+  border-radius: 0.75rem;
+}
+
+.tables-actions .btn {
+  min-height: 44px;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  padding: 0 1rem;
+}
+
+@media (max-width: 1199.98px) {
+  .tables-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .tables-toolbar {
     grid-template-columns: 1fr;
   }
+
+  .tables-actions .btn {
+    width: 100%;
+  }
 }
 
-.table-card-item.d-none {
-  display: none !important;
+/* ---------------------------------- */
+/* Table cards */
+/* ---------------------------------- */
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.table-card-item {
+  min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+  .tables-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .table-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 0.9rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.05);
-  height: 100%;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
   transition: transform .12s ease, box-shadow .12s ease;
 }
 
 .table-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.10) !important;
+  box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .08);
+}
+
+.table-card .card-header {
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 0.8rem 1rem;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
 }
 
 .table-card .card-body {
   padding: 1rem;
 }
 
-.table-schema-badge {
-  display: inline-block;
-  padding: 0.28rem 0.6rem;
+.table-schema-badge,
+.table-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
   border-radius: 999px;
-  background: #eef2f7 !important;
-  color: #1f2937 !important;
-  border: 1px solid #cbd5e1 !important;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.2;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.table-status-badge {
-  display: inline-block;
-  padding: 0.28rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.2;
+.table-schema-badge {
+  background: rgba(108, 117, 125, .12);
+  color: #495057;
+}
+
+/* Same visual hierarchy as Rank Queries. */
+.table-status-high {
+  background: #dc3545;
+  color: #fff;
+}
+
+.table-status-medium {
+  background: #ffc107;
+  color: #212529;
+}
+
+.table-status-low {
+  background: #0dcaf0;
+  color: #212529;
+}
+
+.table-status-small,
+.table-status-no-stats {
+  background: #6c757d;
+  color: #fff;
 }
 
 .tables-name {
   word-break: break-word;
+  font-size: 1rem;
+  line-height: 1.4;
 }
 
 .tables-name code {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
-.metric-inline-value-link {
-  text-decoration: none;
-}
-
-.metric-inline-value-link:hover {
-  text-decoration: underline;
-}
-
-.metrics-inline {
+.table-metric-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
 }
 
-.metric-inline-item {
-  background: #fbfcfd;
-  border: 1px solid #edf0f2;
+.table-metric-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
   border-radius: 999px;
-  padding: 0.28rem 0.58rem;
-  font-size: 0.80rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  font-size: 0.82rem;
+  line-height: 1;
 }
 
-.metric-inline-label {
+.table-metric-chip .label {
   color: #6c757d;
-  margin-right: 0.3rem;
+  font-weight: 500;
 }
 
-.metric-inline-value {
-  font-weight: 600;
-  color: #111827;
+.table-metric-chip .value {
+  color: #212529;
+  font-weight: 700;
   white-space: nowrap;
 }
 
-.tables-actions {
+.table-metric-chip a.value {
+  text-decoration: none;
+}
+
+.table-metric-chip a.value:hover {
+  text-decoration: underline;
+}
+
+.text-metric-danger {
+  color: #dc3545 !important;
+}
+
+.text-metric-warning {
+  color: #9a6b00 !important;
+}
+
+.table-card-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  margin-top: auto;
 }
 
-.tables-actions .btn {
+.table-card-footer .btn {
   flex: 1 1 auto;
 }
 
+/* ---------------------------------- */
+/* Pagination and empty state */
+/* ---------------------------------- */
 .pagination-wrapper {
   display: flex;
   justify-content: space-between;
@@ -179,7 +281,7 @@
 }
 
 .pagination-info {
-  color: #6b7280;
+  color: var(--bs-secondary-color);
   font-size: 0.95rem;
 }
 
@@ -194,14 +296,25 @@
   min-width: 42px;
 }
 
-.no-results {
+.tables-empty-state {
   text-align: center;
   padding: 3rem 1rem;
-  color: #6b7280;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 1rem;
+}
+
+.tables-empty-state .empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.tables-empty-state .empty-text {
+  color: var(--bs-secondary-color);
+  margin-bottom: 0;
 }
 </style>
-{% endblock %}
-
+{% endblock stylesheets %}
 
 {% macro format_rows(n) %}
   {% if n is none %}
@@ -218,240 +331,588 @@
 {% endmacro %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid py-4 ps-3 pe-3">
 
-  {% set q = request.args.get('q', q|default(''))|trim %}
-  {% set q_lower = q|lower %}
-  {% set page = request.args.get('page', page|default(1))|int %}
-  {% set per_page = request.args.get('per_page', per_page|default(24))|int %}
+  {% set summary = namespace(
+    schemas=[],
+    high=0,
+    medium=0,
+    low=0,
+    small=0,
+    no_stats=0
+  ) %}
 
-  {# Filter first, then paginate #}
-  {% if q %}
-    {% set filtered = [] %}
-    {% for r in tables %}
-      {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
-      {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
-      {% set hay = (schema ~ '.' ~ table ~ ' ' ~ schema ~ ' ' ~ table)|lower %}
-      {% if q_lower in hay %}
-        {% set _ = filtered.append(r) %}
-      {% endif %}
-    {% endfor %}
-  {% else %}
-    {% set filtered = tables %}
-  {% endif %}
+  {% for r in tables %}
+    {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+    {% set bloat = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
 
-  {% set total = filtered|length %}
-  {% set total_pages = ((total + per_page - 1) // per_page) if per_page else 1 %}
+    {% if schema not in summary.schemas %}
+      {% set _ = summary.schemas.append(schema) %}
+    {% endif %}
 
-  {% if page < 1 %}{% set page = 1 %}{% endif %}
-  {% if total_pages > 0 and page > total_pages %}{% set page = total_pages %}{% endif %}
+    {% if bloat == 'HIGH' %}
+      {% set summary.high = summary.high + 1 %}
+    {% elif bloat == 'MEDIUM' %}
+      {% set summary.medium = summary.medium + 1 %}
+    {% elif bloat == 'LOW' %}
+      {% set summary.low = summary.low + 1 %}
+    {% elif bloat == 'SMALL_TABLE' %}
+      {% set summary.small = summary.small + 1 %}
+    {% elif bloat == 'NO_STATS' %}
+      {% set summary.no_stats = summary.no_stats + 1 %}
+    {% endif %}
+  {% endfor %}
 
-  {% set start_idx = (page - 1) * per_page %}
-  {% set end_idx = start_idx + per_page %}
-  {% set paged_tables = filtered[start_idx:end_idx] %}
-
-  <div class="py-4">
-    <div class="mb-3 mb-lg-0">
-      <h1 class="h4">Table definition helper</h1>
-      <p class="mb-0">Explore your tables and launch RFC checks, convention checks, or Tetris reordering suggestions.</p>
+  <div class="tables-header-row">
+    <div>
+      <h1 class="h4 mb-1">Table definition helper</h1>
+      <p class="tables-subtitle">
+        Explore table size, index footprint, dead tuples, and launch table design checks.
+      </p>
     </div>
   </div>
 
-  <div class="card border-0 shadow mb-4">
+  {% if tables is defined and tables %}
+    <div class="tables-summary">
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          Tables
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Total number of tables available in this view."
+          ></i>
+        </span>
+        <span class="tables-summary-value">{{ tables|length }}</span>
+      </div>
+
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          Schemas
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Number of distinct schemas represented by the table list."
+          ></i>
+        </span>
+        <span class="tables-summary-value">{{ summary.schemas|length }}</span>
+      </div>
+
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          Matching tables
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Number of tables matching the current search and bloat filter."
+          ></i>
+        </span>
+        <span class="tables-summary-value" id="tables-visible-count">{{ tables|length }}</span>
+      </div>
+
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          High bloat
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Tables currently classified with a HIGH bloat indicator."
+          ></i>
+        </span>
+        <span class="tables-summary-value text-danger">{{ summary.high }}</span>
+      </div>
+
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          Medium bloat
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Tables currently classified with a MEDIUM bloat indicator."
+          ></i>
+        </span>
+        <span class="tables-summary-value text-warning">{{ summary.medium }}</span>
+      </div>
+
+      <div class="tables-summary-card">
+        <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+          No statistics
+          <i
+            class="bi bi-question-circle summary-help-icon"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Tables for which bloat-related statistics are not available."
+          ></i>
+        </span>
+        <span class="tables-summary-value text-secondary">{{ summary.no_stats }}</span>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4 tables-filters-card">
     <div class="card-body">
+      <div class="tables-toolbar">
 
-      <form class="tables-toolbar" method="get" action="" role="search">
-        <div class="tables-search-group">
-          <label for="tableSearch" class="form-label mb-1">Search</label>
-          <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input id="tableSearch"
-                   name="q"
-                   class="form-control"
-                   type="search"
-                   value="{{ q }}"
-                   placeholder="Schema, table name..."
-                   aria-label="Search tables">
-            <button class="btn btn-outline-secondary" type="submit">Search</button>
-          </div>
+        <div class="tables-field">
+          <label for="table-search">Search</label>
+          <input
+            id="table-search"
+            type="search"
+            class="form-control"
+            placeholder="Search schema or table name..."
+            autocomplete="off"
+          >
         </div>
 
-        <div class="tables-toolbar-right">
-          <div class="tables-pages-group">
-            <label for="perPageSelect" class="form-label mb-1">Cards per page</label>
-            <select id="perPageSelect" name="per_page" class="form-select" onchange="this.form.submit()">
-              {% for n in [12,24,36,48,72,96] %}
-                <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="tables-field">
+          <label for="table-bloat-filter">Bloat level</label>
+          <select id="table-bloat-filter" class="form-select">
+            <option value="">All</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+            <option value="SMALL_TABLE">Small table</option>
+            <option value="NO_STATS">No statistics</option>
+          </select>
         </div>
 
-        <input type="hidden" name="page" value="1">
-      </form>
+        <div class="tables-field">
+          <label for="table-sort">Sort by</label>
+          <select id="table-sort" class="form-select">
+            <option value="bloat">Bloat severity</option>
+            <option value="schema">Schema</option>
+            <option value="table">Table name</option>
+            <option value="rows">Row count</option>
+            <option value="dead_pct">Dead tuple percentage</option>
+            <option value="index_pct">Index percentage</option>
+          </select>
+        </div>
 
-      <div id="tablesGrid" class="tables-grid">
-        {% for r in paged_tables %}
-          {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
-          {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
-          {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
-          {% set total_size = r.total_size if r.total_size is defined else r['total_size'] %}
-          {% set table_size = r.table_size if r.table_size is defined else r['table_size'] %}
-          {% set index_size = r.index_size if r.index_size is defined else r['index_size'] %}
-          {% set index_pct = r.index_pct if r.index_pct is defined else r['index_pct'] %}
-          {% set dead_pct = r.dead_pct if r.dead_pct is defined else r['dead_pct'] %}
-          {% set estimated_dead_size = r.estimated_dead_size if r.estimated_dead_size is defined else r['estimated_dead_size'] %}
-          {% set b = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
+        <div class="tables-field">
+          <label for="table-per-page">Cards per page</label>
+          <select id="table-per-page" class="form-select">
+            {% for n in [12, 24, 36, 48, 72, 96] %}
+              <option value="{{ n }}" {% if n == 24 %}selected{% endif %}>{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-          <div class="table-card-item">
-            <div class="card table-card">
-              <div class="card-body">
+        <div class="tables-actions">
+          <button type="button" id="table-reset-btn" class="btn btn-outline-secondary">
+            Reset
+          </button>
+        </div>
 
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="table-schema-badge">
-                      <i class="bi bi-diagram-3 me-1"></i>{{ schema }}
-                    </span>
+      </div>
+    </div>
+  </div>
 
-                    {% if b == 'HIGH' %}
-                      <span class="table-status-badge bg-danger-subtle text-danger border border-danger-subtle">High bloat</span>
-                    {% elif b == 'MEDIUM' %}
-                      <span class="table-status-badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Medium bloat</span>
-                    {% elif b == 'LOW' %}
-                      <span class="table-status-badge bg-success-subtle text-success border border-success-subtle">Low bloat</span>
-                    {% elif b == 'SMALL_TABLE' %}
-                      <span class="table-status-badge bg-light text-muted border">Small table</span>
-                    {% elif b == 'NO_STATS' %}
-                      <span class="table-status-badge bg-secondary-subtle text-secondary border border-secondary-subtle">No stats</span>
-                    {% endif %}
-                  </div>
+  {% if tables is defined and tables %}
+    <div id="tables-grid" class="tables-grid">
+      {% for r in tables %}
+        {% set schema = r.schemaname if r.schemaname is defined else r['schemaname'] %}
+        {% set table = r.table_name if r.table_name is defined else r['table_name'] %}
+        {% set row_count = r.row_count if r.row_count is defined else r['row_count'] %}
+        {% set total_size = r.total_size if r.total_size is defined else r['total_size'] %}
+        {% set table_size = r.table_size if r.table_size is defined else r['table_size'] %}
+        {% set index_size = r.index_size if r.index_size is defined else r['index_size'] %}
+        {% set index_pct = r.index_pct if r.index_pct is defined else r['index_pct'] %}
+        {% set dead_pct = r.dead_pct if r.dead_pct is defined else r['dead_pct'] %}
+        {% set estimated_dead_size = r.estimated_dead_size if r.estimated_dead_size is defined else r['estimated_dead_size'] %}
+        {% set bloat = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
+
+        <div
+          class="table-card-item"
+          data-search="{{ (schema ~ '.' ~ table ~ ' ' ~ schema ~ ' ' ~ table)|lower|e }}"
+          data-schema="{{ schema|lower|e }}"
+          data-table="{{ table|lower|e }}"
+          data-bloat="{{ bloat|e }}"
+          data-rows="{{ row_count if row_count is not none else 0 }}"
+          data-dead-pct="{{ dead_pct if dead_pct is not none else 0 }}"
+          data-index-pct="{{ index_pct if index_pct is not none else 0 }}"
+        >
+          <div class="card shadow-sm h-100 table-card">
+
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="table-schema-badge">
+                  <i class="bi bi-diagram-3 me-1"></i>{{ schema }}
+                </span>
+
+                {% if bloat == 'HIGH' %}
+                  <span class="table-status-badge table-status-high">High bloat</span>
+                {% elif bloat == 'MEDIUM' %}
+                  <span class="table-status-badge table-status-medium">Medium bloat</span>
+                {% elif bloat == 'LOW' %}
+                  <span class="table-status-badge table-status-low">Low bloat</span>
+                {% elif bloat == 'SMALL_TABLE' %}
+                  <span class="table-status-badge table-status-small">Small table</span>
+                {% elif bloat == 'NO_STATS' %}
+                  <span class="table-status-badge table-status-no-stats">No stats</span>
+                {% endif %}
+              </div>
+
+              <span class="text-muted small table-card-index">#{{ loop.index }}</span>
+            </div>
+
+            <div class="card-body d-flex flex-column">
+              <div class="tables-name mb-3">
+                <code class="text-muted">{{ schema }}</code>.<strong>{{ table }}</strong>
+              </div>
+
+              <div class="table-metric-chips mb-3">
+                <div class="table-metric-chip">
+                  <span class="label">Rows</span>
+                  <span class="value" title="{{ row_count }}">{{ format_rows(row_count) }}</span>
                 </div>
 
-                <div class="tables-name mb-3">
-                  <code class="text-muted">{{ schema }}</code>.<strong>{{ table }}</strong>
+                <div class="table-metric-chip">
+                  <span class="label">Total</span>
+                  <span class="value">{{ total_size }}</span>
                 </div>
 
-                <div class="metrics-inline mb-3">
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Rows</span>
-                    <span class="metric-inline-value" title="{{ row_count }}">
-                      {{ format_rows(row_count) }}
-                    </span>
-                  </div>
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Total</span>
-                    <span class="metric-inline-value">{{ total_size }}</span>
-                  </div>
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Table</span>
-                    <span class="metric-inline-value">{{ table_size }}</span>
-                  </div>
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Indexes</span>
-                    <a class="metric-inline-value metric-inline-value-link"
-                      href="/generic/index_io?schemaname={{ schema|urlencode }}&relname={{ table|urlencode }}">
-                      {{ index_size }}
-                    </a>
-                  </div>
-                  {% set pct = index_pct|float %}
-
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Index %</span>
-                    <span class="metric-inline-value {% if pct >= 50 %}text-danger fw-bold{% elif pct >= 30 %}text-warning fw-semibold{% endif %}">
-                      {{ index_pct }}%
-                    </span>
-                  </div>
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Dead size</span>
-                    <span class="metric-inline-value">{{ estimated_dead_size }}</span>
-                  </div>
-                  <div class="metric-inline-item">
-                    <span class="metric-inline-label">Dead %</span>
-                    <span class="metric-inline-value">{{ dead_pct }}%</span>
-                  </div>
-
+                <div class="table-metric-chip">
+                  <span class="label">Table</span>
+                  <span class="value">{{ table_size }}</span>
                 </div>
 
-                <div class="tables-actions">
-                  <a class="btn btn-sm btn-primary"
-                     href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}">
-                    <i class="bi bi-check2-circle me-1"></i> Check RFC
+                <div class="table-metric-chip">
+                  <span class="label">Indexes</span>
+                  <a
+                    class="value"
+                    href="/generic/index_io?schemaname={{ schema|urlencode }}&relname={{ table|urlencode }}"
+                  >
+                    {{ index_size }}
                   </a>
-                  <a class="btn btn-sm btn-outline-secondary"
-                     href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}">
-                    <i class="bi bi-list-check me-1"></i> Check conventions
-                  </a>
-                  <a class="btn btn-sm btn-warning"
-                     href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}">
-                    <i class="bi bi-grid-3x3-gap me-1"></i> Play Tetris
-                  </a>
                 </div>
 
+                {% set index_pct_value = index_pct|float %}
+                <div class="table-metric-chip">
+                  <span class="label">Index %</span>
+                  <span class="value
+                    {% if index_pct_value >= 50 %}text-metric-danger
+                    {% elif index_pct_value >= 30 %}text-metric-warning
+                    {% endif %}">
+                    {{ index_pct }}%
+                  </span>
+                </div>
+
+                <div class="table-metric-chip">
+                  <span class="label">Dead size</span>
+                  <span class="value">{{ estimated_dead_size }}</span>
+                </div>
+
+                {% set dead_pct_value = dead_pct|float %}
+                <div class="table-metric-chip">
+                  <span class="label">Dead %</span>
+                  <span class="value
+                    {% if dead_pct_value >= 20 %}text-metric-danger
+                    {% elif dead_pct_value >= 10 %}text-metric-warning
+                    {% endif %}">
+                    {{ dead_pct }}%
+                  </span>
+                </div>
+              </div>
+
+              <div class="table-card-footer">
+                <a
+                  class="btn btn-sm btn-primary"
+                  href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}"
+                >
+                  <i class="bi bi-check2-circle me-1"></i>Check RFC
+                </a>
+
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}"
+                >
+                  <i class="bi bi-list-check me-1"></i>Check conventions
+                </a>
+
+                <a
+                  class="btn btn-sm btn-warning"
+                  href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}"
+                >
+                  <i class="bi bi-grid-3x3-gap me-1"></i>Play Tetris
+                </a>
               </div>
             </div>
           </div>
-        {% endfor %}
-      </div>
-
-      {% if paged_tables|length == 0 %}
-        <div class="no-results">
-          No table found{% if q %} for <strong>{{ q }}</strong>{% endif %}.
         </div>
-      {% endif %}
-
-      {% if total_pages > 1 %}
-      <div class="pagination-wrapper">
-        <div class="pagination-info">
-          Showing {{ start_idx + 1 if total > 0 else 0 }}-{{ end_idx if end_idx < total else total }} of {{ total }} tables
-        </div>
-
-        <div class="pagination-controls">
-          {% set prev_page = page - 1 %}
-          {% set next_page = page + 1 %}
-
-          <a class="btn btn-outline-primary btn-sm {% if page <= 1 %}disabled{% endif %}"
-             href="?page={{ prev_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
-            Previous
-          </a>
-
-          {% set start = page - 2 %}
-          {% if start < 1 %}{% set start = 1 %}{% endif %}
-          {% set end = page + 2 %}
-          {% if end > total_pages %}{% set end = total_pages %}{% endif %}
-
-          {% if start > 1 %}
-            <a class="btn btn-outline-primary btn-sm page-number" href="?page=1&per_page={{ per_page }}&q={{ q|urlencode }}">1</a>
-            {% if start > 2 %}
-              <span class="btn btn-sm btn-light disabled">…</span>
-            {% endif %}
-          {% endif %}
-
-          {% for p in range(start, end + 1) %}
-            <a class="btn btn-sm page-number {% if p == page %}btn-primary{% else %}btn-outline-primary{% endif %}"
-               href="?page={{ p }}&per_page={{ per_page }}&q={{ q|urlencode }}">
-              {{ p }}
-            </a>
-          {% endfor %}
-
-          {% if end < total_pages %}
-            {% if end < total_pages - 1 %}
-              <span class="btn btn-sm btn-light disabled">…</span>
-            {% endif %}
-            <a class="btn btn-outline-primary btn-sm page-number"
-               href="?page={{ total_pages }}&per_page={{ per_page }}&q={{ q|urlencode }}">
-              {{ total_pages }}
-            </a>
-          {% endif %}
-
-          <a class="btn btn-outline-primary btn-sm {% if page >= total_pages %}disabled{% endif %}"
-             href="?page={{ next_page }}&per_page={{ per_page }}&q={{ q|urlencode }}">
-            Next
-          </a>
-        </div>
-      </div>
-      {% endif %}
-
+      {% endfor %}
     </div>
-  </div>
+
+    <div id="tables-empty-state" class="tables-empty-state d-none">
+      <div class="empty-title">No table found</div>
+      <p class="empty-text">No table matches the current search and filters.</p>
+    </div>
+
+    <div id="tables-pagination" class="pagination-wrapper">
+      <div id="tables-pagination-info" class="pagination-info"></div>
+      <div id="tables-pagination-controls" class="pagination-controls"></div>
+    </div>
+  {% else %}
+    <div class="tables-empty-state">
+      <div class="empty-title">No table available</div>
+      <p class="empty-text">No table metadata is currently available.</p>
+    </div>
+  {% endif %}
+
 </div>
-{% endblock %}
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tooltipTriggerList = [].slice.call(
+    document.querySelectorAll('[data-bs-toggle="tooltip"]')
+  );
+
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+
+  const searchInput = document.getElementById("table-search");
+  const bloatSelect = document.getElementById("table-bloat-filter");
+  const sortSelect = document.getElementById("table-sort");
+  const perPageSelect = document.getElementById("table-per-page");
+  const resetButton = document.getElementById("table-reset-btn");
+  const grid = document.getElementById("tables-grid");
+  const emptyState = document.getElementById("tables-empty-state");
+  const pagination = document.getElementById("tables-pagination");
+  const paginationInfo = document.getElementById("tables-pagination-info");
+  const paginationControls = document.getElementById("tables-pagination-controls");
+  const visibleCount = document.getElementById("tables-visible-count");
+
+  if (!grid) {
+    return;
+  }
+
+  const cards = Array.from(grid.querySelectorAll(".table-card-item"));
+  let currentPage = 1;
+
+  const bloatWeight = {
+    HIGH: 5,
+    MEDIUM: 4,
+    LOW: 3,
+    SMALL_TABLE: 2,
+    NO_STATS: 1
+  };
+
+  function getNumber(card, attributeName) {
+    const value = Number(card.getAttribute(attributeName));
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function compareText(a, b, datasetKey) {
+    return (a.dataset[datasetKey] || "").localeCompare(
+      b.dataset[datasetKey] || "",
+      undefined,
+      { sensitivity: "base" }
+    );
+  }
+
+  function getFilteredAndSortedCards() {
+    const search = (searchInput?.value || "").trim().toLowerCase();
+    const bloat = bloatSelect?.value || "";
+    const sort = sortSelect?.value || "bloat";
+
+    const filtered = cards.filter(function (card) {
+      const matchesSearch = !search || (card.dataset.search || "").includes(search);
+      const matchesBloat = !bloat || card.dataset.bloat === bloat;
+      return matchesSearch && matchesBloat;
+    });
+
+    filtered.sort(function (a, b) {
+      if (sort === "schema") {
+        return compareText(a, b, "schema") || compareText(a, b, "table");
+      }
+
+      if (sort === "table") {
+        return compareText(a, b, "table") || compareText(a, b, "schema");
+      }
+
+      if (sort === "rows") {
+        return getNumber(b, "data-rows") - getNumber(a, "data-rows");
+      }
+
+      if (sort === "dead_pct") {
+        return getNumber(b, "data-dead-pct") - getNumber(a, "data-dead-pct");
+      }
+
+      if (sort === "index_pct") {
+        return getNumber(b, "data-index-pct") - getNumber(a, "data-index-pct");
+      }
+
+      return (
+        (bloatWeight[b.dataset.bloat] || 0) -
+        (bloatWeight[a.dataset.bloat] || 0)
+      ) || compareText(a, b, "schema") || compareText(a, b, "table");
+    });
+
+    return filtered;
+  }
+
+  function createPageButton(label, page, active, disabled) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm " + (active ? "btn-primary" : "btn-outline-primary");
+    button.textContent = label;
+    button.disabled = Boolean(disabled);
+
+    if (!disabled) {
+      button.addEventListener("click", function () {
+        currentPage = page;
+        render();
+        window.scrollTo({ top: grid.offsetTop - 100, behavior: "smooth" });
+      });
+    }
+
+    return button;
+  }
+
+  function createEllipsis() {
+    const span = document.createElement("span");
+    span.className = "btn btn-sm btn-light disabled";
+    span.textContent = "…";
+    return span;
+  }
+
+  function renderPagination(totalPages) {
+    paginationControls.innerHTML = "";
+
+    if (totalPages <= 1) {
+      pagination.classList.add("d-none");
+      return;
+    }
+
+    pagination.classList.remove("d-none");
+    paginationControls.appendChild(
+      createPageButton("Previous", currentPage - 1, false, currentPage <= 1)
+    );
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+
+    if (start > 1) {
+      paginationControls.appendChild(createPageButton("1", 1, currentPage === 1, false));
+      if (start > 2) {
+        paginationControls.appendChild(createEllipsis());
+      }
+    }
+
+    for (let page = start; page <= end; page += 1) {
+      const button = createPageButton(String(page), page, page === currentPage, false);
+      button.classList.add("page-number");
+      paginationControls.appendChild(button);
+    }
+
+    if (end < totalPages) {
+      if (end < totalPages - 1) {
+        paginationControls.appendChild(createEllipsis());
+      }
+      paginationControls.appendChild(
+        createPageButton(String(totalPages), totalPages, currentPage === totalPages, false)
+      );
+    }
+
+    paginationControls.appendChild(
+      createPageButton("Next", currentPage + 1, false, currentPage >= totalPages)
+    );
+  }
+
+  function render() {
+    const filtered = getFilteredAndSortedCards();
+    const perPage = Number(perPageSelect?.value || 24);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    cards.forEach(function (card) {
+      card.style.display = "none";
+    });
+
+    filtered.forEach(function (card) {
+      grid.appendChild(card);
+    });
+
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = Math.min(startIndex + perPage, filtered.length);
+    const visibleCards = filtered.slice(startIndex, endIndex);
+
+    visibleCards.forEach(function (card, index) {
+      card.style.display = "";
+      const indexElement = card.querySelector(".table-card-index");
+      if (indexElement) {
+        indexElement.textContent = "#" + (startIndex + index + 1);
+      }
+    });
+
+    if (visibleCount) {
+      visibleCount.textContent = String(filtered.length);
+    }
+
+    if (filtered.length === 0) {
+      grid.classList.add("d-none");
+      emptyState?.classList.remove("d-none");
+      pagination?.classList.add("d-none");
+      return;
+    }
+
+    grid.classList.remove("d-none");
+    emptyState?.classList.add("d-none");
+
+    if (paginationInfo) {
+      paginationInfo.textContent =
+        "Showing " +
+        (startIndex + 1) +
+        "-" +
+        endIndex +
+        " of " +
+        filtered.length +
+        " tables";
+    }
+
+    renderPagination(totalPages);
+  }
+
+  function resetFilters() {
+    if (searchInput) searchInput.value = "";
+    if (bloatSelect) bloatSelect.value = "";
+    if (sortSelect) sortSelect.value = "bloat";
+    if (perPageSelect) perPageSelect.value = "24";
+    currentPage = 1;
+    render();
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", function () {
+      currentPage = 1;
+      render();
+    });
+  }
+
+  [bloatSelect, sortSelect, perPageSelect].forEach(function (element) {
+    if (element) {
+      element.addEventListener("change", function () {
+        currentPage = 1;
+        render();
+      });
+    }
+  });
+
+  if (resetButton) {
+    resetButton.addEventListener("click", resetFilters);
+  }
+
+  render();
+});
+</script>
+{% endblock javascripts %}

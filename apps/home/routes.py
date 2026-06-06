@@ -41,11 +41,12 @@ def handle_database_post(segment: str):
         session[key] = val
 
     dbinfo = database.get_db_info(session)
+    
 
     if "error" in dbinfo:
         return render_template(f"home/{segment}", segment=segment, dbinfo=dbinfo)  
 
-    session['version']=database.get_pg_major_version(dbinfo['version'])
+    session['version']=database.get_pg_major_version(str(dbinfo['version']))
     session.modified = True
 
     return render_template("home/dashboard.html", segment="dashboard.html", dbinfo=dbinfo)

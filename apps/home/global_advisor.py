@@ -20,6 +20,7 @@ from .database import (
     connectdb,
     db_fetch_json,
 )
+from .pg_version import get_postgresql_upgrade_recommendation
 
 
 def sql_literal(value: str) -> str:
@@ -198,6 +199,219 @@ def build_recommendation_from_row(
     )
 
 
+
+def run_postgresql_version_recommendation(
+    conn,
+) -> List[GlobalRecommendation]:
+    """
+    Check the installed PostgreSQL release against the latest minor release
+    available for its major branch.
+
+    A recommendation is returned when:
+    - a newer minor release is available for the installed major branch; or
+    - the installed major branch is no longer supported.
+
+    No recommendation is returned when the installed release is current and
+    its major branch is still supported.
+    """
+    sql = """
+        SELECT
+            d.oid AS object_id,
+            d.datname AS object_name,
+            current_setting('server_version') AS installed_version
+        FROM pg_database AS d
+        WHERE d.datname = current_database();
+    """
+
+    raw_result = db_fetch_json(conn, sql)
+
+    if isinstance(raw_result, str):
+        rows = json.loads(raw_result)
+    elif isinstance(raw_result, list):
+        rows = raw_result
+    elif isinstance(raw_result, dict):
+        rows = [raw_result]
+    else:
+        raise RuntimeError(
+            "Unexpected result type returned while detecting the "
+            "PostgreSQL server version."
+        )
+
+    if not rows:
+        return []
+
+    row = rows[0]
+
+    installed_version = str(
+        row.get("installed_version") or ""
+    ).strip()
+
+    if not installed_version:
+        raise RuntimeError(
+            "Unable to detect the PostgreSQL server version."
+        )
+
+    version_status = get_postgresql_upgrade_recommendation(
+        installed_version
+    )
+
+    # An unsupported major branch must generate a recommendation even when
+    # its latest available minor release is already installed.
+    if (
+        not version_status.upgrade_recommended
+        and version_status.supported
+    ):
+        return []
+
+    unsupported_branch = not version_status.supported
+
+    minor_update_available = (
+        version_status.installed_version
+        != version_status.latest_minor_version
+    )
+
+    if unsupported_branch:
+        label = (
+            f"PostgreSQL {version_status.major_version} is no longer supported"
+        )
+
+        tags = [
+            "postgresql-version",
+            "upgrade",
+            "end-of-life",
+            "major-upgrade",
+        ]
+
+        why_it_matters = (
+            "This PostgreSQL major branch is no longer supported by the "
+            "PostgreSQL project and no longer receives security, reliability, "
+            "bug, or data-integrity fixes."
+        )
+
+        if minor_update_available:
+            fix_strategy = (
+                f"Upgrade first from PostgreSQL "
+                f"{version_status.installed_version} to the final minor release "
+                f"{version_status.latest_minor_version} of the current branch "
+                "when required by the migration strategy. Then plan a major "
+                "upgrade to a supported PostgreSQL branch. Review application "
+                "and extension compatibility, test the migration, validate "
+                "backup and rollback procedures, and schedule an appropriate "
+                "maintenance window."
+            )
+        else:
+            fix_strategy = (
+                "Plan a major upgrade to a supported PostgreSQL branch. "
+                "Review application and extension compatibility, test the "
+                "migration, validate backup and rollback procedures, and "
+                "schedule an appropriate maintenance window."
+            )
+
+        expected_benefit = (
+            "Return to a supported PostgreSQL branch and regain access to "
+            "current security, reliability, bug, and data-integrity fixes."
+        )
+
+        risk_level = "HIGH"
+        impact = 90
+        effort = 60
+
+    else:
+        label = (
+            f"Upgrade PostgreSQL {version_status.installed_version} "
+            f"to {version_status.latest_minor_version}"
+        )
+
+        tags = [
+            "postgresql-version",
+            "upgrade",
+            "minor-release",
+        ]
+
+        why_it_matters = (
+            "The installed PostgreSQL release is not the latest minor release "
+            "available for its major branch. PostgreSQL minor releases include "
+            "security, reliability, bug, and data-integrity fixes."
+        )
+
+        fix_strategy = (
+            f"Review the release notes between PostgreSQL "
+            f"{version_status.installed_version} and "
+            f"{version_status.latest_minor_version}. Test the update in a "
+            "representative environment, verify operating-system package and "
+            "extension compatibility, validate backups, and schedule a "
+            "controlled PostgreSQL restart."
+        )
+
+        expected_benefit = (
+            "Access to the latest security, reliability, bug, and "
+            "data-integrity fixes available for the installed PostgreSQL "
+            "major branch."
+        )
+
+        risk_level = "MEDIUM"
+        impact = 70
+        effort = 35
+
+    definition: Dict[str, Any] = {
+        "id": "PostgreSQL release upgrade",
+        "source": "postgresql_version_check",
+        "category_id": "MAINTENANCE",
+        "object_type": "DATABASE",
+        "outcome_id": "OPERABILITY",
+        "advisor_group": "MAINTENANCE_RISKS",
+        "risk_level": risk_level,
+
+        # Replace OTHER with UPGRADE if ActionType.UPGRADE is available.
+        "action_type": "OTHER",
+        "action_safety": "SAFE_TO_REVIEW",
+        "requires_lock": False,
+        "requires_maintenance_window": True,
+        "can_generate_sql": False,
+        "can_auto_apply": False,
+        "enabled_by_default": True,
+        "manual_review_required": True,
+
+        "confidence": 95,
+        "impact": impact,
+        "effort": effort,
+
+        "label": label,
+        "tags": tags,
+        "why_it_matters": why_it_matters,
+        "fix_strategy": fix_strategy,
+        "expected_benefit": expected_benefit,
+
+        "result_mapping": {
+            "object_id": "object_id",
+            "object_name": "object_name",
+            "recommendation_note": "recommendation_note",
+            "current_value": "current_value",
+            "recommended_value": "recommended_value",
+        },
+    }
+
+    recommended_value = (
+        "Upgrade to a supported PostgreSQL major branch"
+        if unsupported_branch
+        else version_status.latest_minor_version
+    )
+
+    recommendation_row = {
+        "object_id": row.get("object_id"),
+        "object_name": row.get("object_name"),
+        "current_value": version_status.installed_version,
+        "recommended_value": recommended_value,
+        "recommendation_note": version_status.recommendation,
+    }
+
+    return [
+        build_recommendation_from_row(
+            definition,
+            recommendation_row,
+        )
+    ]
+
 def run_sql_recommendation(
     conn,
     definition: Dict[str, Any],
@@ -361,9 +575,21 @@ def run_global_advisor(
 
     all_recommendations: List[GlobalRecommendation] = []
     errors: List[Dict[str, str]] = []
-    enabled_checks = 0
+
+    # The PostgreSQL release check is implemented in Python rather than YAML.
+    enabled_checks = 1
 
     try:
+        try:
+            all_recommendations.extend(
+                run_postgresql_version_recommendation(conn)
+            )
+        except Exception as exc:
+            errors.append({
+                "recommendation_id": "PostgreSQL release upgrade",
+                "error": str(exc),
+            })
+
         for definition in catalog:
             recommendation_id = definition.get("id", "unknown")
 

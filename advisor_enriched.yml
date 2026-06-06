@@ -1008,100 +1008,237 @@ recommendations:
         recommendation_level: pga_recommendation_level
 
     sql: |
-        WITH settings AS (
+        WITH server_info AS (
+            SELECT current_setting('server_version_num')::integer AS server_version_num
+        ),
+        settings AS (
+            SELECT
+                d.oid AS object_id,
+                d.datname AS object_name,
+                si.server_version_num,
+                s.name,
+                s.setting,
+                s.unit,
+                s.source,
+                s.boot_val,
+                s.reset_val,
+                s.context,
+                s.pending_restart
+            FROM pg_settings AS s
+            CROSS JOIN server_info AS si
+            CROSS JOIN LATERAL (
+                SELECT oid, datname
+                FROM pg_database
+                WHERE datname = current_database()
+            ) AS d
+            WHERE s.name IN (
+                'autovacuum',
+                'track_counts',
+                'track_activities',
+                'log_checkpoints',
+                'log_autovacuum_min_duration',
+                'checkpoint_completion_target',
+                'checkpoint_timeout'
+            )
+        ),
+        checks AS (
+            SELECT
+                object_id,
+                object_name,
+                server_version_num,
+                name AS setting_name,
+                setting AS current_value,
+                unit,
+                source,
+                boot_val,
+                reset_val,
+                context,
+                pending_restart,
+
+                CASE
+                    WHEN name = 'autovacuum'
+                        AND setting <> 'on'
+                        THEN 'HIGH'
+
+                    WHEN name = 'track_counts'
+                        AND setting <> 'on'
+                        THEN 'HIGH'
+
+                    WHEN name = 'track_activities'
+                        AND setting <> 'on'
+                        THEN 'MEDIUM'
+
+                    WHEN name = 'log_checkpoints'
+                        AND setting <> 'on'
+                        THEN 'MEDIUM'
+
+                    WHEN name = 'log_autovacuum_min_duration'
+                        AND setting = '-1'
+                        THEN 'MEDIUM'
+
+                    WHEN name = 'checkpoint_completion_target'
+                        AND setting::numeric < 0.8
+                        THEN 'MEDIUM'
+
+                    WHEN name = 'checkpoint_timeout'
+                        AND setting::integer < 300
+                        THEN 'MEDIUM'
+
+                    ELSE 'NONE'
+                END AS pga_recommendation_level,
+
+                CASE
+                    WHEN name = 'autovacuum'
+                        AND setting <> 'on'
+                    THEN
+                        'Autovacuum is disabled. This can lead to table bloat, '
+                        || 'outdated planner statistics, degraded query performance, '
+                        || 'and transaction ID wraparound risk.'
+
+                    WHEN name = 'track_counts'
+                        AND setting <> 'on'
+                    THEN
+                        'track_counts is disabled. PostgreSQL needs these statistics '
+                        || 'for autovacuum and database activity monitoring.'
+
+                    WHEN name = 'track_activities'
+                        AND setting <> 'on'
+                    THEN
+                        'track_activities is disabled. This limits visibility into '
+                        || 'currently running queries and reduces troubleshooting capabilities.'
+
+                    WHEN name = 'log_checkpoints'
+                        AND setting <> 'on'
+                        AND server_version_num < 150000
+                    THEN
+                        'Checkpoint logging is disabled. This is the PostgreSQL default '
+                        || 'before version 15, but enabling it improves checkpoint and '
+                        || 'write-pressure diagnostics.'
+
+                    WHEN name = 'log_checkpoints'
+                        AND setting <> 'on'
+                    THEN
+                        'Checkpoint logging is disabled even though it is enabled by '
+                        || 'default since PostgreSQL 15. Enabling it improves checkpoint '
+                        || 'and write-pressure diagnostics.'
+
+                    WHEN name = 'log_autovacuum_min_duration'
+                        AND setting = '-1'
+                        AND server_version_num < 150000
+                    THEN
+                        'Autovacuum logging is disabled. This is the PostgreSQL default '
+                        || 'before version 15. Enabling logging for long-running autovacuum '
+                        || 'operations can improve diagnostics.'
+
+                    WHEN name = 'log_autovacuum_min_duration'
+                        AND setting = '-1'
+                    THEN
+                        'Autovacuum logging is disabled even though PostgreSQL logs '
+                        || 'autovacuum operations longer than 10 minutes by default '
+                        || 'since version 15.'
+
+                    WHEN name = 'checkpoint_completion_target'
+                        AND setting::numeric < 0.8
+                        AND server_version_num < 140000
+                    THEN
+                        'checkpoint_completion_target is below 0.8. PostgreSQL 13 uses '
+                        || '0.5 by default, but a value near 0.9 generally spreads '
+                        || 'checkpoint writes more evenly.'
+
+                    WHEN name = 'checkpoint_completion_target'
+                        AND setting::numeric < 0.8
+                    THEN
+                        'checkpoint_completion_target is below the modern PostgreSQL '
+                        || 'default of 0.9. A higher value generally spreads checkpoint '
+                        || 'writes more evenly.'
+
+                    WHEN name = 'checkpoint_timeout'
+                        AND setting::integer < 300
+                    THEN
+                        'checkpoint_timeout is below 5 minutes. Very frequent checkpoints '
+                        || 'may increase write pressure.'
+
+                    ELSE NULL
+                END AS recommendation_note,
+
+                CASE
+                    WHEN name = 'autovacuum'
+                        AND setting <> 'on'
+                    THEN
+                        'ALTER SYSTEM SET autovacuum = on;'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'track_counts'
+                        AND setting <> 'on'
+                    THEN
+                        'ALTER SYSTEM SET track_counts = on;'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'track_activities'
+                        AND setting <> 'on'
+                    THEN
+                        'ALTER SYSTEM SET track_activities = on;'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'log_checkpoints'
+                        AND setting <> 'on'
+                    THEN
+                        'ALTER SYSTEM SET log_checkpoints = on;'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'log_autovacuum_min_duration'
+                        AND setting = '-1'
+                    THEN
+                        'ALTER SYSTEM SET log_autovacuum_min_duration = ''10min'';'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'checkpoint_completion_target'
+                        AND setting::numeric < 0.8
+                    THEN
+                        'ALTER SYSTEM SET checkpoint_completion_target = 0.9;'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    WHEN name = 'checkpoint_timeout'
+                        AND setting::integer < 300
+                    THEN
+                        'ALTER SYSTEM SET checkpoint_timeout = ''5min'';'
+                        || chr(10)
+                        || 'SELECT pg_reload_conf();'
+
+                    ELSE NULL
+                END AS improvement_sql
+            FROM settings
+        )
         SELECT
-            (SELECT oid FROM pg_database WHERE datname = current_database()) AS object_id,
-            current_database() AS object_name,
-            name,
-            setting,
+            object_id,
+            object_name,
+            server_version_num,
+            setting_name,
+            current_value,
             unit,
             source,
             boot_val,
             reset_val,
-            pending_restart
-        FROM pg_settings
-        WHERE name IN (
-            'autovacuum',
-            'track_counts',
-            'track_activities',
-            'log_checkpoints',
-            'log_autovacuum_min_duration',
-            'checkpoint_completion_target',
-            'checkpoint_timeout'
-        )
-        ),
-        checks AS (
-        SELECT
-            object_id,
-            object_name,
-            name AS setting_name,
-            setting AS current_value,
-            source,
+            context,
             pending_restart,
-            CASE
-            WHEN name = 'autovacuum' AND setting <> 'on' THEN 'HIGH'
-            WHEN name = 'track_counts' AND setting <> 'on' THEN 'HIGH'
-            WHEN name = 'track_activities' AND setting <> 'on' THEN 'MEDIUM'
-            WHEN name = 'log_checkpoints' AND setting <> 'on' THEN 'MEDIUM'
-            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1' THEN 'MEDIUM'
-            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8 THEN 'MEDIUM'
-            WHEN name = 'checkpoint_timeout' AND setting::integer < 300 THEN 'MEDIUM'
-            ELSE 'NONE'
-            END AS pga_recommendation_level,
-            CASE
-            WHEN name = 'autovacuum' AND setting <> 'on'
-            THEN 'Autovacuum is disabled. This can lead to table bloat, outdated planner statistics, degraded query performance, and transaction ID wraparound risk.'
-            WHEN name = 'track_counts' AND setting <> 'on'
-            THEN 'track_counts is disabled. PostgreSQL needs table and index statistics for autovacuum and planner-related diagnostics.'
-            WHEN name = 'track_activities' AND setting <> 'on'
-            THEN 'track_activities is disabled. This limits visibility into currently running queries and reduces troubleshooting capabilities.'
-            WHEN name = 'log_checkpoints' AND setting <> 'on'
-            THEN 'log_checkpoints is disabled. Enabling it helps diagnose checkpoint frequency, write pressure, and tuning issues.'
-            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1'
-            THEN 'Autovacuum logging is disabled. Setting log_autovacuum_min_duration helps diagnose slow or frequent autovacuum activity.'
-            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8
-            THEN 'checkpoint_completion_target is lower than commonly recommended values. A higher value usually smooths checkpoint writes over time.'
-            WHEN name = 'checkpoint_timeout' AND setting::integer < 300
-            THEN 'checkpoint_timeout is below 5 minutes. Very frequent checkpoints may increase write pressure.'
-            ELSE NULL
-            END AS recommendation_note,
-            CASE
-            WHEN name = 'autovacuum' AND setting <> 'on'
-            THEN 'ALTER SYSTEM SET autovacuum = on;' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'track_counts' AND setting <> 'on'
-            THEN 'ALTER SYSTEM SET track_counts = on;' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'track_activities' AND setting <> 'on'
-            THEN 'ALTER SYSTEM SET track_activities = on;' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'log_checkpoints' AND setting <> 'on'
-            THEN 'ALTER SYSTEM SET log_checkpoints = on;' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'log_autovacuum_min_duration' AND setting = '-1'
-            THEN 'ALTER SYSTEM SET log_autovacuum_min_duration = ''5s'';' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'checkpoint_completion_target' AND setting::numeric < 0.8
-            THEN 'ALTER SYSTEM SET checkpoint_completion_target = 0.9;' || chr(10) || 'SELECT pg_reload_conf();'
-            WHEN name = 'checkpoint_timeout' AND setting::integer < 300
-            THEN 'ALTER SYSTEM SET checkpoint_timeout = ''5min'';' || chr(10) || 'SELECT pg_reload_conf();'
-            ELSE NULL
-            END AS improvement_sql
-        FROM settings
-        )
-        SELECT
-        object_id,
-        object_name,
-        setting_name,
-        current_value,
-        source,
-        pending_restart,
-        pga_recommendation_level,
-        recommendation_note,
-        improvement_sql
+            pga_recommendation_level,
+            recommendation_note,
+            improvement_sql
         FROM checks
         WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
         ORDER BY
-        CASE pga_recommendation_level
-            WHEN 'HIGH' THEN 2
-            WHEN 'MEDIUM' THEN 1
-        END DESC,
-        setting_name;
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 1
+                ELSE 0
+            END DESC,
+            setting_name;
 
   - id: Invalid or unusable indexes
     source: index_checks
@@ -1216,13 +1353,18 @@ recommendations:
       - maintenance
       - dead-tuples
     why_it_matters: >
-      Tables that have never been vacuumed may have dead tuples, stale visibility
-      information, or indicate that autovacuum activity should be reviewed.
+        A significant accumulation of dead tuples can increase table scan cost,
+        consume unnecessary storage, reduce visibility map coverage, and indicate
+        that autovacuum is not running frequently enough. A missing last vacuum
+        timestamp alone is not considered sufficient evidence because PostgreSQL
+        statistics may have been reset and small tables may not require immediate
+        maintenance.
     fix_strategy: >
-      Run VACUUM ANALYZE and verify whether autovacuum is enabled and active for
-      the affected table.
+        Run VACUUM ANALYZE and verify whether autovacuum is enabled and active for
+        the affected table.
     expected_benefit: >
-      Better table maintenance state and more reliable planner statistics.
+        Reduced dead tuple accumulation, improved visibility map coverage, more
+        reliable planner statistics, and lower table scan and maintenance overhead.
 
     enabled_by_default: true
     manual_review_required: true
@@ -1244,86 +1386,145 @@ recommendations:
 
     sql: |
         WITH table_stats AS (
-        SELECT
-            schemaname AS schema_name,
-            relname AS object_name,
-            relid AS object_id,
-            n_live_tup,
-            n_dead_tup,
-            pg_total_relation_size(relid) AS total_size_bytes,
-            pg_size_pretty(pg_total_relation_size(relid)) AS total_size_pretty,
-            last_vacuum,
-            last_autovacuum
-        FROM pg_stat_user_tables
+            SELECT
+                st.schemaname AS schema_name,
+                st.relname AS object_name,
+                st.relid AS object_id,
+                st.n_live_tup,
+                st.n_dead_tup,
+
+                -- Table and TOAST size, excluding indexes.
+                pg_table_size(st.relid) AS table_size_bytes,
+                pg_size_pretty(pg_table_size(st.relid)) AS table_size_pretty,
+
+                -- Total relation size, including indexes, retained for context.
+                pg_total_relation_size(st.relid) AS total_size_bytes,
+                pg_size_pretty(
+                    pg_total_relation_size(st.relid)
+                ) AS total_size_pretty,
+
+                -- Ratio of dead tuples among all estimated tuples.
+                CASE
+                    WHEN st.n_live_tup + st.n_dead_tup > 0
+                    THEN
+                        st.n_dead_tup::numeric
+                        / (st.n_live_tup + st.n_dead_tup)
+                    ELSE 0::numeric
+                END AS dead_tuple_ratio,
+
+                st.last_vacuum,
+                st.last_autovacuum
+            FROM pg_stat_user_tables AS st
         ),
         scored AS (
+            SELECT
+                object_id,
+                schema_name,
+                object_name,
+                n_live_tup,
+                n_dead_tup,
+                dead_tuple_ratio,
+                table_size_bytes,
+                table_size_pretty,
+                total_size_bytes,
+                total_size_pretty,
+                last_vacuum,
+                last_autovacuum,
+
+                CASE
+                    -- Large table with a significant absolute number of dead tuples.
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND table_size_bytes >= 1024::bigint * 1024 * 1024
+                        AND n_dead_tup >= 10000
+                    THEN 'HIGH'
+
+                    -- High absolute dead tuple count, regardless of percentage.
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND n_dead_tup >= 100000
+                    THEN 'MEDIUM'
+
+                    -- Non-trivial table with both a minimum count and ratio.
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND table_size_bytes >= 10::bigint * 1024 * 1024
+                        AND n_dead_tup >= 1000
+                        AND dead_tuple_ratio >= 0.10
+                    THEN 'MEDIUM'
+
+                    ELSE 'NONE'
+                END AS pga_recommendation_level,
+
+                CASE
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND table_size_bytes >= 1024::bigint * 1024 * 1024
+                        AND n_dead_tup >= 10000
+                    THEN
+                        'Large table contains a significant number of dead tuples '
+                        || 'but has no recorded manual or automatic vacuum activity '
+                        || 'in pg_stat_user_tables. Verify whether statistics were '
+                        || 'recently reset and review autovacuum activity.'
+
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND n_dead_tup >= 100000
+                    THEN
+                        'Table contains a high absolute number of dead tuples but '
+                        || 'has no recorded manual or automatic vacuum activity in '
+                        || 'pg_stat_user_tables. Verify autovacuum configuration and '
+                        || 'whether statistics were recently reset.'
+
+                    WHEN last_vacuum IS NULL
+                        AND last_autovacuum IS NULL
+                        AND table_size_bytes >= 10::bigint * 1024 * 1024
+                        AND n_dead_tup >= 1000
+                        AND dead_tuple_ratio >= 0.10
+                    THEN
+                        'Table contains a significant proportion of dead tuples but '
+                        || 'has no recorded manual or automatic vacuum activity in '
+                        || 'pg_stat_user_tables. Review autovacuum activity before '
+                        || 'running manual maintenance.'
+
+                    ELSE 'No significant vacuum concern detected.'
+                END AS recommendation_note
+            FROM table_stats
+        )
         SELECT
             object_id,
             schema_name,
             object_name,
-            n_live_tup,
-            n_dead_tup,
+            pga_recommendation_level,
+            recommendation_note,
+
+            'VACUUM (ANALYZE) '
+                || quote_ident(schema_name)
+                || '.'
+                || quote_ident(object_name)
+                || ';' AS improvement_sql,
+
+            table_size_bytes,
+            table_size_pretty,
             total_size_bytes,
             total_size_pretty,
+            n_live_tup,
+            n_dead_tup,
+            round(dead_tuple_ratio * 100, 2) AS dead_tuple_percent,
             last_vacuum,
-            last_autovacuum,
-            CASE
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND total_size_bytes >= 1024 * 1024 * 1024 THEN 'HIGH'
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND n_dead_tup > 0 THEN 'MEDIUM'
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND n_live_tup > 0 THEN 'MEDIUM'
-            ELSE 'NONE'
-            END AS pga_recommendation_level,
-            CASE
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND total_size_bytes >= 1024 * 1024 * 1024
-            THEN 'Large table has never been vacuumed or autovacuumed according to pg_stat_user_tables. This may indicate missing maintenance activity or recently reset statistics.'
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND n_dead_tup > 0
-            THEN 'Table has dead tuples but has never been vacuumed or autovacuumed according to pg_stat_user_tables.'
-            WHEN last_vacuum IS NULL
-                AND last_autovacuum IS NULL
-                AND n_live_tup > 0
-            THEN 'Table contains rows but has never been vacuumed or autovacuumed according to pg_stat_user_tables.'
-            ELSE 'No vacuum concern detected.'
-            END AS recommendation_note
-        FROM table_stats
-        )
-        SELECT
-        object_id,
-        schema_name,
-        object_name,
-        pga_recommendation_level,
-        recommendation_note,
-        'VACUUM (ANALYZE) '
-            || quote_ident(schema_name)
-            || '.'
-            || quote_ident(object_name)
-            || ';' AS improvement_sql,
-        total_size_bytes,
-        total_size_pretty,
-        n_live_tup,
-        n_dead_tup,
-        last_vacuum,
-        last_autovacuum
+            last_autovacuum
         FROM scored
         WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM')
         ORDER BY
-        CASE pga_recommendation_level
-            WHEN 'HIGH' THEN 2
-            WHEN 'MEDIUM' THEN 1
-        END DESC,
-        total_size_bytes DESC,
-        n_dead_tup DESC,
-        schema_name,
-        object_name;
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 1
+                ELSE 0
+            END DESC,
+            n_dead_tup DESC,
+            table_size_bytes DESC,
+            schema_name,
+            object_name;
 
   - id: Tables without primary key
     source: schema_checks

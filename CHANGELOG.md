@@ -3,6 +3,20 @@
 
 # Change Log
 
+## [2.9.1] - 2026-06-06
+
+## Global Advisor
+
+- Query Important PostgreSQL settings disabled or suboptimal - Use postgresql version to determine parameter value
+- Query Tables never vacuumed - Add a minimum table size, a minimum of dead tuples
+- Add an upgrade advisor to :
+    - upgrade postgres to the latest release (using https://www.postgresql.org/versions.json)
+    - tell the user that postgres version is no longer supported. Sample : PostgreSQL 13.23 is the latest minor release of the 13 branch, but this branch is no longer supported. Plan a major upgrade to a supported PostgreSQL version. End of life date: 2025-11-13.
+
+## Table definition helper
+
+- Review design
+
 ## [2.9.0] - 2026-05-24
 
 ## Improvements
