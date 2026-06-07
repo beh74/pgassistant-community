@@ -327,7 +327,7 @@
       {% endfor %}
 
       {% set dba_items = [
-        ('Tables Needing Analyze', '/generic/dba_action_table_analyze', 'analyze autovacuum', 'bi bi-clipboard-data', 'Tables where ANALYZE is recommended.', ['analyze','planner','stats']),
+        ('Tables Health', '/global/table_health', 'analyze autovacuum', 'bi bi-clipboard-data', 'Review table activity, dead tuples, statistics freshness, and recent maintenance.', ['analyze','planner','stats']),
         ('Database report', '/dba_report', 'report summary', 'bi bi-file-earmark-text', 'Generate a consolidated database report.', ['report','summary','health'])
       ] %}
       {% for label, href, kw, icon, subtitle, tags in dba_items %}

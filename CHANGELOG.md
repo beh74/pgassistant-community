@@ -3,6 +3,28 @@
 
 # Change Log
 
+## [2.9.2] - 2026-06-07
+
+## Improvements
+
+### Global Advisor
+
+- Improved invalid index recommendations by preferring REINDEX INDEX and handling failed REINDEX CONCURRENTLY artifacts such as _ccnew and _ccold.
+- Improved unused index checks by exposing the statistics reset date and observation age.
+- Updated generic unused index detection to require at least 24 hours of statistics and meaningful table activity before recommending removal.
+- Improved duplicate index detection to keep the most-used equivalent index.
+- Kept statistics age informational for structurally redundant indexes, without requiring an arbitrary observation period.
+
+### DBA Corner
+
+- Add a DBA Corner menu · **Tables Health** - Review table activity, dead tuples, statistics freshness, and recent maintenance.
+
+
+## Bug fixes
+
+- Fixed advisor rules that only inspected the public schema. They now include all user schemas while excluding PostgreSQL system, TOAST, and temporary schemas.
+
+
 ## [2.9.1] - 2026-06-06
 
 ## Global Advisor

@@ -35,81 +35,156 @@ recommendations:
     effort: 60
 
     sql: |
-      WITH foreign_key_columns AS (
-          SELECT
-              c.oid AS object_id,
-              c.conname AS fk_name,
-              ns_fk.nspname AS schema_name,
-              fk_table.relname AS table_name,
-              ref_table.relname AS referenced_table_name,
-              fk_col.attname AS column_name,
-              ref_col.attname AS referenced_column_name,
-              pg_catalog.format_type(fk_col.atttypid, fk_col.atttypmod) AS fk_column_type,
-              pg_catalog.format_type(ref_col.atttypid, ref_col.atttypmod) AS referenced_column_type
-          FROM pg_constraint c
-          JOIN pg_class fk_table ON fk_table.oid = c.conrelid
-          JOIN pg_namespace ns_fk ON ns_fk.oid = fk_table.relnamespace
-          JOIN pg_class ref_table ON ref_table.oid = c.confrelid
-          JOIN unnest(c.conkey) WITH ORDINALITY AS fk_keys(attnum, ord) ON true
-          JOIN unnest(c.confkey) WITH ORDINALITY AS ref_keys(attnum, ord)
+        WITH foreign_key_columns AS (
+            SELECT
+                c.oid AS object_id,
+                c.conname AS fk_name,
+                c.conrelid AS table_oid,
+                ns_fk.nspname AS schema_name,
+                fk_table.relname AS table_name,
+                ref_table.relname AS referenced_table_name,
+                fk_col.attnum AS column_attnum,
+                fk_col.attname AS column_name,
+                ref_col.attname AS referenced_column_name,
+                pg_catalog.format_type(
+                    fk_col.atttypid,
+                    fk_col.atttypmod
+                ) AS fk_column_type,
+                pg_catalog.format_type(
+                    ref_col.atttypid,
+                    ref_col.atttypmod
+                ) AS referenced_column_type
+            FROM pg_constraint AS c
+            JOIN pg_class AS fk_table
+            ON fk_table.oid = c.conrelid
+            JOIN pg_namespace AS ns_fk
+            ON ns_fk.oid = fk_table.relnamespace
+            JOIN pg_class AS ref_table
+            ON ref_table.oid = c.confrelid
+            JOIN unnest(c.conkey) WITH ORDINALITY AS fk_keys(attnum, ord)
+            ON true
+            JOIN unnest(c.confkey) WITH ORDINALITY AS ref_keys(attnum, ord)
             ON ref_keys.ord = fk_keys.ord
-          JOIN pg_attribute fk_col
+            JOIN pg_attribute AS fk_col
             ON fk_col.attrelid = c.conrelid
-           AND fk_col.attnum = fk_keys.attnum
-          JOIN pg_attribute ref_col
+            AND fk_col.attnum = fk_keys.attnum
+            JOIN pg_attribute AS ref_col
             ON ref_col.attrelid = c.confrelid
-           AND ref_col.attnum = ref_keys.attnum
-          WHERE c.contype = 'f'
-            AND ns_fk.nspname = 'public'
-      ),
-      mismatched_types AS (
-          SELECT
-              object_id,
-              fk_name,
-              schema_name,
-              table_name,
-              column_name,
-              referenced_table_name,
-              referenced_column_name,
-              fk_column_type,
-              referenced_column_type,
-              schema_name || '.' || table_name || '.' || column_name AS object_name,
-              'ALTER TABLE '
-              || format('%I.%I', schema_name, table_name)
-              || ' ALTER COLUMN '
-              || quote_ident(column_name)
-              || ' TYPE '
-              || referenced_column_type
-              || ' USING '
-              || quote_ident(column_name)
-              || '::'
-              || referenced_column_type
-              || ';' AS improvement_sql
-          FROM foreign_key_columns
-          WHERE fk_column_type <> referenced_column_type
-      )
-      SELECT
-          object_id,
-          object_name,
-          fk_name,
-          schema_name,
-          table_name,
-          column_name,
-          referenced_table_name,
-          referenced_column_name,
-          fk_column_type,
-          referenced_column_type,
-            'Column '
-            || format('%I.%I.%I', schema_name, table_name, column_name)
-            || ' (' || fk_column_type || ') differs from '
-            || format('%I.%I.%I', schema_name, referenced_table_name, referenced_column_name)
-            || ' (' || referenced_column_type || '). '
-            || 'Foreign key columns should use the same data type to avoid implicit casts and ensure index usage.'
-            AS recommendation_note,
+            AND ref_col.attnum = ref_keys.attnum
+            WHERE c.contype = 'f'
+            AND ns_fk.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+            AND ns_fk.nspname !~ '^pg_temp_'
+            AND ns_fk.nspname !~ '^pg_toast_temp_'
+        ),
+        dependent_indexes AS (
+            SELECT
+                fkc.object_id,
+                string_agg(
+                    format('%I.%I', index_ns.nspname, index_class.relname),
+                    ', '
+                    ORDER BY index_ns.nspname, index_class.relname
+                ) AS dependent_index_names,
+                count(*) AS dependent_index_count
+            FROM foreign_key_columns AS fkc
+            JOIN pg_index AS idx
+            ON idx.indrelid = fkc.table_oid
+            AND fkc.column_attnum = ANY(idx.indkey)
+            JOIN pg_class AS index_class
+            ON index_class.oid = idx.indexrelid
+            JOIN pg_namespace AS index_ns
+            ON index_ns.oid = index_class.relnamespace
+            GROUP BY fkc.object_id
+        ),
+        mismatched_types AS (
+            SELECT
+                fkc.object_id,
+                fkc.fk_name,
+                fkc.schema_name,
+                fkc.table_name,
+                fkc.column_name,
+                fkc.referenced_table_name,
+                fkc.referenced_column_name,
+                fkc.fk_column_type,
+                fkc.referenced_column_type,
+                coalesce(di.dependent_index_count, 0) AS dependent_index_count,
+                di.dependent_index_names,
 
-          improvement_sql
-      FROM mismatched_types
-      ORDER BY schema_name, table_name, fk_name;
+                fkc.schema_name
+                    || '.'
+                    || fkc.table_name
+                    || '.'
+                    || fkc.column_name AS object_name,
+
+                'ALTER TABLE '
+                    || format('%I.%I', fkc.schema_name, fkc.table_name)
+                    || ' ALTER COLUMN '
+                    || quote_ident(fkc.column_name)
+                    || ' TYPE '
+                    || fkc.referenced_column_type
+                    || ' USING '
+                    || quote_ident(fkc.column_name)
+                    || '::'
+                    || fkc.referenced_column_type
+                    || ';'
+                    || chr(10)
+                    || 'ANALYZE '
+                    || format('%I.%I', fkc.schema_name, fkc.table_name)
+                    || ' ('
+                    || quote_ident(fkc.column_name)
+                    || ');' AS improvement_sql
+
+            FROM foreign_key_columns AS fkc
+            LEFT JOIN dependent_indexes AS di
+            ON di.object_id = fkc.object_id
+            WHERE fkc.fk_column_type <> fkc.referenced_column_type
+        )
+        SELECT
+            object_id,
+            object_name,
+            fk_name,
+            schema_name,
+            table_name,
+            column_name,
+            referenced_table_name,
+            referenced_column_name,
+            fk_column_type,
+            referenced_column_type,
+            dependent_index_count,
+            dependent_index_names,
+
+            'Column '
+                || format('%I.%I.%I', schema_name, table_name, column_name)
+                || ' uses type '
+                || fk_column_type
+                || ', while referenced column '
+                || format(
+                    '%I.%I.%I',
+                    schema_name,
+                    referenced_table_name,
+                    referenced_column_name
+                )
+                || ' uses type '
+                || referenced_column_type
+                || '. PostgreSQL automatically converts or rebuilds dependent '
+                || 'indexes when the column type is changed. However, the operation '
+                || 'may rewrite the table and its indexes, acquire an ACCESS EXCLUSIVE '
+                || 'lock, require additional disk space, and should therefore be '
+                || 'tested and scheduled in a maintenance window.'
+                || CASE
+                    WHEN dependent_index_count > 0
+                    THEN
+                        ' Dependent indexes detected: '
+                        || dependent_index_names
+                        || '.'
+                    ELSE ''
+                END AS recommendation_note,
+
+            improvement_sql
+        FROM mismatched_types
+        ORDER BY
+            schema_name,
+            table_name,
+            fk_name;
 
     result_mapping:
       object_id: object_id
@@ -175,7 +250,9 @@ recommendations:
             JOIN pg_class ref ON ref.oid = c.confrelid
             JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
             WHERE c.contype = 'f'
-            AND n.nspname = 'public'
+            AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+            AND n.nspname !~ '^pg_temp_'
+            AND n.nspname !~ '^pg_toast_temp_'
         ),
         fkeys_without_indexes AS (
             SELECT f.*
@@ -288,7 +365,7 @@ recommendations:
       recommendation_note: recommendation_note
 
   - id: redundant_non_unique_indexes_covered_by_unique
-    label: Non-unique indexe covered by unique indexe
+    label: Non-unique index covered by unique index
     source: index_checks
     category_id: INDEX
     object_type: INDEX
@@ -309,9 +386,13 @@ recommendations:
     why_it_matters: >
       A redundant non-unique index increases storage usage and write overhead
       while an equivalent unique index can satisfy the same lookup pattern.
+      This redundancy is determined from the index definitions and does not
+      depend only on usage statistics.
     fix_strategy: >
-      Drop the redundant non-unique index after confirming it is not referenced
-      by application-specific tooling, monitoring, or operational procedures.
+      Drop the redundant non-unique index after confirming that it is not
+      referenced by application-specific tooling, monitoring, or operational
+      procedures. The statistics reset date is exposed for context but does not
+      block this structurally proven recommendation.
     expected_benefit: >
       Lower storage usage, reduced write amplification, and simpler index maintenance.
 
@@ -323,7 +404,16 @@ recommendations:
     effort: 10
 
     sql: |
-        WITH indexes AS (
+        WITH database_stats AS (
+            SELECT
+                COALESCE(
+                    stats_reset,
+                    pg_postmaster_start_time()
+                ) AS observation_started_at
+            FROM pg_stat_database
+            WHERE datname = current_database()
+        ),
+        indexes AS (
             SELECT
                 ix.indexrelid,
                 ix.indrelid,
@@ -347,15 +437,25 @@ recommendations:
                 pg_get_indexdef(idx.oid) AS index_definition,
                 COALESCE(stat.idx_scan, 0) AS idx_scan,
                 pg_relation_size(idx.oid) AS index_size_bytes
-            FROM pg_index ix
-            JOIN pg_class idx ON idx.oid = ix.indexrelid
-            JOIN pg_class tbl ON tbl.oid = ix.indrelid
-            JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-            LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
-            WHERE ns.nspname = 'public'
-            AND ix.indisvalid
-            AND ix.indisready
-            AND NOT ix.indisexclusion
+            FROM pg_index AS ix
+            JOIN pg_class AS idx
+              ON idx.oid = ix.indexrelid
+            JOIN pg_class AS tbl
+              ON tbl.oid = ix.indrelid
+            JOIN pg_namespace AS ns
+              ON ns.oid = tbl.relnamespace
+            LEFT JOIN pg_stat_user_indexes AS stat
+              ON stat.indexrelid = idx.oid
+            WHERE ns.nspname NOT IN (
+                    'pg_catalog',
+                    'information_schema',
+                    'pg_toast'
+                )
+              AND ns.nspname !~ '^pg_temp_'
+              AND ns.nspname !~ '^pg_toast_temp_'
+              AND ix.indisvalid
+              AND ix.indisready
+              AND NOT ix.indisexclusion
         )
         SELECT
             ni.object_id,
@@ -366,36 +466,52 @@ recommendations:
             ni.index_name,
             ui.index_name AS duplicate_of_index_name,
             ni.idx_scan,
+            ui.idx_scan AS covering_index_idx_scan,
             ni.index_size_bytes,
             ni.index_definition,
             ui.index_definition AS covering_index_definition,
+            ds.observation_started_at AS stats_reset,
+            ROUND(
+                EXTRACT(
+                    EPOCH FROM (
+                        now() - ds.observation_started_at
+                    )
+                ) / 3600.0,
+                1
+            ) AS statistics_age_hours,
             'Index '
             || format('%I.%I', ni.schema_name, ni.index_name)
             || ' on table '
             || format('%I.%I', ni.schema_name, ni.table_name)
-            || ' is redundant because it is covered by unique index '
+            || ' is redundant because it is structurally covered by unique index '
             || format('%I.%I', ui.schema_name, ui.index_name)
-            || '. Both indexes use the same column set, so the unique index can handle all lookup operations.'
+            || '. Both indexes use the same key columns, operator classes, '
+            || 'collations, options, expressions, and predicate. The redundant '
+            || 'index has recorded no scans during the current statistics window, '
+            || 'which started at '
+            || ds.observation_started_at::text
+            || '.'
             AS recommendation_note,
             'DROP INDEX CONCURRENTLY IF EXISTS '
             || format('%I.%I', ni.schema_name, ni.index_name)
             || ';' AS improvement_sql
-        FROM indexes ni
-        JOIN indexes ui
-        ON ui.indrelid = ni.indrelid
-        AND ui.relam = ni.relam
-        AND ui.indkey = ni.indkey
-        AND ui.indclass = ni.indclass
-        AND ui.indcollation = ni.indcollation
-        AND ui.indoption = ni.indoption
-        AND ui.indnkeyatts = ni.indnkeyatts
-        AND ui.indnatts = ni.indnatts
-        AND COALESCE(ui.indexprs::text, '') = COALESCE(ni.indexprs::text, '')
-        AND COALESCE(ui.indpred::text, '') = COALESCE(ni.indpred::text, '')
+        FROM indexes AS ni
+        JOIN indexes AS ui
+          ON ui.indrelid = ni.indrelid
+         AND ui.relam = ni.relam
+         AND ui.indkey = ni.indkey
+         AND ui.indclass = ni.indclass
+         AND ui.indcollation = ni.indcollation
+         AND ui.indoption = ni.indoption
+         AND ui.indnkeyatts = ni.indnkeyatts
+         AND ui.indnatts = ni.indnatts
+         AND COALESCE(ui.indexprs::text, '') = COALESCE(ni.indexprs::text, '')
+         AND COALESCE(ui.indpred::text, '') = COALESCE(ni.indpred::text, '')
+        CROSS JOIN database_stats AS ds
         WHERE ni.indisunique = false
-        AND ni.indisprimary = false
-        AND ui.indisunique = true
-        AND ni.idx_scan = 0
+          AND ni.indisprimary = false
+          AND ui.indisunique = true
+          AND ni.idx_scan = 0
         ORDER BY
             ni.schema_name,
             ni.table_name,
@@ -411,9 +527,11 @@ recommendations:
       index_name: index_name
       improvement_sql: improvement_sql
       recommendation_note: recommendation_note
+      stats_reset: stats_reset
+      statistics_age_hours: statistics_age_hours
 
   - id: strictly_duplicate_unused_indexes
-    label: Strictly duplicate unused indexe
+    label: Strictly duplicate unused index
     source: index_checks
     category_id: INDEX
     object_type: INDEX
@@ -433,10 +551,12 @@ recommendations:
       - quick-win
     why_it_matters: >
       Strict duplicate indexes waste disk space and add unnecessary overhead to
-      INSERT, UPDATE, DELETE, VACUUM, and autovacuum work.
+      INSERT, UPDATE, DELETE, VACUUM, and autovacuum work. Their redundancy is
+      determined structurally and does not rely only on the observation period.
     fix_strategy: >
-      Keep one index from each duplicate group and drop the unused duplicate
-      indexes concurrently after reviewing recent statistics reset history.
+      Keep the most-used index from each strictly duplicate group and drop only
+      duplicate indexes that have recorded no scans. Review the statistics reset
+      date for context and confirm that index names are not used by external tools.
     expected_benefit: >
       Reduced storage usage and write overhead without removing index coverage.
 
@@ -448,8 +568,18 @@ recommendations:
     effort: 15
 
     sql: |
-      WITH duplicate_groups AS (
+      WITH database_stats AS (
           SELECT
+              COALESCE(
+                  stats_reset,
+                  pg_postmaster_start_time()
+              ) AS observation_started_at
+          FROM pg_stat_database
+          WHERE datname = current_database()
+      ),
+      index_candidates AS (
+          SELECT
+              ix.indexrelid,
               ix.indrelid,
               ix.indkey,
               ix.indclass,
@@ -460,64 +590,122 @@ recommendations:
               ix.indexprs,
               ix.indpred,
               idx.relam,
-              array_agg(ix.indexrelid ORDER BY ix.indexrelid) AS index_oids,
-              COUNT(*) AS duplicate_count
-          FROM pg_index ix
-          JOIN pg_class idx ON idx.oid = ix.indexrelid
-          JOIN pg_class tbl ON tbl.oid = ix.indrelid
-          JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-          WHERE ns.nspname = 'public'
+              ns.nspname AS schema_name,
+              tbl.relname AS table_name,
+              tbl.oid AS table_id,
+              idx.relname AS index_name,
+              idx.oid AS object_id,
+              COALESCE(stat.idx_scan, 0) AS idx_scan,
+              pg_relation_size(idx.oid) AS index_size_bytes,
+              pg_get_indexdef(idx.oid) AS index_definition
+          FROM pg_index AS ix
+          JOIN pg_class AS idx
+            ON idx.oid = ix.indexrelid
+          JOIN pg_class AS tbl
+            ON tbl.oid = ix.indrelid
+          JOIN pg_namespace AS ns
+            ON ns.oid = tbl.relnamespace
+          LEFT JOIN pg_stat_user_indexes AS stat
+            ON stat.indexrelid = idx.oid
+          WHERE ns.nspname NOT IN (
+                  'pg_catalog',
+                  'information_schema',
+                  'pg_toast'
+              )
+            AND ns.nspname !~ '^pg_temp_'
+            AND ns.nspname !~ '^pg_toast_temp_'
             AND ix.indisvalid
             AND ix.indisready
             AND NOT ix.indisprimary
             AND NOT ix.indisunique
             AND NOT ix.indisexclusion
+      ),
+      duplicate_groups AS (
+          SELECT
+              indrelid,
+              indkey,
+              indclass,
+              indcollation,
+              indoption,
+              indnkeyatts,
+              indnatts,
+              indexprs,
+              indpred,
+              relam,
+              array_agg(
+                  indexrelid
+                  ORDER BY idx_scan DESC, indexrelid
+              ) AS index_oids,
+              COUNT(*) AS duplicate_count
+          FROM index_candidates
           GROUP BY
-              ix.indrelid,
-              ix.indkey,
-              ix.indclass,
-              ix.indcollation,
-              ix.indoption,
-              ix.indnkeyatts,
-              ix.indnatts,
-              ix.indexprs,
-              ix.indpred,
-              idx.relam
+              indrelid,
+              indkey,
+              indclass,
+              indcollation,
+              indoption,
+              indnkeyatts,
+              indnatts,
+              indexprs,
+              indpred,
+              relam
           HAVING COUNT(*) > 1
       ),
       duplicate_indexes AS (
           SELECT
-              unnest(index_oids[2:array_length(index_oids, 1)]) AS index_oid,
+              unnest(
+                  index_oids[2:array_length(index_oids, 1)]
+              ) AS index_oid,
               index_oids[1] AS kept_index_oid
           FROM duplicate_groups
       )
       SELECT
-          idx.oid AS object_id,
-          ns.nspname || '.' || idx.relname AS object_name,
-          ns.nspname AS schema_name,
-          tbl.relname AS table_name,
-          tbl.oid AS table_id,
-          idx.relname AS index_name,
-          kept_idx.relname AS duplicate_of_index_name,
-          COALESCE(stat.idx_scan, 0) AS idx_scan,
-          pg_relation_size(idx.oid) AS index_size_bytes,
-          pg_get_indexdef(idx.oid) AS index_definition,
+          dropped.object_id,
+          dropped.schema_name || '.' || dropped.index_name AS object_name,
+          dropped.schema_name,
+          dropped.table_name,
+          dropped.table_id,
+          dropped.index_name,
+          kept.index_name AS duplicate_of_index_name,
+          dropped.idx_scan,
+          kept.idx_scan AS kept_index_idx_scan,
+          dropped.index_size_bytes,
+          dropped.index_definition,
+          kept.index_definition AS kept_index_definition,
+          ds.observation_started_at AS stats_reset,
+          ROUND(
+              EXTRACT(
+                  EPOCH FROM (
+                      now() - ds.observation_started_at
+                  )
+              ) / 3600.0,
+              1
+          ) AS statistics_age_hours,
+          'Index '
+          || format('%I.%I', dropped.schema_name, dropped.index_name)
+          || ' is a strict duplicate of '
+          || format('%I.%I', kept.schema_name, kept.index_name)
+          || '. The kept index was selected using the highest observed scan '
+          || 'count. The duplicate index has recorded no scans during the '
+          || 'current statistics window, which started at '
+          || ds.observation_started_at::text
+          || '.'
+          AS recommendation_note,
           'DROP INDEX CONCURRENTLY IF EXISTS '
-          || format('%I.%I', ns.nspname, idx.relname)
+          || format('%I.%I', dropped.schema_name, dropped.index_name)
           || ';' AS improvement_sql
-      FROM duplicate_indexes d
-      JOIN pg_class idx ON idx.oid = d.index_oid
-      JOIN pg_class kept_idx ON kept_idx.oid = d.kept_index_oid
-      JOIN pg_index ix ON ix.indexrelid = idx.oid
-      JOIN pg_class tbl ON tbl.oid = ix.indrelid
-      JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-      LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = idx.oid
-      WHERE COALESCE(stat.idx_scan, 0) = 0
+      FROM duplicate_indexes AS d
+      JOIN index_candidates AS dropped
+        ON dropped.indexrelid = d.index_oid
+      JOIN index_candidates AS kept
+        ON kept.indexrelid = d.kept_index_oid
+      CROSS JOIN database_stats AS ds
+      WHERE dropped.idx_scan = 0
       ORDER BY
-          ns.nspname,
-          tbl.relname,
-          pg_relation_size(idx.oid) DESC,
-          idx.relname;
+          dropped.schema_name,
+          dropped.table_name,
+          dropped.index_size_bytes DESC,
+          dropped.index_name;
 
     result_mapping:
       object_id: object_id
@@ -527,9 +715,12 @@ recommendations:
       table_name: table_name
       index_name: index_name
       improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+      stats_reset: stats_reset
+      statistics_age_hours: statistics_age_hours
 
   - id: unused_non_constraint_indexes
-    label: Unused indexe not supporting constraints
+    label: Unused index not supporting constraints
     source: index_checks
     category_id: INDEX
     object_type: INDEX
@@ -548,29 +739,75 @@ recommendations:
       - storage
       - requires-review
     why_it_matters: >
-      Unused indexes consume storage and increase write overhead, but usage
-      counters may be misleading after statistics resets or for rare queries.
+      Unused indexes consume storage and increase write overhead, but an
+      idx_scan value of zero is meaningful only when the statistics window is
+      long enough and the underlying table has received representative activity.
     fix_strategy: >
-      Review the statistics reset date and application workload before dropping.
-      Prefer dropping concurrently and keep a rollback plan to recreate the index.
+      Recommend removal only after at least 24 hours of statistics and when the
+      table has recorded at least 100 scans or 1,000 row modifications during
+      that window. Review rare workloads and keep a rollback definition before
+      dropping the index concurrently.
     expected_benefit: >
       Lower write cost and storage usage when the index is truly unused.
 
     enabled_by_default: true
     manual_review_required: true
 
-    confidence: 75
+    confidence: 80
     impact: 65
     effort: 20
 
     sql: |
-        WITH index_columns AS (
+        WITH params AS (
+            SELECT
+                interval '24 hours' AS min_observation_time,
+                100::bigint AS min_table_scans,
+                1000::bigint AS min_table_writes
+        ),
+        database_stats AS (
+            SELECT
+                COALESCE(
+                    stats_reset,
+                    pg_postmaster_start_time()
+                ) AS observation_started_at
+            FROM pg_stat_database
+            WHERE datname = current_database()
+        ),
+        table_activity AS (
+            SELECT
+                st.relid,
+                COALESCE(st.seq_scan, 0) AS seq_scan,
+                COALESCE(SUM(si.idx_scan), 0)::bigint AS total_index_scans,
+                (
+                    COALESCE(st.seq_scan, 0)
+                    + COALESCE(SUM(si.idx_scan), 0)
+                )::bigint AS table_scan_count,
+                (
+                    COALESCE(st.n_tup_ins, 0)
+                    + COALESCE(st.n_tup_upd, 0)
+                    + COALESCE(st.n_tup_del, 0)
+                )::bigint AS table_write_count
+            FROM pg_stat_user_tables AS st
+            LEFT JOIN pg_stat_user_indexes AS si
+              ON si.relid = st.relid
+            GROUP BY
+                st.relid,
+                st.seq_scan,
+                st.n_tup_ins,
+                st.n_tup_upd,
+                st.n_tup_del
+        ),
+        index_columns AS (
             SELECT
                 i.indexrelid,
-                array_agg(k.attnum ORDER BY k.ord) AS index_key_attnums
-            FROM pg_index i
-            JOIN unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
-            ON k.ord <= i.indnkeyatts
+                array_agg(
+                    k.attnum
+                    ORDER BY k.ord
+                ) AS index_key_attnums
+            FROM pg_index AS i
+            JOIN unnest(i.indkey::int2[])
+                WITH ORDINALITY AS k(attnum, ord)
+              ON k.ord <= i.indnkeyatts
             GROUP BY i.indexrelid
         ),
         fk_columns AS (
@@ -579,7 +816,7 @@ recommendations:
                 c.oid AS constraint_oid,
                 c.conname AS constraint_name,
                 c.conkey AS fk_attnums
-            FROM pg_constraint c
+            FROM pg_constraint AS c
             WHERE c.contype = 'f'
         ),
         candidate_indexes AS (
@@ -591,7 +828,9 @@ recommendations:
                 s.indexrelid AS object_id,
                 s.idx_scan,
                 pg_relation_size(s.indexrelid) AS index_size_bytes,
-                pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size_pretty,
+                pg_size_pretty(
+                    pg_relation_size(s.indexrelid)
+                ) AS index_size_pretty,
                 pg_get_indexdef(s.indexrelid) AS index_definition,
                 ix.indrelid,
                 ix.indisunique,
@@ -599,23 +838,47 @@ recommendations:
                 ix.indisexclusion,
                 ix.indpred,
                 ix.indexprs,
-                ic.index_key_attnums
-            FROM pg_stat_user_indexes s
-            JOIN pg_index ix ON ix.indexrelid = s.indexrelid
-            JOIN index_columns ic ON ic.indexrelid = s.indexrelid
-            WHERE s.schemaname = 'public'
-            AND s.idx_scan = 0
-            AND ix.indisvalid
-            AND ix.indisready
-            AND NOT ix.indisprimary
-            AND NOT ix.indisunique
-            AND NOT ix.indisexclusion
-            AND NOT EXISTS (
-                SELECT 1
-                FROM pg_constraint c
-                WHERE c.conindid = ix.indexrelid
+                ic.index_key_attnums,
+                ta.seq_scan,
+                ta.total_index_scans,
+                ta.table_scan_count,
+                ta.table_write_count,
+                ds.observation_started_at,
+                ROUND(
+                    EXTRACT(
+                        EPOCH FROM (
+                            now() - ds.observation_started_at
+                        )
+                    ) / 3600.0,
+                    1
+                ) AS statistics_age_hours
+            FROM pg_stat_user_indexes AS s
+            JOIN pg_index AS ix
+              ON ix.indexrelid = s.indexrelid
+            JOIN index_columns AS ic
+              ON ic.indexrelid = s.indexrelid
+            JOIN table_activity AS ta
+              ON ta.relid = s.relid
+            CROSS JOIN database_stats AS ds
+            WHERE s.schemaname NOT IN (
+                    'pg_catalog',
+                    'information_schema',
+                    'pg_toast'
+                )
+              AND s.schemaname !~ '^pg_temp_'
+              AND s.schemaname !~ '^pg_toast_temp_'
+              AND s.idx_scan = 0
+              AND ix.indisvalid
+              AND ix.indisready
+              AND NOT ix.indisprimary
+              AND NOT ix.indisunique
+              AND NOT ix.indisexclusion
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM pg_constraint AS c
+                  WHERE c.conindid = ix.indexrelid
                     AND c.contype IN ('p', 'u', 'x')
-            )
+              )
         )
         SELECT
             ci.object_id,
@@ -628,21 +891,49 @@ recommendations:
             ci.index_size_bytes,
             ci.index_size_pretty,
             ci.index_definition,
-
-            'Index has not been used according to pg_stat_user_indexes (idx_scan = 0) since the last PostgreSQL statistics reset. It is not required by a primary key, unique constraint, exclusion constraint, or foreign key support. Dropping it may reduce storage usage and write overhead.' 
+            ci.observation_started_at AS stats_reset,
+            ci.statistics_age_hours,
+            ci.seq_scan,
+            ci.total_index_scans,
+            ci.table_scan_count,
+            ci.table_write_count,
+            EXTRACT(
+                EPOCH FROM p.min_observation_time
+            ) / 3600.0 AS minimum_observation_hours,
+            p.min_table_scans,
+            p.min_table_writes,
+            'Index has recorded no scans during '
+            || ci.statistics_age_hours::text
+            || ' hours of statistics. During the same window, table '
+            || format('%I.%I', ci.schema_name, ci.table_name)
+            || ' recorded '
+            || ci.table_scan_count::text
+            || ' scans and '
+            || ci.table_write_count::text
+            || ' row modifications. The index does not support a primary key, '
+            || 'unique constraint, exclusion constraint, or detected foreign '
+            || 'key access path. Review rare or periodic workloads before '
+            || 'dropping it.'
             AS recommendation_note,
-
             'DROP INDEX CONCURRENTLY IF EXISTS '
             || format('%I.%I', ci.schema_name, ci.index_name)
             || ';' AS improvement_sql
-
-        FROM candidate_indexes ci
+        FROM candidate_indexes AS ci
+        CROSS JOIN params AS p
         WHERE NOT EXISTS (
-            SELECT 1
-            FROM fk_columns fk
-            WHERE fk.conrelid = ci.indrelid
-            AND ci.index_key_attnums[1:array_length(fk.fk_attnums, 1)] = fk.fk_attnums
-        )
+                SELECT 1
+                FROM fk_columns AS fk
+                WHERE fk.conrelid = ci.indrelid
+                  AND ci.index_key_attnums[
+                      1:array_length(fk.fk_attnums, 1)
+                  ] = fk.fk_attnums
+            )
+          AND ci.observation_started_at
+                <= now() - p.min_observation_time
+          AND (
+                ci.table_scan_count >= p.min_table_scans
+                OR ci.table_write_count >= p.min_table_writes
+              )
         ORDER BY
             ci.index_size_bytes DESC,
             ci.schema_name,
@@ -658,6 +949,11 @@ recommendations:
       index_name: index_name
       improvement_sql: improvement_sql
       recommendation_note: recommendation_note
+      stats_reset: stats_reset
+      statistics_age_hours: statistics_age_hours
+      table_scan_count: table_scan_count
+      table_write_count: table_write_count
+      minimum_observation_hours: minimum_observation_hours
 
   - id: Tables with potentially stale statistics
     source: statistics_checks
@@ -1285,54 +1581,152 @@ recommendations:
         recommendation_level: pga_recommendation_level
 
     sql: |
-        SELECT
-        i.indexrelid AS object_id,
-        n.nspname AS schema_name,
-        ic.relname AS object_name,
-        t.relname AS table_name,
-        i.indrelid AS table_id,
-        i.indisvalid,
-        i.indisready,
-        i.indislive,
-        pg_relation_size(i.indexrelid) AS index_size_bytes,
-        pg_size_pretty(pg_relation_size(i.indexrelid)) AS index_size_pretty,
-        pg_get_indexdef(i.indexrelid) AS index_definition,
-        'HIGH' AS pga_recommendation_level,
-        CASE
-            WHEN i.indisvalid = false AND i.indisready = false
-            THEN 'Index is invalid and not ready. This typically indicates a failed CREATE INDEX CONCURRENTLY operation. PostgreSQL will not use this index.'
-            WHEN i.indisvalid = false
-            THEN 'Index is invalid and cannot be used by the query planner.'
-            WHEN i.indisready = false
-            THEN 'Index build is incomplete. This may indicate an interrupted CREATE INDEX CONCURRENTLY.'
-            WHEN i.indislive = false
-            THEN 'Index is not live and is likely in a transient state (being dropped or rebuilt).'
-            ELSE 'Index is in an unexpected state.'
-        END AS recommendation_note,
-        'DROP INDEX CONCURRENTLY IF EXISTS '
-            || quote_ident(n.nspname)
-            || '.'
-            || quote_ident(ic.relname)
-            || ';'
-            || chr(10)
-            || '-- Recreate the index if it is still required by the workload.'
-            AS improvement_sql
-        FROM pg_index i
-        JOIN pg_class ic ON ic.oid = i.indexrelid
-        JOIN pg_namespace n ON n.oid = ic.relnamespace
-        JOIN pg_class t ON t.oid = i.indrelid
-        WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-        AND ic.relkind = 'i'
-        AND (
-            i.indisvalid = false
-            OR i.indisready = false
-            OR i.indislive = false
+        WITH invalid_indexes AS (
+            SELECT
+                i.indexrelid AS object_id,
+                n.nspname AS schema_name,
+                ic.relname AS object_name,
+                t.relname AS table_name,
+                i.indrelid AS table_id,
+                i.indisvalid,
+                i.indisready,
+                i.indislive,
+                i.indisunique,
+                i.indisprimary,
+                i.indisexclusion,
+                c.conname AS constraint_name,
+                pg_relation_size(i.indexrelid) AS index_size_bytes,
+                pg_size_pretty(
+                    pg_relation_size(i.indexrelid)
+                ) AS index_size_pretty,
+                pg_get_indexdef(i.indexrelid) AS index_definition
+            FROM pg_index AS i
+            JOIN pg_class AS ic
+            ON ic.oid = i.indexrelid
+            JOIN pg_namespace AS n
+            ON n.oid = ic.relnamespace
+            JOIN pg_class AS t
+            ON t.oid = i.indrelid
+            LEFT JOIN pg_constraint AS c
+            ON c.conindid = i.indexrelid
+            WHERE n.nspname NOT IN (
+                'pg_catalog',
+                'information_schema'
+            )
+            AND ic.relkind = 'i'
+            AND (
+                i.indisvalid = false
+                OR i.indisready = false
+                OR i.indislive = false
+            )
         )
+        SELECT
+            object_id,
+            schema_name,
+            object_name,
+            table_name,
+            table_id,
+            indisvalid,
+            indisready,
+            indislive,
+            indisunique,
+            indisprimary,
+            indisexclusion,
+            constraint_name,
+            index_size_bytes,
+            index_size_pretty,
+            index_definition,
+            'HIGH' AS pga_recommendation_level,
+            CASE
+                WHEN indislive = false
+                THEN
+                    'Index is not live and is likely involved in an unfinished '
+                    || 'DROP INDEX or REINDEX operation. Verify that no concurrent '
+                    || 'maintenance operation is still running before taking action.'
+                WHEN object_name LIKE '%\_ccnew' ESCAPE '\'
+                THEN
+                    'Index appears to be a temporary invalid index left by a failed '
+                    || 'REINDEX CONCURRENTLY operation. The invalid _ccnew index '
+                    || 'should normally be dropped after verifying that the original '
+                    || 'index still exists.'
+                WHEN object_name LIKE '%\_ccold' ESCAPE '\'
+                THEN
+                    'Index appears to be an old index left behind by a partially '
+                    || 'completed REINDEX CONCURRENTLY operation. Verify that the '
+                    || 'replacement index is valid before dropping this index.'
+                WHEN indisvalid = false
+                AND indisready = false
+                THEN
+                    'Index is invalid and not ready. This commonly indicates an '
+                    || 'interrupted or failed concurrent index build. PostgreSQL '
+                    || 'will not use this index for query execution.'
+                WHEN indisvalid = false
+                THEN
+                    'Index is invalid and cannot be selected by the query planner. '
+                    || 'Rebuilding it with REINDEX INDEX is recommended.'
+                WHEN indisready = false
+                THEN
+                    'Index is not ready for inserts or updates. This may indicate '
+                    || 'an interrupted concurrent index operation.'
+                ELSE
+                    'Index is in an unexpected internal state and should be reviewed.'
+            END AS recommendation_note,
+            CASE
+                /*
+                * An index with indislive=false may still be in a transient internal
+                * state. Do not generate an automatic repair command.
+                */
+                WHEN indislive = false
+                THEN
+                    '-- No automatic repair generated.'
+                    || chr(10)
+                    || '-- Verify active CREATE INDEX, REINDEX, or DROP INDEX '
+                    || 'operations first.'
+                /*
+                * A _ccnew index is normally a temporary invalid replacement left
+                * after a failed REINDEX CONCURRENTLY.
+                */
+                WHEN object_name LIKE '%\_ccnew' ESCAPE '\'
+                THEN
+                    '-- Verify that the original index is still present and valid.'
+                    || chr(10)
+                    || 'DROP INDEX IF EXISTS '
+                    || format('%I.%I', schema_name, object_name)
+                    || ';'
+                /*
+                * A _ccold index is normally the old copy left after a concurrent
+                * rebuild. Only drop it after validating the replacement index.
+                */
+                WHEN object_name LIKE '%\_ccold' ESCAPE '\'
+                THEN
+                    '-- Verify that the replacement index is present and valid.'
+                    || chr(10)
+                    || 'DROP INDEX IF EXISTS '
+                    || format('%I.%I', schema_name, object_name)
+                    || ';'
+                /*
+                * REINDEX preserves the index definition and also works for indexes
+                * backing constraints. The non-concurrent form blocks table writes
+                * and should be run in a maintenance window.
+                */
+                ELSE
+                    'REINDEX INDEX '
+                    || format('%I.%I', schema_name, object_name)
+                    || ';'
+                    || chr(10)
+                    || chr(10)
+                    || '-- Online alternative for a production system:'
+                    || chr(10)
+                    || '-- REINDEX INDEX CONCURRENTLY '
+                    || format('%I.%I', schema_name, object_name)
+                    || ';'
+            END AS improvement_sql
+        FROM invalid_indexes
         ORDER BY
-        pg_relation_size(i.indexrelid) DESC,
-        n.nspname,
-        t.relname,
-        ic.relname;       
+            index_size_bytes DESC,
+            schema_name,
+            table_name,
+            object_name;       
 
   - id: Tables never vacuumed
     source: maintenance_checks

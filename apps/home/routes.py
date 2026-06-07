@@ -772,6 +772,19 @@ def global_advisor_route():
         print(tb)
         return jsonify({"error": str(e1), "traceback": tb}), 500
 
+@blueprint.route('/global/table_health', methods=['GET'])
+def global_table_health_route():
+    try:
+        if session.get("db_name"):
+            rows,description=database.generic_select(session,"table_health")
+            return render_template('home/table_health.html', segment='table_health', table_health=rows)
+       
+    except Exception as e1:
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"error": str(e1), "traceback": tb}), 500
+
+
 @blueprint.route('/<template>', methods=['GET', 'POST'])
 def route_template(template: str):
     try:

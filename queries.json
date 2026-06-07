@@ -398,7 +398,15 @@
             "sql": "select column_name, data_type, character_maximum_length, column_default, is_nullable from INFORMATION_SCHEMA.COLUMNS where table_name = '$1';",
             "type": "param_query",
             "reference": "https://www.postgresql.org/docs/current/information-schema.html"
-        },         
+        },
+        {
+            "category": "Table",
+            "id": "table_health",
+            "description" : "Table health",
+            "sql": "WITH database_stats AS (SELECT stats_reset FROM pg_stat_database WHERE datname = current_database()), table_metrics AS (SELECT st.relid AS object_id, st.schemaname AS schema_name, st.relname AS table_name, pg_table_size(st.relid) AS table_size_bytes, pg_indexes_size(st.relid) AS indexes_size_bytes, pg_total_relation_size(st.relid) AS total_size_bytes, st.n_live_tup, st.n_dead_tup, st.n_mod_since_analyze, st.n_tup_ins, st.n_tup_upd, st.n_tup_hot_upd, st.n_tup_del, st.last_vacuum, st.last_autovacuum, st.last_analyze, st.last_autoanalyze, GREATEST(st.last_vacuum, st.last_autovacuum) AS last_any_vacuum, GREATEST(st.last_analyze, st.last_autoanalyze) AS last_any_analyze, dbs.stats_reset FROM pg_stat_user_tables AS st CROSS JOIN database_stats AS dbs) SELECT object_id, schema_name, table_name, schema_name || '.' || table_name AS object_name, table_size_bytes, pg_size_pretty(table_size_bytes) AS table_size_pretty, indexes_size_bytes, pg_size_pretty(indexes_size_bytes) AS indexes_size_pretty, total_size_bytes, pg_size_pretty(total_size_bytes) AS total_size_pretty, n_live_tup, n_dead_tup, round(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) AS dead_tuple_pct, n_mod_since_analyze, round(100.0 * n_mod_since_analyze / NULLIF(n_live_tup, 0), 2) AS modified_since_analyze_pct, n_tup_ins, n_tup_upd, n_tup_hot_upd, n_tup_del, round(100.0 * n_tup_upd / NULLIF(n_tup_ins + n_tup_upd + n_tup_del, 0), 2) AS update_share_pct, round(100.0 * n_tup_hot_upd / NULLIF(n_tup_upd, 0), 2) AS hot_update_pct, last_vacuum, last_autovacuum, last_any_vacuum, last_analyze, last_autoanalyze, last_any_analyze, CASE WHEN last_any_vacuum IS NOT NULL THEN round(extract(epoch FROM now() - last_any_vacuum) / 86400.0, 1) END AS vacuum_age_days, CASE WHEN last_any_analyze IS NOT NULL THEN round(extract(epoch FROM now() - last_any_analyze) / 86400.0, 1) END AS analyze_age_days, stats_reset, CASE WHEN last_any_analyze IS NULL AND n_live_tup >= 1000 THEN 'NEVER_ANALYZED' WHEN n_live_tup > 0 AND n_mod_since_analyze::numeric / NULLIF(n_live_tup, 0) >= 0.30 THEN 'ANALYZE_DUE' WHEN n_live_tup + n_dead_tup > 0 AND n_dead_tup::numeric / NULLIF(n_live_tup + n_dead_tup, 0) >= 0.20 THEN 'HIGH_DEAD_TUPLES' ELSE 'HEALTHY' END AS health_status FROM table_metrics ORDER BY schema_name, table_size_bytes DESC, table_name;",
+            "type": "select",
+            "reference": "https://www.postgresql.org/docs/current/information-schema.html"
+        },                  
         {
             "id": "top_queries_on_object",
             "description": "Top 50 queries on object",

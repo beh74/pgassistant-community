@@ -1,0 +1,632 @@
+{# templates/table_health.html #}
+{% extends "layouts/base.html" %}
+
+{% block title %}Table Health{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+.table-health-header{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.table-health-subtitle{color:var(--bs-secondary-color);margin:0}
+.health-summary{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem}
+.health-summary-card{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.75rem 1rem;min-width:170px;box-shadow:0 .125rem .25rem rgba(0,0,0,.04)}
+.health-summary-label{display:block;font-size:.78rem;color:var(--bs-secondary-color)}
+.health-summary-value{font-size:1.1rem;font-weight:700}
+.health-filters .card-body{padding:1.25rem}
+.health-toolbar{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:1rem 1.25rem;align-items:end}
+.health-field{min-width:0}
+.health-field label{display:block;font-weight:600;margin-bottom:.45rem}
+.health-field .form-control,.health-field .form-select{min-height:44px;border-radius:.75rem}
+.health-toolbar .btn{min-height:44px;border-radius:.75rem;font-weight:600}
+.health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1.25rem;align-items:stretch}
+.health-item{min-width:0}
+.health-card{border:1px solid var(--bs-border-color);border-radius:1rem;transition:transform .12s ease,box-shadow .12s ease}
+.health-card:hover{transform:translateY(-2px);box-shadow:0 .5rem 1rem rgba(0,0,0,.08)}
+.health-card .card-header{background:var(--bs-tertiary-bg);border-bottom:1px solid var(--bs-border-color);padding:.8rem 1rem;border-radius:1rem 1rem 0 0}
+.health-card .card-body{padding:1rem}
+.schema-badge,.status-badge{display:inline-flex;align-items:center;padding:.35rem .6rem;border-radius:999px;font-size:.72rem;font-weight:700;line-height:1}
+.schema-badge{background:rgba(108,117,125,.12);color:#495057}
+.status-healthy{background:rgba(25,135,84,.12);color:#198754}
+.status-analyze{background:#0dcaf0;color:#212529}
+.status-never{background:#ffc107;color:#212529}
+.status-dead{background:#dc3545;color:#fff}
+.table-name{word-break:break-word;font-size:1rem}
+.metric-chips{display:flex;flex-wrap:wrap;gap:.65rem;margin-bottom:1rem}
+.metric-chip{display:inline-flex;align-items:baseline;gap:.45rem;padding:.45rem .9rem;border-radius:999px;background:#f8f9fa;border:1px solid #e9ecef;font-size:.82rem;line-height:1}
+.metric-chip .label{color:#6c757d;font-weight:500}
+.metric-chip .value{color:#212529;font-weight:700;white-space:nowrap}
+.metric-danger{color:#dc3545!important}
+.metric-warning{color:#9a6b00!important}
+.maintenance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin-bottom:1rem}
+.maintenance-item{border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.65rem .75rem}
+.maintenance-label{display:block;font-size:.72rem;color:var(--bs-secondary-color);margin-bottom:.2rem}
+.maintenance-value{display:block;font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
+.health-details{border-top:1px solid var(--bs-border-color);padding-top:.85rem}
+.health-details dl{display:grid;grid-template-columns:minmax(150px,1fr) minmax(120px,auto);gap:.45rem 1rem;margin:0;font-size:.82rem}
+.health-details dt{color:var(--bs-secondary-color);font-weight:500}
+.health-details dd{text-align:right;font-weight:600;margin:0}
+.health-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:auto}
+.health-actions .btn{flex:1 1 auto}
+.pagination-wrapper{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.5rem}
+.pagination-info{color:var(--bs-secondary-color);font-size:.95rem}
+.pagination-controls{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.page-number{min-width:42px}
+.health-empty{text-align:center;padding:3rem 1rem;border:1px dashed var(--bs-border-color);border-radius:1rem}
+.command-preview{font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-word;background:var(--bs-tertiary-bg);border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.85rem}
+.maintenance-exec-result{white-space:pre-wrap;font-size:.95rem;background:var(--bs-tertiary-bg);padding:15px;border-radius:.75rem;border:1px solid var(--bs-border-color)}
+@media(max-width:1399.98px){.health-toolbar{grid-template-columns:2fr 1fr 1fr}}
+@media(max-width:767.98px){.health-toolbar{grid-template-columns:1fr}.health-toolbar .btn{width:100%}}
+@media(max-width:575.98px){.health-grid{grid-template-columns:1fr}.maintenance-grid{grid-template-columns:1fr}}
+</style>
+{% endblock stylesheets %}
+
+{% macro format_count(n) -%}
+  {% if n is none %}-{% elif n >= 1000000000 %}{{ (n/1000000000)|round(1) }}B
+  {% elif n >= 1000000 %}{{ (n/1000000)|round(1) }}M
+  {% elif n >= 1000 %}{{ (n/1000)|round(1) }}k
+  {% else %}{{ n }}{% endif %}
+{%- endmacro %}
+
+{% macro format_ts(v) -%}
+  {{ v if v else "Never" }}
+{%- endmacro %}
+
+{% block content %}
+<div class="container-fluid py-4 ps-3 pe-3">
+  {% set rows = table_health|default([], true) %}
+  {% set summary = namespace(schemas=[],healthy=0,analyze_due=0,never_analyzed=0,high_dead=0) %}
+
+  {% for r in rows %}
+    {% if r.schema_name not in summary.schemas %}
+      {% set _ = summary.schemas.append(r.schema_name) %}
+    {% endif %}
+    {% if r.health_status == 'HEALTHY' %}
+      {% set summary.healthy = summary.healthy + 1 %}
+    {% elif r.health_status == 'ANALYZE_DUE' %}
+      {% set summary.analyze_due = summary.analyze_due + 1 %}
+    {% elif r.health_status == 'NEVER_ANALYZED' %}
+      {% set summary.never_analyzed = summary.never_analyzed + 1 %}
+    {% elif r.health_status == 'HIGH_DEAD_TUPLES' %}
+      {% set summary.high_dead = summary.high_dead + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  <div class="table-health-header">
+    <div>
+      <h1 class="h4 mb-1">Table Health</h1>
+      <p class="table-health-subtitle">Review table activity, dead tuples, statistics freshness, and recent maintenance.</p>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div class="health-summary">
+    <div class="health-summary-card"><span class="health-summary-label">Tables</span><span class="health-summary-value">{{ rows|length }}</span></div>
+    <div class="health-summary-card"><span class="health-summary-label">Schemas</span><span class="health-summary-value">{{ summary.schemas|length }}</span></div>
+    <div class="health-summary-card"><span class="health-summary-label">Matching tables</span><span id="health-visible-count" class="health-summary-value">{{ rows|length }}</span></div>
+    <div class="health-summary-card"><span class="health-summary-label">Analyze due</span><span class="health-summary-value text-info">{{ summary.analyze_due }}</span></div>
+    <div class="health-summary-card"><span class="health-summary-label">Never analyzed</span><span class="health-summary-value text-warning">{{ summary.never_analyzed }}</span></div>
+    <div class="health-summary-card"><span class="health-summary-label">High dead tuples</span><span class="health-summary-value text-danger">{{ summary.high_dead }}</span></div>
+    <div class="health-summary-card">
+      <span class="health-summary-label">Statistics reset</span>
+      <span class="health-summary-value" style="font-size:.9rem">{{ format_ts(rows[0].stats_reset) }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4 health-filters">
+    <div class="card-body">
+      <div class="health-toolbar">
+        <div class="health-field">
+          <label for="health-search">Search</label>
+          <input id="health-search" type="search" class="form-control" placeholder="Search schema or table..." autocomplete="off">
+        </div>
+        <div class="health-field">
+          <label for="health-schema">Schema</label>
+          <select id="health-schema" class="form-select">
+            <option value="">All schemas</option>
+            {% for schema in summary.schemas|sort %}
+              <option value="{{ schema|lower|e }}">{{ schema }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="health-field">
+          <label for="health-status">Status</label>
+          <select id="health-status" class="form-select">
+            <option value="">All statuses</option>
+            <option value="HEALTHY">Healthy</option>
+            <option value="ANALYZE_DUE">Analyze due</option>
+            <option value="NEVER_ANALYZED">Never analyzed</option>
+            <option value="HIGH_DEAD_TUPLES">High dead tuples</option>
+          </select>
+        </div>
+        <div class="health-field">
+          <label for="health-sort">Sort by</label>
+          <select id="health-sort" class="form-select">
+            <option value="status">Health status</option>
+            <option value="size">Total size</option>
+            <option value="rows">Estimated rows</option>
+            <option value="dead">Dead tuple percentage</option>
+            <option value="modified">Modified since analyze</option>
+            <option value="analyze-age">Analyze age</option>
+            <option value="vacuum-age">Vacuum age</option>
+            <option value="name">Schema and table</option>
+          </select>
+        </div>
+        <div class="health-field">
+          <label for="health-per-page">Cards per page</label>
+          <select id="health-per-page" class="form-select">
+            {% for n in [12,24,36,48,72,96] %}
+              <option value="{{ n }}" {% if n == 24 %}selected{% endif %}>{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div><button id="health-reset" type="button" class="btn btn-outline-secondary">Reset</button></div>
+      </div>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div id="health-grid" class="health-grid">
+    {% for r in rows %}
+      {% set dead_pct = (r.dead_tuple_pct or 0)|float %}
+      {% set modified_pct = (r.modified_since_analyze_pct or 0)|float %}
+      {% set update_share = (r.update_share_pct or 0)|float %}
+      {% set hot_pct = (r.hot_update_pct or 0)|float %}
+      {% set analyze_age = (r.analyze_age_days|float) if r.analyze_age_days is not none else -1 %}
+      {% set vacuum_age = (r.vacuum_age_days|float) if r.vacuum_age_days is not none else -1 %}
+
+      <div class="health-item"
+           data-search="{{ (r.schema_name ~ '.' ~ r.table_name ~ ' ' ~ r.schema_name ~ ' ' ~ r.table_name)|lower|e }}"
+           data-schema="{{ r.schema_name|lower|e }}"
+           data-table="{{ r.table_name|lower|e }}"
+           data-status="{{ r.health_status|e }}"
+           data-size="{{ r.total_size_bytes or 0 }}"
+           data-rows="{{ r.n_live_tup or 0 }}"
+           data-dead="{{ dead_pct }}"
+           data-modified="{{ modified_pct }}"
+           data-analyze-age="{{ analyze_age }}"
+           data-vacuum-age="{{ vacuum_age }}">
+        <div class="card shadow-sm h-100 health-card">
+          <div class="card-header d-flex justify-content-between align-items-center gap-2">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <span class="schema-badge"><i class="bi bi-diagram-3 me-1"></i>{{ r.schema_name }}</span>
+              {% if r.health_status == 'HEALTHY' %}
+                <span class="status-badge status-healthy"><i class="bi bi-check-circle me-1"></i>Healthy</span>
+              {% elif r.health_status == 'ANALYZE_DUE' %}
+                <span class="status-badge status-analyze"><i class="bi bi-bar-chart-line me-1"></i>Analyze due</span>
+              {% elif r.health_status == 'NEVER_ANALYZED' %}
+                <span class="status-badge status-never"><i class="bi bi-exclamation-triangle me-1"></i>Never analyzed</span>
+              {% elif r.health_status == 'HIGH_DEAD_TUPLES' %}
+                <span class="status-badge status-dead"><i class="bi bi-recycle me-1"></i>High dead tuples</span>
+              {% endif %}
+            </div>
+            <span class="text-muted small health-card-index">#{{ loop.index }}</span>
+          </div>
+
+          <div class="card-body d-flex flex-column">
+            <div class="table-name mb-3"><code class="text-muted">{{ r.schema_name }}</code>.<strong>{{ r.table_name }}</strong></div>
+
+            <div class="metric-chips">
+              <div class="metric-chip"><span class="label">Total</span><span class="value">{{ r.total_size_pretty }}</span></div>
+              <div class="metric-chip"><span class="label">Table</span><span class="value">{{ r.table_size_pretty }}</span></div>
+              <div class="metric-chip"><span class="label">Indexes</span><span class="value">{{ r.indexes_size_pretty }}</span></div>
+              <div class="metric-chip"><span class="label">Rows</span><span class="value" title="{{ r.n_live_tup }}">{{ format_count(r.n_live_tup) }}</span></div>
+              <div class="metric-chip"><span class="label">Dead tuples</span><span class="value" title="{{ r.n_dead_tup }}">{{ format_count(r.n_dead_tup) }}</span></div>
+              <div class="metric-chip"><span class="label">Dead %</span><span class="value {% if dead_pct >= 20 %}metric-danger{% elif dead_pct >= 10 %}metric-warning{% endif %}">{{ "%.2f"|format(dead_pct|float) }}%</span></div>
+              <div class="metric-chip"><span class="label">Modified</span><span class="value" title="{{ r.n_mod_since_analyze }}">{{ format_count(r.n_mod_since_analyze) }}</span></div>
+              <div class="metric-chip"><span class="label">Modified %</span><span class="value {% if modified_pct >= 30 %}metric-danger{% elif modified_pct >= 20 %}metric-warning{% endif %}">{{ "%.2f"|format(modified_pct|float) }}%</span></div>
+              <div class="metric-chip"><span class="label">Updates</span><span class="value">{{ format_count(r.n_tup_upd) }}</span></div>
+              <div class="metric-chip"><span class="label">Update share</span><span class="value">{{ "%.2f"|format(update_share|float) }}%</span></div>
+              <div class="metric-chip"><span class="label">HOT updates</span><span class="value">{{ "%.2f"|format(hot_pct|float) }}%</span></div>
+            </div>
+
+            <div class="maintenance-grid">
+              <div class="maintenance-item"><span class="maintenance-label">Last vacuum</span><span class="maintenance-value">{{ format_ts(r.last_vacuum) }}</span></div>
+              <div class="maintenance-item"><span class="maintenance-label">Last autovacuum</span><span class="maintenance-value">{{ format_ts(r.last_autovacuum) }}</span></div>
+              <div class="maintenance-item"><span class="maintenance-label">Last analyze</span><span class="maintenance-value">{{ format_ts(r.last_analyze) }}</span></div>
+              <div class="maintenance-item"><span class="maintenance-label">Last autoanalyze</span><span class="maintenance-value">{{ format_ts(r.last_autoanalyze) }}</span></div>
+            </div>
+
+            <div class="mb-3">
+              <button class="btn btn-sm btn-link px-0 text-decoration-none" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#health-details-{{ r.object_id }}">
+                <i class="bi bi-chevron-down me-1"></i>More details
+              </button>
+              <div class="collapse" id="health-details-{{ r.object_id }}">
+                <div class="health-details">
+                  <dl>
+                    <dt>Analyze age</dt><dd>{{ r.analyze_age_days ~ ' days' if r.analyze_age_days is not none else 'Never' }}</dd>
+                    <dt>Vacuum age</dt><dd>{{ r.vacuum_age_days ~ ' days' if r.vacuum_age_days is not none else 'Never' }}</dd>
+                    <dt>Inserted tuples</dt><dd>{{ format_count(r.n_tup_ins) }}</dd>
+                    <dt>Updated tuples</dt><dd>{{ format_count(r.n_tup_upd) }}</dd>
+                    <dt>HOT updated tuples</dt><dd>{{ format_count(r.n_tup_hot_upd) }}</dd>
+                    <dt>Deleted tuples</dt><dd>{{ format_count(r.n_tup_del) }}</dd>
+                    <dt>Last maintenance vacuum</dt><dd>{{ format_ts(r.last_any_vacuum) }}</dd>
+                    <dt>Last planner statistics refresh</dt><dd>{{ format_ts(r.last_any_analyze) }}</dd>
+                    <dt>Database statistics reset</dt><dd>{{ format_ts(r.stats_reset) }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div class="health-actions">
+              <button type="button" class="btn btn-sm btn-primary maintenance-action"
+                      data-bs-toggle="modal" data-bs-target="#maintenanceModal"
+                      data-action="analyze" data-schema="{{ r.schema_name|e }}" data-table="{{ r.table_name|e }}"
+                      data-size="{{ r.total_size_pretty|e }}" data-dead="{{ r.n_dead_tup or 0 }}" data-dead-pct="{{ dead_pct }}">
+                <i class="bi bi-bar-chart-line me-1"></i>Analyze
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-warning maintenance-action"
+                      data-bs-toggle="modal" data-bs-target="#maintenanceModal"
+                      data-action="vacuum_analyze" data-schema="{{ r.schema_name|e }}" data-table="{{ r.table_name|e }}"
+                      data-size="{{ r.total_size_pretty|e }}" data-dead="{{ r.n_dead_tup or 0 }}" data-dead-pct="{{ dead_pct }}">
+                <i class="bi bi-recycle me-1"></i>Vacuum Analyze
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div id="health-empty-filter" class="health-empty d-none">
+    <div class="fw-bold mb-1">No table found</div>
+    <div class="text-muted">No table matches the current search and filters.</div>
+  </div>
+
+  <div id="health-pagination" class="pagination-wrapper">
+    <div id="health-pagination-info" class="pagination-info"></div>
+    <div id="health-pagination-controls" class="pagination-controls"></div>
+  </div>
+  {% else %}
+  <div class="health-empty">
+    <div class="fw-bold mb-1">No table health data available</div>
+    <div class="text-muted">The query did not return any user table.</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="maintenance-form">
+        <div class="modal-header">
+          <h2 class="h5 modal-title" id="maintenanceModalLabel">Confirm maintenance action</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="action" id="maintenance-action">
+          <input type="hidden" name="schema_name" id="maintenance-schema">
+          <input type="hidden" name="table_name" id="maintenance-table">
+
+          <p id="maintenance-description"></p>
+          <dl class="row small mb-3">
+            <dt class="col-5">Table</dt><dd class="col-7" id="maintenance-object"></dd>
+            <dt class="col-5">Total size</dt><dd class="col-7" id="maintenance-size"></dd>
+            <dt class="col-5">Dead tuples</dt><dd class="col-7" id="maintenance-dead"></dd>
+          </dl>
+
+          <label class="form-label fw-semibold">Command</label>
+          <div id="maintenance-command" class="command-preview"></div>
+
+          <div id="maintenance-result-wrapper" class="mt-3 d-none">
+            <div class="small text-muted mb-1">Execution result</div>
+            <div id="maintenance-result" class="maintenance-exec-result">Waiting...</div>
+
+            <div class="small text-muted mt-3 mb-1">Execution time</div>
+            <div id="maintenance-execution-time" class="fw-semibold">Pending...</div>
+          </div>
+
+          <div class="alert alert-warning mt-3 mb-0">
+            Review current workload and privileges before running this operation.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="maintenance-submit">Run action</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const search = document.getElementById("health-search");
+  const schema = document.getElementById("health-schema");
+  const status = document.getElementById("health-status");
+  const sort = document.getElementById("health-sort");
+  const perPage = document.getElementById("health-per-page");
+  const reset = document.getElementById("health-reset");
+  const grid = document.getElementById("health-grid");
+  const empty = document.getElementById("health-empty-filter");
+  const pagination = document.getElementById("health-pagination");
+  const paginationInfo = document.getElementById("health-pagination-info");
+  const paginationControls = document.getElementById("health-pagination-controls");
+  const visibleCount = document.getElementById("health-visible-count");
+  const maintenanceSubmit = document.getElementById("maintenance-submit");
+  const maintenanceResultWrapper = document.getElementById("maintenance-result-wrapper");
+  const maintenanceResult = document.getElementById("maintenance-result");
+  const maintenanceExecutionTime = document.getElementById("maintenance-execution-time");
+
+  let pendingMaintenanceSql = null;
+
+  function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
+  async function executeMaintenanceSql(sql) {
+    if (!sql) {
+      maintenanceResultWrapper?.classList.remove("d-none");
+      if (maintenanceResult) {
+        maintenanceResult.innerHTML =
+          '<div class="text-danger"><strong>Error</strong></div>' +
+          '<div class="mt-2">No SQL command was generated.</div>';
+      }
+      return;
+    }
+
+    const originalText = maintenanceSubmit?.textContent || "Run action";
+
+    if (maintenanceSubmit) {
+      maintenanceSubmit.disabled = true;
+      maintenanceSubmit.textContent = "Running...";
+    }
+
+    maintenanceResultWrapper?.classList.remove("d-none");
+
+    if (maintenanceResult) {
+      maintenanceResult.textContent = "Running...";
+    }
+
+    if (maintenanceExecutionTime) {
+      maintenanceExecutionTime.textContent = "Running...";
+    }
+
+    const startedAt = performance.now();
+
+    try {
+      const response = await fetch("/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sql })
+      });
+
+      const elapsedMs = Math.round(performance.now() - startedAt);
+
+      if (maintenanceExecutionTime) {
+        maintenanceExecutionTime.textContent = `${elapsedMs} ms`;
+      }
+
+      let result;
+
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        throw new Error(
+          `The server returned an invalid response (${response.status}).`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || `HTTP error ${response.status}`
+        );
+      }
+
+      if (result.success) {
+        if (maintenanceResult) {
+          maintenanceResult.innerHTML =
+            '<div class="text-success"><strong>Success</strong></div>' +
+            '<div class="mt-2">' +
+            escapeHtml(result.message || "Query executed successfully.") +
+            '</div>';
+        }
+      } else {
+        if (maintenanceResult) {
+          maintenanceResult.innerHTML =
+            '<div class="text-danger"><strong>Error</strong></div>' +
+            '<div class="mt-2">' +
+            escapeHtml(result.error || "Unknown execution error.") +
+            '</div>';
+        }
+      }
+    } catch (error) {
+      const elapsedMs = Math.round(performance.now() - startedAt);
+
+      if (maintenanceExecutionTime) {
+        maintenanceExecutionTime.textContent = `${elapsedMs} ms`;
+      }
+
+      if (maintenanceResult) {
+        maintenanceResult.innerHTML =
+          '<div class="text-danger"><strong>Error</strong></div>' +
+          '<div class="mt-2">' +
+          escapeHtml(error.message) +
+          '</div>';
+      }
+    } finally {
+      if (maintenanceSubmit) {
+        maintenanceSubmit.disabled = false;
+        maintenanceSubmit.textContent = originalText;
+      }
+    }
+  }
+
+  if (!grid) return;
+
+  const cards = Array.from(grid.querySelectorAll(".health-item"));
+  const weight = {HIGH_DEAD_TUPLES:4,NEVER_ANALYZED:3,ANALYZE_DUE:2,HEALTHY:1};
+  let currentPage = 1;
+
+  const num = (el, name) => {
+    const value = Number(el.getAttribute(name));
+    return Number.isFinite(value) ? value : 0;
+  };
+
+  const textCompare = (a,b,key) =>
+    (a.dataset[key] || "").localeCompare(b.dataset[key] || "", undefined, {sensitivity:"base"});
+
+  function filteredCards() {
+    const q = (search?.value || "").trim().toLowerCase();
+    const selectedSchema = schema?.value || "";
+    const selectedStatus = status?.value || "";
+    const selectedSort = sort?.value || "status";
+
+    const result = cards.filter(card =>
+      (!q || (card.dataset.search || "").includes(q)) &&
+      (!selectedSchema || card.dataset.schema === selectedSchema) &&
+      (!selectedStatus || card.dataset.status === selectedStatus)
+    );
+
+    result.sort((a,b) => {
+      if (selectedSort === "size") return num(b,"data-size") - num(a,"data-size");
+      if (selectedSort === "rows") return num(b,"data-rows") - num(a,"data-rows");
+      if (selectedSort === "dead") return num(b,"data-dead") - num(a,"data-dead");
+      if (selectedSort === "modified") return num(b,"data-modified") - num(a,"data-modified");
+      if (selectedSort === "analyze-age") return num(b,"data-analyze-age") - num(a,"data-analyze-age");
+      if (selectedSort === "vacuum-age") return num(b,"data-vacuum-age") - num(a,"data-vacuum-age");
+      if (selectedSort === "name") return textCompare(a,b,"schema") || textCompare(a,b,"table");
+      return ((weight[b.dataset.status] || 0) - (weight[a.dataset.status] || 0))
+        || num(b,"data-size") - num(a,"data-size");
+    });
+    return result;
+  }
+
+  function pageButton(label,page,active,disabled) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm " + (active ? "btn-primary" : "btn-outline-primary");
+    button.textContent = label;
+    button.disabled = disabled;
+    if (!disabled) button.addEventListener("click", () => {
+      currentPage = page;
+      render();
+      window.scrollTo({top:grid.offsetTop - 100,behavior:"smooth"});
+    });
+    return button;
+  }
+
+  function drawPagination(totalPages) {
+    paginationControls.innerHTML = "";
+    if (totalPages <= 1) {
+      pagination.classList.add("d-none");
+      return;
+    }
+    pagination.classList.remove("d-none");
+    paginationControls.appendChild(pageButton("Previous",currentPage-1,false,currentPage<=1));
+    for (let p=1;p<=totalPages;p+=1) {
+      if (p===1 || p===totalPages || Math.abs(p-currentPage)<=2) {
+        const b = pageButton(String(p),p,p===currentPage,false);
+        b.classList.add("page-number");
+        paginationControls.appendChild(b);
+      } else if (p===currentPage-3 || p===currentPage+3) {
+        const e = document.createElement("span");
+        e.className = "btn btn-sm btn-light disabled";
+        e.textContent = "…";
+        paginationControls.appendChild(e);
+      }
+    }
+    paginationControls.appendChild(pageButton("Next",currentPage+1,false,currentPage>=totalPages));
+  }
+
+  function render() {
+    const filtered = filteredCards();
+    const size = Number(perPage?.value || 24);
+    const pages = Math.max(1,Math.ceil(filtered.length/size));
+    if (currentPage > pages) currentPage = pages;
+
+    cards.forEach(card => card.style.display = "none");
+    filtered.forEach(card => grid.appendChild(card));
+
+    const start = (currentPage-1)*size;
+    const end = Math.min(start+size,filtered.length);
+    filtered.slice(start,end).forEach((card,index) => {
+      card.style.display = "";
+      const badge = card.querySelector(".health-card-index");
+      if (badge) badge.textContent = "#" + (start+index+1);
+    });
+
+    if (visibleCount) visibleCount.textContent = String(filtered.length);
+
+    if (!filtered.length) {
+      grid.classList.add("d-none");
+      empty.classList.remove("d-none");
+      pagination.classList.add("d-none");
+      return;
+    }
+
+    grid.classList.remove("d-none");
+    empty.classList.add("d-none");
+    paginationInfo.textContent = `Showing ${start+1}-${end} of ${filtered.length} tables`;
+    drawPagination(pages);
+  }
+
+  search?.addEventListener("input", () => {currentPage=1;render();});
+  [schema,status,sort,perPage].forEach(el => el?.addEventListener("change", () => {currentPage=1;render();}));
+  reset?.addEventListener("click", () => {
+    search.value = "";
+    schema.value = "";
+    status.value = "";
+    sort.value = "status";
+    perPage.value = "24";
+    currentPage = 1;
+    render();
+  });
+
+  document.querySelectorAll(".maintenance-action").forEach(button => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.action;
+      const schemaName = button.dataset.schema;
+      const tableName = button.dataset.table;
+      const quoteIdent = value => '"' + String(value).replaceAll('"','""') + '"';
+      const qualified = quoteIdent(schemaName) + "." + quoteIdent(tableName);
+      const isAnalyze = action === "analyze";
+      const command = isAnalyze
+        ? `ANALYZE ${qualified};`
+        : `VACUUM (ANALYZE) ${qualified};`;
+
+      pendingMaintenanceSql = command;
+
+      document.getElementById("maintenance-action").value = action;
+      document.getElementById("maintenance-schema").value = schemaName;
+      document.getElementById("maintenance-table").value = tableName;
+      document.getElementById("maintenance-object").textContent = `${schemaName}.${tableName}`;
+      document.getElementById("maintenance-size").textContent = button.dataset.size || "-";
+      document.getElementById("maintenance-dead").textContent =
+        `${Number(button.dataset.dead || 0).toLocaleString()} (${Number(button.dataset.deadPct || 0).toFixed(2)}%)`;
+      document.getElementById("maintenance-command").textContent = command;
+      document.getElementById("maintenance-description").textContent = isAnalyze
+        ? "ANALYZE refreshes planner statistics for this table."
+        : "VACUUM (ANALYZE) cleans reusable dead tuples and refreshes planner statistics.";
+
+      const submit = document.getElementById("maintenance-submit");
+      submit.textContent = isAnalyze ? "Run Analyze" : "Run Vacuum Analyze";
+      submit.className = isAnalyze ? "btn btn-primary" : "btn btn-warning";
+
+      maintenanceResultWrapper?.classList.add("d-none");
+
+      if (maintenanceResult) {
+        maintenanceResult.textContent = "Waiting...";
+      }
+
+      if (maintenanceExecutionTime) {
+        maintenanceExecutionTime.textContent = "Pending...";
+      }
+    });
+  });
+
+  maintenanceSubmit?.addEventListener("click", async function () {
+    await executeMaintenanceSql(pendingMaintenanceSql);
+  });
+
+  render();
+});
+</script>
+{% endblock javascripts %}
