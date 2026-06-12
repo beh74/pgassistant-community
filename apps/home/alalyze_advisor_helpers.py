@@ -63,6 +63,35 @@ class JoinFinding:
 
 
 @dataclass
+class OrderByFinding:
+    node_type: str
+    sort_key: Optional[List[str]]
+    presorted_key: Optional[List[str]]
+    has_limit: bool
+    schema: str
+    table: str
+    alias: Optional[str]
+    child_node_type: str
+    child_index_name: Optional[str]
+    child_index_cond: Optional[str]
+    child_recheck_cond: Optional[str]
+    child_filter_expr: Optional[str]
+    child_actual_rows: float
+    child_plan_rows: float
+    actual_rows: float
+    plan_rows: float
+    actual_loops: float
+    startup_cost: float
+    total_cost: float
+    actual_total_time: float
+    shared_hit_blocks: int
+    shared_read_blocks: int
+    sort_method: Optional[str] = None
+    sort_space_type: Optional[str] = None
+    sort_space_used: Optional[float] = None
+
+
+@dataclass
 class QueryStats:
     queryid: str
     calls: float
@@ -99,6 +128,8 @@ class Recommendation:
     reason: str
     filter_expr: Optional[str] = None
     candidate_columns: Optional[List[str]] = None
+    candidate_order_columns: Optional[List[Dict[str, str]]] = None
+    recommendation_type: Optional[str] = None
     create_index_sql: Optional[str] = None
     existing_index_match: Optional[str] = None
     stats_reason: Optional[str] = None
@@ -172,6 +203,7 @@ def walk_plan_collect_findings(
     node: Dict[str, Any],
     scan_findings: List[ScanFinding],
     join_findings: List[JoinFinding],
+    order_by_findings: Optional[List[OrderByFinding]] = None,
     parent_node_type: Optional[str] = None,
 ) -> None:
     node_type = node.get("Node Type", "")
@@ -243,13 +275,72 @@ def walk_plan_collect_findings(
             )
         )
 
+    # ------------------------------------------------------------
+    # ORDER BY / Sort findings
+    # ------------------------------------------------------------
+    if order_by_findings is not None and node_type in {"Sort", "Incremental Sort"}:
+        child = first_direct_scan_child(node)
+        if child is not None:
+            order_by_findings.append(
+                OrderByFinding(
+                    node_type=node_type,
+                    sort_key=node.get("Sort Key"),
+                    presorted_key=node.get("Presorted Key"),
+                    has_limit=parent_node_type == "Limit",
+                    schema=child["Schema"],
+                    table=child["Relation Name"],
+                    alias=child.get("Alias"),
+                    child_node_type=child.get("Node Type", ""),
+                    child_index_name=child.get("Index Name"),
+                    child_index_cond=child.get("Index Cond"),
+                    child_recheck_cond=child.get("Recheck Cond"),
+                    child_filter_expr=child.get("Filter"),
+                    child_actual_rows=float(child.get("Actual Rows", 0) or 0),
+                    child_plan_rows=float(child.get("Plan Rows", 0) or 0),
+                    actual_rows=float(node.get("Actual Rows", 0) or 0),
+                    plan_rows=float(node.get("Plan Rows", 0) or 0),
+                    actual_loops=float(node.get("Actual Loops", 0) or 0),
+                    startup_cost=float(node.get("Startup Cost", 0) or 0),
+                    total_cost=float(node.get("Total Cost", 0) or 0),
+                    actual_total_time=float(node.get("Actual Total Time", 0) or 0),
+                    shared_hit_blocks=int(node.get("Shared Hit Blocks", 0) or 0),
+                    shared_read_blocks=int(node.get("Shared Read Blocks", 0) or 0),
+                    sort_method=node.get("Sort Method"),
+                    sort_space_type=node.get("Sort Space Type"),
+                    sort_space_used=(
+                        float(node.get("Sort Space Used"))
+                        if node.get("Sort Space Used") is not None
+                        else None
+                    ),
+                )
+            )
+
     for child in node.get("Plans", []) or []:
         walk_plan_collect_findings(
             child,
             scan_findings,
             join_findings,
+            order_by_findings=order_by_findings,
             parent_node_type=node_type,
         )
+
+
+def first_direct_scan_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Returns the direct child scan for simple Sort -> Scan patterns.
+    This deliberately avoids joins and complex subtrees to keep ORDER BY index
+    recommendations conservative.
+    """
+    plans = node.get("Plans", []) or []
+    if len(plans) != 1:
+        return None
+
+    child = plans[0]
+    if child.get("Node Type") in {"Seq Scan", "Index Scan", "Index Only Scan", "Bitmap Heap Scan"} \
+       and child.get("Relation Name") and child.get("Schema"):
+        return child
+
+    return None
 
 
 # --------------------------------------------------------------------
@@ -1282,6 +1373,141 @@ def looks_suspicious_predicate(filter_expr: str) -> bool:
     if "discount" in expr and "> 1" in expr:
         return True
     return False
+
+
+def extract_simple_sort_keys(
+    keys: Optional[List[str]],
+    alias: Optional[str],
+    table: str,
+) -> List[Dict[str, str]]:
+    """
+    Extracts simple ORDER BY keys from PostgreSQL JSON plan Sort Key entries.
+    Only plain columns are accepted. Expressions, functions, CASE, and mixed
+    relation keys intentionally return an empty list.
+
+    Returns: [{"column": "created_at", "direction": "DESC"}]
+    """
+    if not keys:
+        return []
+
+    result: List[Dict[str, str]] = []
+    seen = set()
+
+    for raw_key in keys:
+        key = str(raw_key).strip()
+
+        direction = "ASC"
+        if re.search(r"\bDESC\b", key, flags=re.IGNORECASE):
+            direction = "DESC"
+
+        key = re.sub(
+            r"\s+(ASC|DESC)\b.*$",
+            "",
+            key,
+            flags=re.IGNORECASE,
+        ).strip()
+        key = strip_trivial_lhs_casts(key)
+        key = key.strip('"')
+
+        m = re.match(
+            r'^(?:(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\.)?(?P<col>[A-Za-z_][A-Za-z0-9_]*)$',
+            key,
+            flags=re.IGNORECASE,
+        )
+        if not m:
+            return []
+
+        found_prefix = m.group("prefix")
+        col = m.group("col")
+
+        if alias and found_prefix and found_prefix != alias:
+            return []
+
+        if not alias and found_prefix and found_prefix != table:
+            return []
+
+        if col in seen:
+            continue
+
+        result.append({"column": col, "direction": direction})
+        seen.add(col)
+
+    return result
+
+
+def merge_columns_with_order(
+    filter_columns: List[str],
+    order_columns: List[Dict[str, str]],
+) -> List[str]:
+    merged: List[str] = []
+
+    for col in filter_columns or []:
+        if col not in merged:
+            merged.append(col)
+
+    for item in order_columns or []:
+        col = item.get("column")
+        if col and col not in merged:
+            merged.append(col)
+
+    return merged
+
+
+def build_create_index_sql_with_order(
+    schema: str,
+    table: str,
+    filter_columns: List[str],
+    order_columns: List[Dict[str, str]],
+) -> str:
+    index_parts: List[str] = []
+    name_parts: List[str] = []
+
+    for col in filter_columns or []:
+        if col not in name_parts:
+            index_parts.append(f'"{col}"')
+            name_parts.append(col)
+
+    for item in order_columns or []:
+        col = item.get("column")
+        if not col or col in name_parts:
+            continue
+
+        direction = str(item.get("direction", "ASC")).upper()
+        if direction not in {"ASC", "DESC"}:
+            direction = "ASC"
+
+        index_parts.append(f'"{col}" {direction}')
+        name_parts.append(f"{col}_{direction.lower()}")
+
+    idx_name = f"pga_idx_{table}_{'_'.join(name_parts)}"
+    cols_sql = ", ".join(index_parts)
+    return f'CREATE INDEX CONCURRENTLY "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
+
+
+def sort_spilled_to_disk(finding: OrderByFinding) -> bool:
+    return (finding.sort_space_type or "").lower() == "disk"
+
+
+def build_sort_context_reason(finding: OrderByFinding) -> str:
+    details: List[str] = []
+
+    if finding.has_limit:
+        details.append("ORDER BY is directly under a LIMIT")
+
+    if finding.sort_key:
+        details.append(f"sort_key={finding.sort_key}")
+
+    if finding.sort_method:
+        details.append(f"sort_method={finding.sort_method}")
+
+    if finding.sort_space_type:
+        space = f", sort_space_used={finding.sort_space_used:g}kB" if finding.sort_space_used is not None else ""
+        details.append(f"sort_space_type={finding.sort_space_type}{space}")
+
+    if finding.actual_total_time:
+        details.append(f"sort_actual_total_time={finding.actual_total_time:.3f} ms")
+
+    return "; ".join(details)
 
 
 def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List[str]) -> Optional[str]:

@@ -36,10 +36,16 @@ def analyze_plan_for_safe_indexes(
 
         scan_findings: List[helpers.ScanFinding] = []
         join_findings: List[helpers.JoinFinding] = []
+        order_by_findings: List[helpers.OrderByFinding] = []
         alias_map: Dict[str, Dict[str, str]] = {}
 
         helpers.collect_relation_aliases(root, alias_map)
-        helpers.walk_plan_collect_findings(root, scan_findings, join_findings)
+        helpers.walk_plan_collect_findings(
+            root,
+            scan_findings,
+            join_findings,
+            order_by_findings=order_by_findings,
+        )
 
         query_stats = helpers.load_query_stats(con, queryid) if queryid is not None else None
 
@@ -74,6 +80,33 @@ def analyze_plan_for_safe_indexes(
 
             rec = evaluate_scan_candidate(con, finding, meta, query_stats)
             recommendations.append(rec)
+
+        # ------------------------------------------------------------
+        # ORDER BY / Sort-based recommendations
+        # ------------------------------------------------------------
+        for finding in order_by_findings:
+            meta = helpers.load_table_meta(con, finding.schema, finding.table)
+            if meta is None:
+                recommendations.append(
+                    helpers.Recommendation(
+                        schema=finding.schema,
+                        table=finding.table,
+                        confidence="none",
+                        reason="Could not load table metadata for ORDER BY analysis.",
+                        node_type=finding.node_type,
+                        access_path=finding.child_node_type,
+                        used_index_name=finding.child_index_name,
+                        index_cond=finding.child_index_cond,
+                        recheck_cond=finding.child_recheck_cond,
+                        filter_expr=finding.child_filter_expr,
+                        recommendation_type="order_by_index_observation",
+                    )
+                )
+                continue
+
+            recommendations.append(
+                evaluate_order_by_candidate(con, finding, meta, query_stats)
+            )
 
         # ------------------------------------------------------------
         # Join-based recommendations
@@ -115,6 +148,7 @@ def analyze_plan_for_safe_indexes(
             "observations": [asdict(r) for r in observations],
             "scan_findings": [asdict(f) for f in scan_findings],
             "join_findings": [asdict(j) for j in join_findings],
+            "order_by_findings": [asdict(o) for o in order_by_findings],
             "query_stats": asdict(query_stats) if query_stats else None,
         }
 
@@ -799,6 +833,235 @@ def evaluate_seq_scan_candidate(
     )
 
 
+def evaluate_order_by_candidate(
+    con,
+    finding: helpers.OrderByFinding,
+    meta: helpers.TableMeta,
+    query_stats: Optional[helpers.QueryStats] = None,
+) -> helpers.Recommendation:
+    """
+    Recommends conservative indexes for simple ORDER BY patterns, especially:
+
+      Limit -> Sort -> Scan
+      Sort  -> Scan
+
+    Candidate index order:
+      1. equality predicates from Index Cond / Recheck Cond / Filter
+      2. ORDER BY columns with their direction
+
+    Range predicates are deliberately not prepended before the ORDER BY key in
+    this V1 because they can prevent the index order from satisfying the sort.
+    """
+    order_columns = helpers.extract_simple_sort_keys(
+        finding.sort_key,
+        alias=finding.alias,
+        table=finding.table,
+    )
+
+    base_reason = (
+        f"{finding.node_type} above {finding.child_node_type} on "
+        f"{finding.schema}.{finding.table}."
+    )
+    sort_context = helpers.build_sort_context_reason(finding)
+    if sort_context:
+        base_reason += " " + sort_context + "."
+
+    if not order_columns:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " Sort keys are not simple single-table columns, so no safe ORDER BY index recommendation is emitted."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_order_columns=None,
+            recommendation_type="order_by_index_observation",
+        )
+
+    if helpers.is_small_table(meta):
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " Table is small; keeping the explicit sort is usually cheaper than adding a dedicated ORDER BY index."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_order_columns=order_columns,
+            recommendation_type="order_by_index_observation",
+        )
+
+    predicates: List[Dict[str, str]] = []
+
+    for expr in (
+        finding.child_index_cond,
+        finding.child_recheck_cond,
+        finding.child_filter_expr,
+    ):
+        if not expr:
+            continue
+        parsed = helpers.extract_simple_filter_predicates(
+            expr,
+            alias=finding.alias,
+            table=finding.table,
+        )
+        predicates = helpers.merge_simple_predicates(predicates, parsed)
+
+    equality_predicates = [p for p in predicates if p.get("operator") == "="]
+    filter_columns = (
+        helpers.reorder_index_candidate_columns(
+            con,
+            finding.schema,
+            finding.table,
+            equality_predicates,
+        )
+        if equality_predicates
+        else []
+    )
+
+    candidate_columns = helpers.merge_columns_with_order(filter_columns, order_columns)
+
+    if not candidate_columns:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=base_reason + " Could not build a reliable ORDER BY candidate column list.",
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_order_columns=order_columns,
+            recommendation_type="order_by_index_observation",
+        )
+
+    matched_index = helpers.find_equivalent_index(meta.indexes, candidate_columns)
+    if matched_index:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + f' Candidate ORDER BY index columns ({", ".join(candidate_columns)}) are already covered by existing index "{matched_index}".'
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_columns=candidate_columns,
+            candidate_order_columns=order_columns,
+            existing_index_match=matched_index,
+            stats_reason=load_candidate_stats_reason(con, finding.schema, finding.table, candidate_columns),
+            recommendation_type="order_by_index_observation",
+        )
+
+    sort_is_meaningful = (
+        finding.has_limit
+        or helpers.sort_spilled_to_disk(finding)
+        or finding.actual_total_time >= 1.0
+        or helpers.is_high_workload(query_stats)
+    )
+
+    if not sort_is_meaningful:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " The sort does not look expensive enough and the workload is not significant enough for an automatic index recommendation."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_columns=candidate_columns,
+            candidate_order_columns=order_columns,
+            stats_reason=load_candidate_stats_reason(con, finding.schema, finding.table, candidate_columns),
+            recommendation_type="order_by_index_observation",
+        )
+
+    if finding.has_limit and filter_columns:
+        confidence = "safe"
+        reason = (
+            base_reason
+            + " ORDER BY with LIMIT follows equality predicate(s) on the same table. "
+            "A composite B-tree index with equality column(s) first and ORDER BY column(s) next may let PostgreSQL avoid the explicit Sort and return the first rows faster."
+        )
+    elif finding.has_limit:
+        confidence = "review"
+        reason = (
+            base_reason
+            + " ORDER BY with LIMIT can often benefit from an index matching the sort key, but there is no simple equality predicate to narrow the scan first. Review selectivity and projected columns before creating it."
+        )
+    elif helpers.sort_spilled_to_disk(finding):
+        confidence = "review"
+        reason = (
+            base_reason
+            + " The sort spilled to disk. An index matching the ORDER BY keys may avoid or reduce the explicit Sort, but review the query shape before creating a dedicated index."
+        )
+    else:
+        confidence = "review"
+        reason = (
+            base_reason
+            + " The plan performs an explicit sort on a non-small table. An index matching the ORDER BY keys may help, especially if the query is frequent or latency-sensitive."
+        )
+
+    stats_reason = load_candidate_stats_reason(
+        con,
+        finding.schema,
+        finding.table,
+        candidate_columns,
+    )
+
+    return helpers.Recommendation(
+        schema=finding.schema,
+        table=finding.table,
+        confidence=confidence,
+        reason=reason,
+        node_type=finding.node_type,
+        access_path=finding.child_node_type,
+        used_index_name=finding.child_index_name,
+        index_cond=finding.child_index_cond,
+        recheck_cond=finding.child_recheck_cond,
+        filter_expr=finding.child_filter_expr,
+        candidate_columns=candidate_columns,
+        candidate_order_columns=order_columns,
+        create_index_sql=helpers.build_create_index_sql_with_order(
+            finding.schema,
+            finding.table,
+            filter_columns,
+            order_columns,
+        ),
+        stats_reason=stats_reason,
+        row_estimation_reason=helpers.build_row_estimation_reason(
+            finding.child_plan_rows,
+            finding.child_actual_rows,
+        ),
+        recommendation_type="order_by_limit_index" if finding.has_limit else "order_by_index",
+    )
+
+
 def evaluate_join_candidate(
     con,
     join: helpers.JoinFinding,
@@ -939,6 +1202,22 @@ def pretty_print_analysis(result: Dict[str, Any]) -> None:
             print(f"plan_rows: {finding['plan_rows']}")
             print(f"actual_total_time: {finding['actual_total_time']}")
 
+    if result.get("order_by_findings"):
+        print("=" * 80)
+        print("ORDER BY FINDINGS")
+        for order_finding in result["order_by_findings"]:
+            print("-" * 80)
+            print(f"{order_finding['schema']}.{order_finding['table']} ({order_finding['node_type']})")
+            print(f"child_access_path: {order_finding['child_node_type']}")
+            print(f"has_limit: {order_finding['has_limit']}")
+            if order_finding.get("sort_key"):
+                print(f"sort_key: {order_finding['sort_key']}")
+            if order_finding.get("child_filter_expr"):
+                print(f"child_filter: {order_finding['child_filter_expr']}")
+            if order_finding.get("child_index_cond"):
+                print(f"child_index_cond: {order_finding['child_index_cond']}")
+            print(f"actual_total_time: {order_finding['actual_total_time']}")
+
     if result.get("join_findings"):
         print("=" * 80)
         print("JOIN FINDINGS")
@@ -975,6 +1254,10 @@ def pretty_print_analysis(result: Dict[str, Any]) -> None:
             print(f"filter: {rec['filter_expr']}")
         if rec.get("candidate_columns"):
             print(f"columns: {rec['candidate_columns']}")
+        if rec.get("candidate_order_columns"):
+            print(f"order_columns: {rec['candidate_order_columns']}")
+        if rec.get("recommendation_type"):
+            print(f"recommendation_type: {rec['recommendation_type']}")
         if rec.get("existing_index_match"):
             print(f"existing_index: {rec['existing_index_match']}")
         if rec.get("stats_reason"):

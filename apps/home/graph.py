@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from typing import Any, Dict, List, Tuple
 from . import database
 
@@ -102,14 +103,14 @@ def build_mermaid_erd_from_explain_stats(
             for c in pks:
                 flag = "PK"
                 if c in fks:
-                    flag = "PK, FK"
-                lines.append(f"        _ {c} {flag}")
+                    flag = "PK FK"
+                lines.append(_mermaid_attribute_line(c, flag))
             for c in fk_only:
-                lines.append(f"        _ {c} FK")
+                lines.append(_mermaid_attribute_line(c, "FK"))
 
             # Optional: show estimate as pseudo-field
             if include_est_rows:
-                lines.append(f"        _ est_rows ~{int(est_rows.get(table, 0))}~")
+                lines.append(_mermaid_attribute_line("est_rows", f"~{int(est_rows.get(table, 0))}~"))
 
             lines.append("    }")
             lines.append("")
@@ -118,7 +119,8 @@ def build_mermaid_erd_from_explain_stats(
         for e in fk_edges:
             parent = _mermaid_entity_id(e["to_table"])
             child = _mermaid_entity_id(e["from_table"])
-            lines.append(f"    {parent} ||--o{{ {child} : {e['fk_name']}")
+            rel_label = _mermaid_relationship_label(e)
+            lines.append(f"    {parent} ||--o{{ {child} : {rel_label}")
 
         lines.append("")
 
@@ -208,7 +210,69 @@ def _resolve_input_relations(cur, tables: List[Tuple[str, str]]) -> List[Dict[st
 
 
 def _mermaid_entity_id(schema_table: str) -> str:
-    return schema_table.replace(".", "_").replace("-", "_").upper()
+    """
+    Mermaid ER entity identifiers are safest when they only contain ASCII
+    letters, digits and underscores. Schema/table names coming from PostgreSQL
+    may contain dots, dashes, spaces or quoted identifiers, so normalize them.
+    """
+    ident = re.sub(r"[^A-Za-z0-9_]", "_", str(schema_table or "table"))
+    ident = re.sub(r"_+", "_", ident).strip("_") or "table"
+    if ident[0].isdigit():
+        ident = f"t_{ident}"
+    return ident.upper()
+
+
+def _mermaid_safe_name(value: str, fallback: str = "col") -> str:
+    """
+    Normalize a PostgreSQL identifier so it can safely be used as an ER
+    attribute name. Keep the original semantic information in comments/labels
+    where possible, but never inject raw names into Mermaid syntax.
+    """
+    name = re.sub(r"[^A-Za-z0-9_]", "_", str(value or fallback))
+    name = re.sub(r"_+", "_", name).strip("_") or fallback
+    if name[0].isdigit():
+        name = f"{fallback}_{name}"
+    return name
+
+
+def _mermaid_safe_label(value: str, fallback: str = "relationship") -> str:
+    """
+    Mermaid ER relationship labels are fragile with punctuation. In particular,
+    composite foreign keys can tempt us to display `a,b -> x,y`, which breaks
+    some Mermaid parsers. Keep labels compact and syntax-safe.
+    """
+    label = re.sub(r"[^A-Za-z0-9_]", "_", str(value or fallback))
+    label = re.sub(r"_+", "_", label).strip("_") or fallback
+    if label[0].isdigit():
+        label = f"fk_{label}"
+    return label
+
+
+def _mermaid_attribute_line(column_name: str, role: str = "") -> str:
+    col = _mermaid_safe_name(column_name, "col")
+    role = str(role or "").replace('"', "'").strip()
+    if role:
+        # Put PK/FK information in a quoted comment instead of Mermaid's key
+        # position. This avoids invalid syntax such as `PK, FK` for columns
+        # that belong to both a primary key and a composite foreign key.
+        return f'        _ {col} "{role}"'
+    return f"        _ {col}"
+
+
+def _mermaid_relationship_label(edge: Dict[str, Any]) -> str:
+    """
+    Build a syntax-safe label for FK edges.
+
+    For composite FKs, include the column count rather than raw comma-separated
+    column lists. Raw lists such as `[a, b]` or `a,b -> x,y` are a common reason
+    Mermaid ER diagrams fail to parse.
+    """
+    fk_name = _mermaid_safe_label(edge.get("fk_name"), "fk")
+    from_cols = edge.get("from_cols") or []
+    to_cols = edge.get("to_cols") or []
+    if len(from_cols) > 1 or len(to_cols) > 1:
+        return f"{fk_name}_composite_{max(len(from_cols), len(to_cols))}_cols"
+    return fk_name
 
 
 def _pct_to_bucket(pct: float) -> str:

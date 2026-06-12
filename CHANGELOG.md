@@ -3,6 +3,13 @@
 
 # Change Log
 
+## [2.9.3] - 2026-06-12
+
+## Improvements
+
+- Index advisor: recommends indexes for queries using `ORDER BY`, including index column order and sort direction when relevant.
+- Analyze Query : explains column statistics to the user. 
+
 ## [2.9.2] - 2026-06-07
 
 ## Improvements

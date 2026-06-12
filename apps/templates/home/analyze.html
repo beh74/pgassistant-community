@@ -347,6 +347,65 @@
     font-size: 0.9rem;
   }
 
+  .advisor-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: #eef6ff;
+    border: 1px solid #cfe3fb;
+    color: #214f7a;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .advisor-order-callout {
+    border-left: 4px solid var(--pg-blue);
+    background: #f8fbff;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .advisor-order-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid #cfe3fb;
+    background: #ffffff;
+    color: #26364d;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .advisor-order-direction {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #e8f1fb;
+    color: #29577f;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .advisor-index-shape {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .advisor-index-shape-separator {
+    color: #708198;
+    font-weight: 700;
+  }
+
   .advisor-copy-btn {
     border: 1px solid #d8e1ee;
     background: #fff;
@@ -392,6 +451,108 @@
   .mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
+
+  .stats-help-btn {
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 999px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .column-stats-card {
+    border: 1px solid #e4ebf4;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 0.75rem 0.9rem;
+  }
+
+  .column-stats-raw {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: #26364d;
+    word-break: break-word;
+  }
+
+  .column-stats-hint {
+    color: var(--pg-muted);
+    font-size: 0.82rem;
+    margin-top: 0.35rem;
+  }
+
+  .stats-help-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .stats-help-table th,
+  .stats-help-table td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    vertical-align: top;
+  }
+
+  .stats-help-table th:first-child {
+    width: 11rem;
+  }
+
+  .stats-help-table code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-help-term {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 700;
+    color: #214f7a;
+  }
+
+
+  .stats-summary-box {
+    border: 1px solid #cfe3fb;
+    background: #f8fbff;
+    border-radius: 0.85rem;
+    padding: 0.9rem 1rem;
+    margin-top: 0.85rem;
+  }
+
+  .stats-summary-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #29577f;
+    margin-bottom: 0.4rem;
+  }
+
+  .stats-summary-text {
+    color: #334155;
+    line-height: 1.5;
+    margin-bottom: 0;
+  }
+
+  .stats-summary-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.7rem;
+  }
+
+  .stats-summary-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid #d8e1ee;
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.78rem;
+  }
+
 </style>
 {% endblock stylesheets %}
 
@@ -728,7 +889,7 @@
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
               <h2 class="h4 mb-1">Index Advisor</h2>
-              <p class="analyze-muted mb-0">Suggestions derived from the plan, with confidence and technical context.</p>
+              <p class="analyze-muted mb-0">Suggestions derived from the plan, including filters, joins, ORDER BY patterns, confidence, and technical context.</p>
             </div>
             {% if advisor_result and advisor_result.recommendations %}
               <span class="badge text-bg-secondary">{{ advisor_result.recommendations | length }} recommendations</span>
@@ -743,7 +904,12 @@
                 <div class="card-body p-4">
                   <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                     <div class="flex-grow-1">
-                      <h5 class="mb-2 advisor-title">{{ rec.schema }}.{{ rec.table }}</h5>
+                      <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                        <h5 class="mb-0 advisor-title">{{ rec.schema }}.{{ rec.table }}</h5>
+                        {% if rec.recommendation_type is defined and rec.recommendation_type %}
+                          <span class="advisor-type-badge">{{ rec.recommendation_type | replace('_', ' ') | title }}</span>
+                        {% endif %}
+                      </div>
                       <div class="d-flex flex-wrap gap-2">
                         {% if rec.node_type %}
                           <span class="advisor-meta-pill">
@@ -763,6 +929,16 @@
                             <span class="advisor-meta-value">{{ rec.candidate_columns | join(', ') }}</span>
                           </span>
                         {% endif %}
+                        {% if rec.candidate_order_columns is defined and rec.candidate_order_columns %}
+                          <span class="advisor-meta-pill">
+                            <span class="advisor-meta-label">ORDER BY</span>
+                            <span class="advisor-meta-value">
+                              {% for order_col in rec.candidate_order_columns %}
+                                {{ order_col.column }} {{ order_col.direction|default('ASC') }}{% if not loop.last %}, {% endif %}
+                              {% endfor %}
+                            </span>
+                          </span>
+                        {% endif %}
                       </div>
                     </div>
 
@@ -775,6 +951,39 @@
                   </div>
 
                   <div class="advisor-summary mb-3">{{ rec.reason }}</div>
+
+                  {% if rec.candidate_order_columns is defined and rec.candidate_order_columns %}
+                  <div class="advisor-order-callout mb-3">
+                    <div class="advisor-section-title mb-2">ORDER BY aware index shape</div>
+                    <div class="advisor-index-shape">
+                      {% set has_filter_prefix = namespace(value=false) %}
+                      {% if rec.candidate_columns %}
+                        {% for col in rec.candidate_columns %}
+                          {% set is_order_col = namespace(value=false) %}
+                          {% for order_col in rec.candidate_order_columns %}
+                            {% if order_col.column == col %}
+                              {% set is_order_col.value = true %}
+                            {% endif %}
+                          {% endfor %}
+                          {% if not is_order_col.value %}
+                            {% set has_filter_prefix.value = true %}
+                            <span class="advisor-column-pill">{{ col }}</span>
+                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                      {% if has_filter_prefix.value %}
+                        <span class="advisor-index-shape-separator">→</span>
+                      {% endif %}
+                      {% for order_col in rec.candidate_order_columns %}
+                        <span class="advisor-order-pill">
+                          <span>{{ order_col.column }}</span>
+                          <span class="advisor-order-direction">{{ order_col.direction|default('ASC') }}</span>
+                        </span>
+                      {% endfor %}
+                    </div>
+                    <div class="muted-small mt-2">Filter equality columns are placed before the sort key when available, so PostgreSQL may avoid or reduce an explicit Sort for ORDER BY / LIMIT queries.</div>
+                  </div>
+                  {% endif %}
 
                   {% if rec.create_index_sql %}
                   <div class="mb-3">
@@ -831,13 +1040,59 @@
                       </div>
                       {% endif %}
 
+                      {% if rec.candidate_order_columns is defined and rec.candidate_order_columns %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">ORDER BY columns</div>
+                        <div class="d-flex flex-wrap gap-2">
+                          {% for order_col in rec.candidate_order_columns %}
+                            <span class="advisor-order-pill">
+                              <span>{{ order_col.column }}</span>
+                              <span class="advisor-order-direction">{{ order_col.direction|default('ASC') }}</span>
+                            </span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.sort_key is defined and rec.sort_key %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Sort key from plan</div>
+                        <div class="advisor-code-block"><code class="small">{{ rec.sort_key }}</code></div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.recommendation_type is defined and rec.recommendation_type %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">Recommendation type</div>
+                        <div class="advisor-code-inline"><code class="small">{{ rec.recommendation_type }}</code></div>
+                      </div>
+                      {% endif %}
+
                       {% if rec.stats_reason %}
                       <div class="advisor-section">
-                        <div class="advisor-section-title">Column statistics</div>
+                        <div class="advisor-section-title mb-2">Column statistics</div>
                         <div class="vstack gap-2">
                           {% for stat_line in rec.stats_reason.split(' | ') %}
-                            <div class="border rounded-3 px-3 py-2 bg-white small">
-                              {{ stat_line }}
+                            <div class="column-stats-card small">
+                              <div class="d-flex align-items-start justify-content-between gap-2">
+                                <div class="column-stats-raw flex-grow-1">{{ stat_line }}</div>
+                                {% if 'n_distinct=' in stat_line or 'null_frac=' in stat_line or 'mcv_count=' in stat_line or 'histogram_bounds=' in stat_line %}
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-info stats-help-btn flex-shrink-0"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#columnStatsHelpModal"
+                                    data-stat-line="{{ stat_line | e }}"
+                                    aria-label="Explain this PostgreSQL column statistic"
+                                    title="Explain this column statistic"
+                                  >?</button>
+                                {% endif %}
+                              </div>
+                              {% if 'n_distinct=' in stat_line or 'null_frac=' in stat_line or 'mcv_count=' in stat_line or 'histogram_bounds=' in stat_line %}
+                                <div class="column-stats-hint">
+                                  Open the help for this column to see how PostgreSQL uses these values to estimate selectivity and choose access paths.
+                                </div>
+                              {% endif %}
                             </div>
                           {% endfor %}
                         </div>
@@ -1002,6 +1257,108 @@
 
   </div>
 
+
+
+  <div class="modal fade" id="columnStatsHelpModal" tabindex="-1" aria-labelledby="columnStatsHelpModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="columnStatsHelpModalTitle">How to read PostgreSQL column statistics</h5>
+            <div class="text-muted small mt-1">These values usually come from <code>pg_stats</code> after <code>ANALYZE</code>. The planner uses them to estimate how many rows a predicate will return.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info mb-4">
+            <div class="fw-semibold mb-1">Selected column statistic</div>
+            <code id="columnStatsSelectedLine">boarding_time [&lt;]: n_distinct=-0.9938, null_frac=0.0062, mcv_count=0, histogram_bounds=101</code>
+            <div class="stats-summary-box">
+              <div class="stats-summary-title">Summary for the selected column</div>
+              <p class="stats-summary-text" id="columnStatsSummary">
+                This column is almost always populated, has very high cardinality, has no dominant repeated values, and has a histogram available for range selectivity estimates.
+              </p>
+              <div class="stats-summary-chips" id="columnStatsSummaryChips" aria-label="Parsed statistic values"></div>
+            </div>
+            <div class="mt-2 text-muted small">
+              The table below remains as a pedagogical reference for each PostgreSQL statistic shown in the selected line.
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle stats-help-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Statistic</th>
+                  <th>Meaning</th>
+                  <th>How to interpret it</th>
+                  <th>Planner impact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th><span class="stats-help-term">n_distinct</span></th>
+                  <td>Estimated number of distinct non-null values.</td>
+                  <td>
+                    Positive value = absolute estimated count. Negative value = fraction of the table row count.
+                    For example, <code>-0.9938</code> means approximately <code>0.9938 × reltuples</code> distinct values.
+                  </td>
+                  <td>Used for equality selectivity, joins, grouping, and deciding whether an index is likely to be selective.</td>
+                </tr>
+                <tr>
+                  <th><span class="stats-help-term">null_frac</span></th>
+                  <td>Estimated fraction of rows where the column is <code>NULL</code>.</td>
+                  <td><code>0.0062</code> means about <code>0.62%</code> of rows are null.</td>
+                  <td>Used for <code>IS NULL</code>, <code>IS NOT NULL</code>, and as a correction factor for other predicates.</td>
+                </tr>
+                <tr>
+                  <th><span class="stats-help-term">mcv_count</span></th>
+                  <td>Number of Most Common Values stored for the column.</td>
+                  <td><code>0</code> means PostgreSQL did not keep a list of dominant values, often because values are highly unique or no value is frequent enough.</td>
+                  <td>When MCVs exist, equality predicates on common values can be estimated more accurately than with a uniform assumption.</td>
+                </tr>
+                <tr>
+                  <th><span class="stats-help-term">histogram_bounds</span></th>
+                  <td>Number of histogram boundary values stored.</td>
+                  <td><code>101</code> usually represents 100 histogram buckets. It is common when <code>default_statistics_target = 100</code>.</td>
+                  <td>Used mainly for range predicates such as <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, and <code>BETWEEN</code>.</td>
+                </tr>
+                <tr>
+                  <th><span class="stats-help-term">[&lt;]</span></th>
+                  <td>Ordering operator used to build or interpret the histogram.</td>
+                  <td>For timestamps, it means values are ordered chronologically from older to newer.</td>
+                  <td>Relevant for estimating inequalities and range filters.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="row g-3 mt-2">
+            <div class="col-12 col-lg-6">
+              <div class="analyze-subtle-box h-100">
+                <div class="fw-semibold mb-2">Typical reading</div>
+                <div class="small text-muted">
+                  High <code>n_distinct</code> plus <code>mcv_count=0</code> means values are spread out. Equality predicates are expected to match very few rows; range predicates depend mostly on the histogram.
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="analyze-subtle-box h-100">
+                <div class="fw-semibold mb-2">When to be careful</div>
+                <div class="small text-muted">
+                  Statistics are estimates from a sample. If the table changed significantly, run <code>ANALYZE</code>. If estimates remain poor, consider increasing statistics with <code>ALTER TABLE ... ALTER COLUMN ... SET STATISTICS</code>.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
       <div class="modal-content py-xl-4">
@@ -1034,6 +1391,137 @@
 {% block javascripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+  function parseColumnStatsLine(statLine) {
+    const result = {
+      raw: statLine || '',
+      column: null,
+      operator: null,
+      values: {}
+    };
+
+    const headerMatch = result.raw.match(/^\s*([^:\[]+?)\s*(?:\[([^\]]+)\])?\s*:/);
+    if (headerMatch) {
+      result.column = headerMatch[1].trim();
+      result.operator = headerMatch[2] ? headerMatch[2].trim() : null;
+    }
+
+    const statRegex = /(n_distinct|null_frac|mcv_count|histogram_bounds)\s*=\s*(-?\d+(?:\.\d+)?)/g;
+    let match;
+    while ((match = statRegex.exec(result.raw)) !== null) {
+      result.values[match[1]] = Number(match[2]);
+    }
+
+    return result;
+  }
+
+  function formatPctFromFraction(value) {
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    return `${(value * 100).toFixed(2).replace(/\.00$/, '')}%`;
+  }
+
+  function buildColumnStatsSummary(statLine) {
+    const parsed = parseColumnStatsLine(statLine);
+    const v = parsed.values;
+    const subject = parsed.column ? `Column ${parsed.column}` : 'This column';
+    const parts = [];
+    const chips = [];
+
+    if (typeof v.null_frac === 'number') {
+      const pct = formatPctFromFraction(v.null_frac);
+      if (v.null_frac === 0) {
+        parts.push(`${subject} has no estimated NULL values.`);
+      } else if (v.null_frac < 0.01) {
+        parts.push(`${subject} is almost always populated: only about ${pct} of rows are estimated to be NULL.`);
+      } else if (v.null_frac < 0.20) {
+        parts.push(`${subject} is usually populated: about ${pct} of rows are estimated to be NULL.`);
+      } else {
+        parts.push(`${subject} has a significant NULL fraction: about ${pct} of rows are estimated to be NULL.`);
+      }
+      chips.push(['NULL fraction', pct]);
+    }
+
+    if (typeof v.n_distinct === 'number') {
+      if (v.n_distinct < 0) {
+        const pct = formatPctFromFraction(Math.abs(v.n_distinct));
+        if (Math.abs(v.n_distinct) >= 0.80) {
+          parts.push(`Its cardinality is very high: PostgreSQL estimates roughly ${pct} as many distinct non-null values as table rows.`);
+        } else if (Math.abs(v.n_distinct) >= 0.20) {
+          parts.push(`Its cardinality is moderate to high: PostgreSQL estimates roughly ${pct} as many distinct non-null values as table rows.`);
+        } else {
+          parts.push(`Its cardinality is relatively low compared with the table size: PostgreSQL estimates roughly ${pct} as many distinct non-null values as table rows.`);
+        }
+        chips.push(['Distinct estimate', `${pct} of rows`]);
+      } else {
+        parts.push(`PostgreSQL estimates about ${v.n_distinct.toLocaleString()} distinct non-null values.`);
+        chips.push(['Distinct estimate', v.n_distinct.toLocaleString()]);
+      }
+    }
+
+    if (typeof v.mcv_count === 'number') {
+      if (v.mcv_count === 0) {
+        parts.push('No most-common-values list is stored, so equality estimates will usually rely on a uniform distribution assumption rather than known dominant values.');
+      } else {
+        parts.push(`PostgreSQL stored ${v.mcv_count} most common value(s), so predicates matching those values can be estimated more accurately.`);
+      }
+      chips.push(['MCV count', v.mcv_count.toLocaleString()]);
+    }
+
+    if (typeof v.histogram_bounds === 'number') {
+      if (v.histogram_bounds > 1) {
+        parts.push(`A histogram with ${v.histogram_bounds} boundary values is available, which mainly helps estimate range predicates such as <, <=, >, >=, and BETWEEN.`);
+      } else {
+        parts.push('No useful histogram appears to be available, so range selectivity estimates may be less precise.');
+      }
+      chips.push(['Histogram bounds', v.histogram_bounds.toLocaleString()]);
+    }
+
+    if (parsed.operator) {
+      parts.push(`The histogram is ordered with the ${parsed.operator} operator, which is the comparison PostgreSQL uses for range estimates on this data type.`);
+      chips.push(['Histogram operator', parsed.operator]);
+    }
+
+    if (parts.length === 0) {
+      parts.push('This line contains column statistics, but no recognized statistic values were found. The reference table below explains the supported fields.');
+    }
+
+    return { text: parts.join(' '), chips };
+  }
+
+  function updateColumnStatsModal(statLine) {
+    const selectedLine = document.getElementById("columnStatsSelectedLine");
+    const summary = document.getElementById("columnStatsSummary");
+    const chips = document.getElementById("columnStatsSummaryChips");
+
+    if (statLine && selectedLine) {
+      selectedLine.textContent = statLine;
+    }
+
+    const built = buildColumnStatsSummary(statLine || (selectedLine ? selectedLine.textContent : ''));
+
+    if (summary) {
+      summary.textContent = built.text;
+    }
+
+    if (chips) {
+      chips.innerHTML = '';
+      built.chips.forEach(([label, value]) => {
+        const chip = document.createElement('span');
+        chip.className = 'stats-summary-chip';
+        chip.innerHTML = `<span class="text-muted">${label}:</span> <strong></strong>`;
+        chip.querySelector('strong').textContent = value;
+        chips.appendChild(chip);
+      });
+    }
+  }
+
+  updateColumnStatsModal(document.getElementById("columnStatsSelectedLine")?.textContent || '');
+
+  document.querySelectorAll(".stats-help-btn").forEach(btn => {
+    btn.addEventListener("click", function () {
+      updateColumnStatsModal(this.getAttribute("data-stat-line"));
+    });
+  });
 
   document.querySelectorAll(".copy-btn").forEach(btn => {
     btn.addEventListener("click", async function () {
