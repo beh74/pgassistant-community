@@ -33,4 +33,12 @@ curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
     }
   }'
 
+  
+curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "db_config": {
+      "db_uri": "postgresql://postgres:demo@host.docker.internal:5421/demo?options=-c%20search_path%3Dapp%2Cbookings"
+    }
+  }'  
 """

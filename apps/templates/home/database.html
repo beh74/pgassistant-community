@@ -114,10 +114,11 @@
             <div class="mb-4">
               <div class="connect-section-title">Connection URI</div>
               <div class="connect-subtle-box">
-                <label for="db_uri" class="form-label">Connection URI (optional)</label>
+                <label for="db_uri" class="form-label">Connection URI (optional but used in priority)</label>
                 <input
                   class="form-control no-validate"
                   id="db_uri"
+                  value="{{ session.get('db_uri', '') }}"
                   name="db_uri"
                   type="text"
                   placeholder="postgresql://user:password@host:5432/dbname"

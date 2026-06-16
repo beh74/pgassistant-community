@@ -3,6 +3,29 @@
 
 # Change Log
 
+
+## [2.9.4] - 2026-06-16
+
+## Bug fixes
+
+### Database connection
+
+- Prioritized `db_uri` when connecting to the database, when provided.
+
+- Preserved full PostgreSQL connection strings instead of relying only on decomposed connection fields such as host, port, database, user, and password.
+
+- Allowed users to pass libpq-compatible connection options through the PostgreSQL URI.
+
+- Fixed connection issues when `pg_stat_statements` is installed in a schema that is not part of the default `search_path`.
+
+- Improved support for custom session-level settings such as `search_path`.
+
+Sample connexion : 
+
+```
+postgresql://postgres:demo@host.docker.internal:5421/demo?options=-c%20search_path%3Dapp%2Cbookings
+```
+
 ## [2.9.3] - 2026-06-12
 
 ## Improvements

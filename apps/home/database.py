@@ -5,6 +5,9 @@ import os
 import re
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.extensions import parse_dsn
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
 
 from flask import g
 from . import sqlhelper
@@ -36,27 +39,81 @@ def dict_merge(dct, merge_dct):
         else:
             dct[k] = merge_dct[k]
 
+
+
+
+def _dsn_has_param(dsn: str, param_name: str) -> bool:
+    """
+    Returns True if the PostgreSQL URI already contains the given query parameter.
+    """
+    parsed = urlparse(dsn)
+    query_params = parse_qs(parsed.query, keep_blank_values=True)
+    return param_name in query_params
+
+
+def _add_default_uri_param(dsn: str, param_name: str, param_value: str) -> str:
+    """
+    Adds a query parameter to a PostgreSQL URI only if it is not already present.
+    """
+    if _dsn_has_param(dsn, param_name):
+        return dsn
+
+    parsed = urlparse(dsn)
+    query_params = parse_qs(parsed.query, keep_blank_values=True)
+    query_params[param_name] = [param_value]
+
+    new_query = urlencode(query_params, doseq=True)
+
+    return urlunparse(parsed._replace(query=new_query))
+
+
 def connectdb(db_config):
     """
     Establishes a connection to a PostgreSQL database using psycopg2.
-    
-    :param db_config: Dictionary containing database connection details.
-    :return: Connection object or None in case of failure, along with a status message.
-    """    
+
+    Priority:
+    - If db_uri is provided, use it as the PostgreSQL connection string.
+    - If db_uri does not define connect_timeout, use connect_timeout=5.
+    - If db_uri does not define application_name, use application_name=pgAssistant.
+    - Otherwise, fall back to explicit connection fields.
+
+    Important:
+    - Do not rewrite the URI, because libpq options such as
+      options=-c%20search_path%3Dapp%2Cpublic are sensitive to URL encoding.
+    """
     try:
-        con = psycopg2.connect(database=db_config["db_name"],
-                            host=db_config["db_host"],
-                            user=db_config["db_user"],
-                            password=db_config["db_password"],
-                            port=db_config["db_port"],
-                            connect_timeout=5,
-                            application_name="pgAssistant")
-    
+        db_uri = (db_config.get("db_uri") or "").strip()
+
+        if db_uri:
+            parsed_dsn = parse_dsn(db_uri)
+
+            connect_kwargs = {}
+
+            if "connect_timeout" not in parsed_dsn:
+                connect_kwargs["connect_timeout"] = 5
+
+            if "application_name" not in parsed_dsn:
+                connect_kwargs["application_name"] = "pgAssistant"
+
+            con = psycopg2.connect(db_uri, **connect_kwargs)
+
+        else:
+            con = psycopg2.connect(
+                database=db_config["db_name"],
+                host=db_config["db_host"],
+                user=db_config["db_user"],
+                password=db_config["db_password"],
+                port=db_config["db_port"],
+                connect_timeout=5,
+                application_name="pgAssistant",
+            )
+
         con.autocommit = True
+
     except psycopg2.Error as err:
         return None, format(err).rstrip()
-    return con, "OK"
 
+    return con, "OK"
 def db_exec(conn, sql):
     """
     Executes a SQL statement that does not return a result (e.g., INSERT, UPDATE).

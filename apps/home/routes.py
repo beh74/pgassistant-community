@@ -299,6 +299,7 @@ def analyze_query(querid):
                 session.pop("full_query", None)
                 session["analyze_querid"] = querid
 
+            # get informations from pg_stat_statements by queryid
             sql_query = database.get_pgstat_query_by_id(session, querid)
 
             # format SQL

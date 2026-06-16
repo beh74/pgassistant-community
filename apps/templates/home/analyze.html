@@ -568,12 +568,15 @@
     </div>
   </div>
 
+  {% if not rows or parameters %}
   <div class="card analyze-summary-card mb-4">
     <div class="card-body p-4">
+      {% if not rows %}
       <div class="analyze-section-title">Query</div>
       <pre class="analyze-sql-block">{{ query }}</pre>
+      {% endif %}
 
-      <form method="POST" id="form_analyse" class="mt-4">
+      <form method="POST" id="form_analyse" class="{% if not rows %}mt-4{% endif %}">
         <input class="form-control" value="" id="action" name="action" type="hidden">
 
         {% if parameters %}
@@ -659,6 +662,13 @@
       </form>
     </div>
   </div>
+  {% endif %}
+
+  {% if rows and not parameters %}
+  <form method="POST" id="form_analyse" class="d-none">
+    <input class="form-control" value="" id="action" name="action" type="hidden">
+  </form>
+  {% endif %}
 
 {% if rows %}
 
@@ -668,6 +678,7 @@
       <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph" type="button" role="tab" aria-controls="graph" aria-selected="false">Relational View</button>
       <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">Statistics</button>
       <button class="nav-link" id="advisor-tab" data-bs-toggle="tab" data-bs-target="#advisor" type="button" role="tab" aria-controls="advisor" aria-selected="false">Advisor</button>
+      <button class="nav-link" id="query-tab" data-bs-toggle="tab" data-bs-target="#query-tab-pane" type="button" role="tab" aria-controls="query-tab-pane" aria-selected="false">Query</button>
     </div>
   </nav>
 
@@ -1255,6 +1266,21 @@
       </div>
     </div>
 
+    <div class="tab-pane fade" id="query-tab-pane" role="tabpanel" aria-labelledby="query-tab">
+      <div class="card analyze-section-card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div>
+              <h2 class="h4 mb-1">Query</h2>
+              <p class="analyze-muted mb-0">SQL text used for this analysis.</p>
+            </div>
+            <button class="btn btn-sm copy-query-btn advisor-copy-btn" data-query-target="analyzeQueryText" title="Copy query" type="button">Copy</button>
+          </div>
+          <pre class="analyze-sql-block" id="analyzeQueryText">{{ query }}</pre>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 
@@ -1530,6 +1556,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
       try {
         await navigator.clipboard.writeText(sql);
+        const original = this.innerText;
+        this.innerText = "✅";
+        setTimeout(() => {
+          this.innerText = original;
+        }, 1000);
+      } catch (err) {
+        console.error("Clipboard error:", err);
+      }
+    });
+  });
+
+  document.querySelectorAll(".copy-query-btn").forEach(btn => {
+    btn.addEventListener("click", async function () {
+      const targetId = this.getAttribute("data-query-target");
+      const target = targetId ? document.getElementById(targetId) : null;
+      const query = target ? target.textContent : "";
+      if (!query) return;
+
+      try {
+        await navigator.clipboard.writeText(query);
         const original = this.innerText;
         this.innerText = "✅";
         setTimeout(() => {
