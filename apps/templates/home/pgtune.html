@@ -51,15 +51,52 @@
     background: #fff;
     line-height: 1;
   }
+
+  .tune-result-card {
+    border-left: 4px solid var(--bs-primary);
+  }
+
+  .tune-result-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .tune-result-pre {
+    max-height: 520px;
+    overflow: auto;
+    margin: 0;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    background: #212529;
+    color: #f8f9fa;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+
+  .tune-empty-state {
+    border: 1px dashed rgba(0, 0, 0, 0.15);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    background-color: #fff;
+  }
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
+{% set selected_db_type = request.form.get('db_type', 'web') if request is defined else 'web' %}
+{% set selected_memory_unit = request.form.get('db_memory_unity', 'GB') if request is defined else 'GB' %}
+{% set selected_storage = request.form.get('db_storage', 'ssd') if request is defined else 'ssd' %}
+{% set tune_result = pgtune_result|default(result|default(tuning_result|default(tuning|default(output|default(None))))) %}
+
 <div class="container-fluid py-4">
   <div class="row g-4">
 
-    <div class="col-12 col-xl-8">
-      <div class="card border-0 shadow-sm">
+    <div class="col-12 col-xl-7">
+      <div class="card border-0 shadow-sm h-100">
         <div class="card-body p-4">
           <div class="mb-4">
             <h1 class="h4 mb-1">pgTune</h1>
@@ -86,9 +123,9 @@
                       </span>
                     </label>
                     <select class="form-select" id="db_type" name="db_type" aria-label="Database type">
-                      <option selected value="web">Web application</option>
-                      <option value="oltp">Online transaction processing system</option>
-                      <option value="dw">Data warehouse</option>
+                      <option value="web" {% if selected_db_type == 'web' %}selected{% endif %}>Web application</option>
+                      <option value="oltp" {% if selected_db_type == 'oltp' %}selected{% endif %}>Online transaction processing system</option>
+                      <option value="dw" {% if selected_db_type == 'dw' %}selected{% endif %}>Data warehouse</option>
                     </select>
                   </div>
                 </div>
@@ -112,10 +149,10 @@
                       </span>
                     </label>
                     <div class="input-group">
-                      <input class="form-control" value="2" id="db_memory" name="db_memory" type="number" min="1" required>
+                      <input class="form-control" value="{{ request.form.get('db_memory', '2') if request is defined else '2' }}" id="db_memory" name="db_memory" type="number" min="1" required>
                       <select class="form-select" id="db_memory_unity" name="db_memory_unity" style="max-width: 110px;">
-                        <option value="MB">MB</option>
-                        <option selected value="GB">GB</option>
+                        <option value="MB" {% if selected_memory_unit == 'MB' %}selected{% endif %}>MB</option>
+                        <option value="GB" {% if selected_memory_unit == 'GB' %}selected{% endif %}>GB</option>
                       </select>
                     </div>
                   </div>
@@ -132,7 +169,7 @@
                         >?</span>
                       </span>
                     </label>
-                    <input class="form-control" value="1" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
+                    <input class="form-control" value="{{ request.form.get('db_cpu', '1') if request is defined else '1' }}" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
                   </div>
 
                   <div class="col-12 col-md-4">
@@ -147,7 +184,7 @@
                         >?</span>
                       </span>
                     </label>
-                    <input class="form-control" value="200" id="db_maxconn" name="db_maxconn" type="number" min="10" max="2000" required>
+                    <input class="form-control" value="{{ request.form.get('db_maxconn', '200') if request is defined else '200' }}" id="db_maxconn" name="db_maxconn" type="number" min="10" max="2000" required>
                   </div>
 
                   <div class="col-12 col-md-4">
@@ -163,16 +200,19 @@
                       </span>
                     </label>
                     <select class="form-select" id="db_storage" name="db_storage">
-                      <option selected value="ssd">SSD storage</option>
-                      <option value="san">SAN storage</option>
-                      <option value="hdd">HDD storage</option>
+                      <option value="ssd" {% if selected_storage == 'ssd' %}selected{% endif %}>SSD storage</option>
+                      <option value="san" {% if selected_storage == 'san' %}selected{% endif %}>SAN storage</option>
+                      <option value="hdd" {% if selected_storage == 'hdd' %}selected{% endif %}>HDD storage</option>
                     </select>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="d-flex justify-content-end pt-2">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pt-2">
+              <p class="tune-helper-text mb-0">
+                You can adjust the inputs and generate a new recommendation without leaving this page.
+              </p>
               <button class="btn btn-primary tune-submit-btn" type="submit">
                 Generate tuning
                 <svg class="icon icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -185,30 +225,58 @@
       </div>
     </div>
 
-    <div class="col-12 col-xl-4">
+    <div class="col-12 col-xl-5">
+      {% if tune_result %}
+      <div class="card border-0 shadow-sm h-100 tune-result-card" id="pgtune-result">
+        <div class="card-body p-4">
+          <div class="tune-result-toolbar">
+            <div>
+              <h2 class="h5 mb-1">Generated configuration</h2>
+              <p class="tune-helper-text mb-0">Review these settings before applying them to PostgreSQL.</p>
+            </div>
+            <span class="badge bg-success-subtle text-success border border-success-subtle">Generated</span>
+          </div>
+
+          {% if tune_result is mapping %}
+          <pre class="tune-result-pre"><code>{% for key, value in tune_result.items() %}{{ key }} = {{ value }}
+{% endfor %}</code></pre>
+          {% else %}
+          <pre class="tune-result-pre"><code>{{ tune_result }}</code></pre>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body p-4">
-            <h2 class="h5 mb-3">How it works</h2>
+          <h2 class="h5 mb-3">How it works</h2>
 
-            <p class="tune-helper-text mb-3">
-                pgAssistant uses the well-known <strong>pgTune</strong> algorithm to estimate a sensible
-                PostgreSQL configuration based on your workload and server resources.
-            </p>
+          <p class="tune-helper-text mb-3">
+            pgAssistant uses the well-known <strong>pgTune</strong> algorithm to estimate a sensible
+            PostgreSQL configuration based on your workload and server resources.
+          </p>
 
-            <p class="tune-helper-text mb-3">
-                You can learn more about pgTune here:
-                <a href="https://pgtune.leopard.in.ua/" target="_blank" rel="noopener">
-                https://pgtune.leopard.in.ua/
-                </a>
-            </p>
-
+          <div class="tune-empty-state mb-3">
+            <div class="fw-semibold mb-1">First step</div>
             <p class="tune-helper-text mb-0">
-                Review generated settings carefully before applying them in production, especially
-                <code>shared_buffers</code>, <code>work_mem</code>, <code>effective_cache_size</code>,
-                and <code>max_connections</code>.
+              Fill in the form and generate a recommendation. The result will appear here, while the form remains available for quick adjustments.
             </p>
-            </div>
+          </div>
+
+          <p class="tune-helper-text mb-3">
+            You can learn more about pgTune here:
+            <a href="https://pgtune.leopard.in.ua/" target="_blank" rel="noopener">
+              https://pgtune.leopard.in.ua/
+            </a>
+          </p>
+
+          <p class="tune-helper-text mb-0">
+            Review generated settings carefully before applying them in production, especially
+            <code>shared_buffers</code>, <code>work_mem</code>, <code>effective_cache_size</code>,
+            and <code>max_connections</code>.
+          </p>
+        </div>
       </div>
+      {% endif %}
     </div>
 
   </div>

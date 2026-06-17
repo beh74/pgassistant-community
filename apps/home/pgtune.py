@@ -10,7 +10,7 @@ def is_number(s):
 
 
 class pgTune:
-    db_version="16"
+    db_version="18"
     db_cpu=1
     db_memory="1GB"
     db_storage="ssd"
@@ -102,6 +102,14 @@ class pgTune:
         # Header (compose version is optional but recommended for clarity)
         docker_cmd = "services:\n"
 
+        if db_version is None:
+            db_version = self.db_version  # default to class attribute if not provided
+
+        if db_version in ["18", "19"]:
+            mount_path= "/var/lib/postgresql"
+        else:
+            mount_path= "/var/lib/postgresql/data"
+
         # Build the main PostgreSQL service definition
         docker_cmd += (
             f"  {service_name}:\n"
@@ -115,7 +123,7 @@ class pgTune:
             f"    #    tmpfs:\n"
             f"    #      size: {shared_buffers_bytes}\n"
             f"    volumes:\n"
-            f"      - {volume_name}:/var/lib/postgresql/data\n"
+            f"      - {volume_name}:{mount_path}\n"
             f"    ports:\n"
             f"      - \"{db_config['db_port']}:5432\"\n"
             f"    deploy:\n"
@@ -129,7 +137,7 @@ class pgTune:
             f"      - POSTGRES_DB={db_config.get('db_name', db_config['db_user'])}\n"
             f"      - POSTGRES_INITDB_ARGS=--auth-local=scram-sha-256 --auth-host=scram-sha-256\n"  
             f"    healthcheck:\n"
-            f"      test: [\"CMD\", \"pg_isready\", \"-U\", \"{db_config['db_user']}\"]\n"
+            f"      test: [\"CMD-SHELL\", \"pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB\"]\n"
             f"      interval: 10s\n"
             f"      timeout: 5s\n"
             f"      retries: 5\n"

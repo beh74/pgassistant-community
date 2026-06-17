@@ -3,6 +3,15 @@
 
 # Change Log
 
+## [2.9.5] - 2026-06-17
+
+## Bug fixes
+
+pgTune : docker compose should use /var/lib/postgresql volume with postgresql 18 and 19 versions.
+
+## Improvements
+
+pgTune : UI refactoring for better presentation and usage
 
 ## [2.9.4] - 2026-06-16
 
