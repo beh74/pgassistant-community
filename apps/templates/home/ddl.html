@@ -1,40 +1,326 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} DDL {% endblock %} 
+{% block title %} DDL {% endblock %}
 
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .ddl-query-page {
+    padding: 1.5rem;
+    background:
+      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34rem),
+      radial-gradient(circle at top left, rgba(8, 145, 178, 0.08), transparent 28rem),
+      var(--ga-bg, #f4f7fb);
+    min-height: calc(100vh - 1px);
+  }
+
+  .ddl-query-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .ddl-query-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.10);
+    color: var(--ga-primary-dark, #1d4ed8);
+    font-size: .72rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .65rem;
+  }
+
+  .ddl-query-title {
+    margin: 0;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    color: var(--ga-text, #0f172a);
+  }
+
+  .ddl-query-subtitle {
+    color: var(--ga-muted, #64748b);
+    margin: .35rem 0 0 0;
+    font-size: .98rem;
+  }
+
+  .ddl-query-grid {
+    display: grid;
+    grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .ddl-query-card {
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: var(--ga-radius, 1.15rem);
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+    padding: 1.15rem;
+  }
+
+  .ddl-query-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: .85rem;
+  }
+
+  .ddl-query-section-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    color: var(--ga-text, #0f172a);
+  }
+
+  .ddl-query-section-copy {
+    color: var(--ga-muted, #64748b);
+    font-size: .86rem;
+    margin: .15rem 0 0 0;
+  }
+
+  .ddl-query-code,
+  .ddl-query-ddl {
+    background: #0b1220;
+    color: #e5e7eb;
+    border-radius: .9rem;
+    padding: .9rem 1rem;
+    font-size: .86rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    border: 1px solid rgba(148, 163, 184, .18);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+
+  .ddl-query-ddl {
+    max-height: 70vh;
+    overflow: auto;
+  }
+
+  .ddl-query-ddl pre,
+  .ddl-query-ddl code {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    color: inherit;
+    border: 0 !important;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    font-size: inherit;
+  }
+
+  .ddl-query-ddl .highlight,
+  .ddl-query-ddl .highlight pre {
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .ddl-query-table-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+  }
+
+  .ddl-query-table-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .35rem .7rem;
+    font-size: .78rem;
+    font-weight: 850;
+    background: var(--ga-cyan-soft, #cffafe);
+    color: #075985;
+    border: 1px solid rgba(8, 145, 178, .18);
+    overflow-wrap: anywhere;
+  }
+
+  .ddl-query-raw-tables {
+    background: var(--ga-surface-soft, #f8fafc);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .9rem;
+    padding: .85rem;
+    color: var(--ga-slate, #334155);
+    overflow-wrap: anywhere;
+  }
+
+  .ddl-copy-btn {
+    border-color: var(--ga-border-strong, #c8d4e3);
+    color: var(--ga-slate, #334155);
+    font-weight: 800;
+    background: rgba(255, 255, 255, .75);
+  }
+
+  .ddl-copy-btn:hover {
+    border-color: var(--ga-primary, #2563eb);
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: var(--ga-primary-soft, #dbeafe);
+  }
+
+  @media (max-width: 1100px) {
+    .ddl-query-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .ddl-query-page {
+      padding: 1rem;
+    }
+
+    .ddl-query-header,
+    .ddl-query-card-header {
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
+{% set query_text = query|string|trim %}
+<div class="ddl-query-page">
 
-        <div class="row">
-            <div class="col-12 col-xl-8">
-                <div class="card card-body border-0 shadow mb-1">
-                    <h2 class="h5 mb-1">DDL relative to a query</h2>
-                </div>
-                    
-                <div>
-                    <h3 class="h5 mb-1">Query</h3>
-                </div>
-                <div>
-                    {{ query }}
-                    <br>
-                </div>
-                <div>
-                    <h3 class="h5 mb-1">Tables in query</h3>
-                </div>
-                <div>
-                    {{ tables }}
-                    <br>
-                </div>                
-                <br>
-                    
-                    {{ sql_text|safe }}
-                </div>        
-            </div>
+  <div class="ddl-query-header">
+    <div>
+      <div class="ddl-query-eyebrow">Query structure</div>
+      <h1 class="ddl-query-title h3">DDL relative to a query</h1>
+      <p class="ddl-query-subtitle">
+        Review the SQL statement, the detected tables, and the generated DDL context.
+      </p>
+    </div>
+  </div>
+
+  <div class="ddl-query-grid">
+
+    <div class="ddl-query-card">
+      <div class="ddl-query-card-header">
+        <div>
+          <h2 class="ddl-query-section-title">Query</h2>
+          <p class="ddl-query-section-copy">SQL statement used to identify the related objects.</p>
+        </div>
+        <button type="button" class="btn btn-sm ddl-copy-btn" data-copy-target="ddlQueryText">
+          Copy
+        </button>
+      </div>
+
+      <pre class="ddl-query-code" id="ddlQueryText"><code>{{ query_text|e }}</code></pre>
+
+      <div class="mt-4">
+        <div class="ddl-query-card-header mb-2">
+          <div>
+            <h2 class="ddl-query-section-title">Tables in query</h2>
+            <p class="ddl-query-section-copy">Objects detected from the query analysis.</p>
+          </div>
         </div>
 
+        {% if tables is iterable and tables is not string %}
+          <div class="ddl-query-table-list">
+            {% for table in tables %}
+              <span class="ddl-query-table-pill">{{ table }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="ddl-query-raw-tables">{{ tables }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="ddl-query-card">
+      <div class="ddl-query-card-header">
+        <div>
+          <h2 class="ddl-query-section-title">Generated DDL</h2>
+          <p class="ddl-query-section-copy">Schema context collected for the query.</p>
+        </div>
+        <button type="button" class="btn btn-sm ddl-copy-btn" data-copy-target="ddlSqlText">
+          Copy
+        </button>
+      </div>
+
+      <div class="ddl-query-ddl" id="ddlSqlText">{{ sql_text|trim|safe }}</div>
+    </div>
+
+  </div>
+</div>
 {% endblock content %}
 
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  function normalizeDisplayedText(element) {
+    if (!element) return;
+
+    const firstTextNode = Array.from(element.childNodes).find(function (node) {
+      return node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0;
+    });
+
+    if (firstTextNode && firstTextNode === element.firstChild) {
+      firstTextNode.textContent = firstTextNode.textContent.replace(/^[\s\u00a0]+/, "");
+    }
+
+    const lastTextNode = Array.from(element.childNodes).reverse().find(function (node) {
+      return node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0;
+    });
+
+    if (lastTextNode && lastTextNode === element.lastChild) {
+      lastTextNode.textContent = lastTextNode.textContent.replace(/[\s\u00a0]+$/, "");
+    }
+  }
+
+  normalizeDisplayedText(document.getElementById("ddlSqlText"));
+
+  const queryCode = document.querySelector("#ddlQueryText code");
+  if (queryCode) {
+    queryCode.textContent = (queryCode.textContent || "").replace(/\r\n/g, "\n").trim();
+  }
+
+  document.querySelectorAll("[data-copy-target]").forEach(function (button) {
+    const originalText = button.textContent.trim();
+
+    button.addEventListener("click", async function () {
+      const target = document.getElementById(button.getAttribute("data-copy-target"));
+      if (!target) return;
+
+      const text = (target.innerText || target.textContent || "").replace(/\r\n/g, "\n").trim();
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+
+        button.textContent = "Copied";
+        button.classList.add("btn-success");
+
+        window.setTimeout(function () {
+          button.textContent = originalText;
+          button.classList.remove("btn-success");
+        }, 1200);
+      } catch (error) {
+        button.textContent = "Copy failed";
+        window.setTimeout(function () {
+          button.textContent = originalText;
+        }, 1200);
+      }
+    });
+  });
+});
+</script>
+{% endblock javascripts %}

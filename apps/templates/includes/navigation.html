@@ -1,80 +1,319 @@
-<nav class="navbar navbar-top navbar-expand navbar-dashboard navbar-dark">
-              <div class="container-fluid px-0">
-                <div class="d-flex justify-content-between w-100" id="navbarSupportedContent">
-                  <div class="d-flex align-items-center">
-                    <!-- Search form -->
-                    <form class="navbar-search form-inline" id="navbar-search-main" action="/search.html" method="POST">
-                      <div class="input-group input-group-merge search-bar">
-                          <span class="input-group-text" id="topbar-addon">
-                            <svg class="icon icon-xs" x-description="Heroicon name: solid/search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
-                            </svg>
-                          </span>
-                          <input class="form-control" id="searchkey" name="searchkey" type="text" placeholder="Search query">                          
-                      </div>
-                      <div class="input-group input-group-merge search-bar">
-                      
-                    </div>                      
-                    </form>
-                    <!-- / Search form -->
-                  </div>
-                  <!-- Navbar links -->
-                  <ul class="navbar-nav align-items-center">
-                    <li class="nav-item">
-                    {% if session['db_host'] %}
-                    <div class="media-body ms-2 text-dark align-items-center d-none d-lg-block">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4.318 2.687C5.234 2.271 6.536 2 8 2s2.766.27 3.682.687C12.644 3.125 13 3.627 13 4c0 .374-.356.875-1.318 1.313C10.766 5.729 9.464 6 8 6s-2.766-.27-3.682-.687C3.356 4.875 3 4.373 3 4c0-.374.356-.875 1.318-1.313M13 5.698V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7V5.698c.271.202.58.378.904.525C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777A5 5 0 0 0 13 5.698M14 4c0-1.007-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1s-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4v9c0 1.007.875 1.755 1.904 2.223C4.978 15.71 6.427 16 8 16s3.022-.289 4.096-.777C13.125 14.755 14 14.007 14 13zm-1 4.698V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10V8.698c.271.202.58.378.904.525C4.978 9.71 6.427 10 8 10s3.022-.289 4.096-.777A5 5 0 0 0 13 8.698m0 3V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13v-1.302c.271.202.58.378.904.525C4.978 12.71 6.427 13 8 13s3.022-.289 4.096-.777c.324-.147.633-.323.904-.525"/>
-                        </svg>
-                      <span class="mb-0 font-small fw-bold text-gray-900">
-                        {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
-                      </span>
-                    </div>
-                    {% endif %}
-                    </li>
-                    <li class="nav-item dropdown ms-lg-3">
-                      <a class="nav-link dropdown-toggle pt-1 px-0" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <div class="media d-flex align-items-center">
-                          <span>
-                            <svg class="icon icon-s me-2" fill="black" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
-                          </span>
-                        </div>
-                      </a>
-                      <div class="dropdown-menu dashboard-dropdown dropdown-menu-end mt-2 py-1">
-                        <a class="dropdown-item d-flex align-items-center" href="/dashboard.html">
-                          <svg class="dropdown-icon text-gray-400 me-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            
-                              <path clip-rule="evenodd" fill-rule="evenodd" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z"></path>
-                              <path clip-rule="evenodd" fill-rule="evenodd" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z"></path>                              
-                            </svg>
-                         Dashboard
-                        </a>
-                        <a class="dropdown-item d-flex align-items-center" href="/llm.html">
-                          <svg class="dropdown-icon text-gray-400 me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
-                          LLM Settings
-                        </a>
-                        <a class="dropdown-item d-flex align-items-center" href="/lint.html">
-                          <svg class="dropdown-icon text-gray-400 me-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-2 0c0 .993-.241 1.929-.668 2.754l-1.524-1.525a3.997 3.997 0 00.078-2.183l1.562-1.562C15.802 8.249 16 9.1 16 10zm-5.165 3.913l1.58 1.58A5.98 5.98 0 0110 16a5.976 5.976 0 01-2.516-.552l1.562-1.562a4.006 4.006 0 001.789.027zm-4.677-2.796a4.002 4.002 0 01-.041-2.08l-.08.08-1.53-1.533A5.98 5.98 0 004 10c0 .954.223 1.856.619 2.657l1.54-1.54zm1.088-6.45A5.974 5.974 0 0110 4c.954 0 1.856.223 2.657.619l-1.54 1.54a4.002 4.002 0 00-2.346.033L7.246 4.668zM12 10a2 2 0 11-4 0 2 2 0 014 0z" clip-rule="evenodd"></path></svg>
-                          Format SQL
-                        </a>
-                        <div role="separator" class="dropdown-divider my-1"></div>
-                        <a class="dropdown-item d-flex align-items-center" href="/myqueries.html">
-                          <svg class="dropdown-icon text-info me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"></path>
-                          </svg>
-                          My queries
-                        </a>
-                        <div role="separator" class="dropdown-divider my-1"></div>
-                        <a class="dropdown-item d-flex align-items-center" href="/pgtune.html">
-                          <svg class="dropdown-icon text-info me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"></path>
-                          </svg>
-                          PG Tune
-                        </a>
-                        
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </nav>
+<style>
+  .pga-topnav {
+    position: sticky;
+    top: 0;
+    z-index: 1010;
+    margin: .75rem 1rem 1rem;
+    padding: .7rem .85rem;
+    border: 1px solid rgba(148, 163, 184, .24);
+    border-radius: 1.35rem;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, .92), rgba(248, 250, 252, .82));
+    box-shadow: 0 18px 42px rgba(15, 23, 42, .08);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .pga-topnav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .pga-topnav-left,
+  .pga-topnav-right {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+  }
+
+  .pga-topnav-search {
+    min-width: min(460px, 42vw);
+  }
+
+  .pga-topnav-search .input-group {
+    border: 1px solid rgba(148, 163, 184, .25);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .9);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+    overflow: hidden;
+  }
+
+  .pga-topnav-search .input-group-text,
+  .pga-topnav-search .form-control {
+    border: 0;
+    background: transparent;
+  }
+
+  .pga-topnav-search .input-group-text {
+    color: #64748b;
+    padding-left: 1rem;
+    padding-right: .45rem;
+  }
+
+  .pga-topnav-search .form-control {
+    min-height: 42px;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: .9rem;
+  }
+
+  .pga-topnav-search .form-control::placeholder {
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .pga-topnav-search .form-control:focus {
+    box-shadow: none;
+  }
+
+  .pga-db-context {
+    display: inline-flex;
+    align-items: center;
+    gap: .65rem;
+    min-width: 0;
+    max-width: 46vw;
+    padding: .45rem .7rem .45rem .5rem;
+    border: 1px solid rgba(20, 184, 166, .22);
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(236, 253, 245, .95), rgba(240, 249, 255, .85));
+    color: #0f172a;
+  }
+
+  .pga-db-context-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #14b8a6, #38bdf8);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(20, 184, 166, .26);
+  }
+
+  .pga-db-context-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+
+  .pga-db-context-label {
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #0f766e;
+  }
+
+  .pga-db-context-value {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .84rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .pga-topnav-menu-btn {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(99, 102, 241, .18);
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(79, 70, 229, .10), rgba(14, 165, 233, .10));
+    color: #4338ca !important;
+    box-shadow: 0 10px 24px rgba(79, 70, 229, .10);
+  }
+
+  .pga-topnav-menu-btn::after {
+    display: none;
+  }
+
+  .pga-topnav-menu-btn:hover,
+  .pga-topnav-menu-btn:focus {
+    color: #1d4ed8 !important;
+    background: linear-gradient(135deg, rgba(79, 70, 229, .16), rgba(14, 165, 233, .16));
+  }
+
+  .pga-topnav-dropdown {
+    min-width: 260px;
+    padding: .55rem;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 24px 52px rgba(15, 23, 42, .16);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .pga-topnav-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .72rem .75rem;
+    border-radius: .8rem;
+    color: #334155;
+    font-size: .9rem;
+    font-weight: 700;
+  }
+
+  .pga-topnav-dropdown .dropdown-item:hover,
+  .pga-topnav-dropdown .dropdown-item:focus {
+    background: linear-gradient(135deg, rgba(59, 130, 246, .10), rgba(99, 102, 241, .08));
+    color: #1d4ed8;
+  }
+
+  .pga-dropdown-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: .75rem;
+    background: rgba(248, 250, 252, .95);
+    color: #2563eb;
+    border: 1px solid rgba(148, 163, 184, .18);
+  }
+
+  .pga-dropdown-section {
+    padding: .35rem .75rem .2rem;
+    font-size: .66rem;
+    font-weight: 900;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .pga-topnav-dropdown .dropdown-divider {
+    margin: .45rem .25rem;
+    border-color: rgba(148, 163, 184, .18);
+  }
+
+  @media (max-width: 991.98px) {
+    .pga-topnav {
+      margin: .5rem .75rem .85rem;
+      border-radius: 1.1rem;
+    }
+
+    .pga-topnav-search {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .pga-topnav-left {
+      flex: 1 1 auto;
+    }
+
+    .pga-db-context {
+      display: none;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .pga-topnav {
+      padding: .55rem;
+    }
+
+    .pga-topnav-search .form-control {
+      min-height: 38px;
+      font-size: .85rem;
+    }
+  }
+</style>
+
+<nav class="navbar navbar-top navbar-expand navbar-dashboard pga-topnav" aria-label="Top navigation">
+  <div class="container-fluid px-0">
+    <div class="pga-topnav-inner" id="navbarSupportedContent">
+
+      <div class="pga-topnav-left">
+        <form class="navbar-search form-inline pga-topnav-search" id="navbar-search-main" action="/search.html" method="POST" role="search">
+          <div class="input-group input-group-merge search-bar">
+            <span class="input-group-text" id="topbar-addon" aria-hidden="true">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              class="form-control"
+              id="searchkey"
+              name="searchkey"
+              type="text"
+              placeholder="Search query"
+              aria-label="Search query"
+            >
+          </div>
+        </form>
+      </div>
+
+      <div class="pga-topnav-right">
+        {% if session['db_host'] %}
+          <div class="pga-db-context d-none d-lg-inline-flex" title="{{ session['db_host'] }} : {{ session['db_name'] }}">
+            <span class="pga-db-context-icon" aria-hidden="true">
+              <i class="bi bi-database"></i>
+            </span>
+            <span class="pga-db-context-text">
+              <span class="pga-db-context-label">Connected database</span>
+              <span class="pga-db-context-value">
+                {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
+              </span>
+            </span>
+          </div>
+        {% endif %}
+
+        <div class="nav-item dropdown">
+          <a
+            class="nav-link dropdown-toggle pga-topnav-menu-btn"
+            href="#"
+            role="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            aria-label="Open quick actions menu"
+          >
+            <i class="bi bi-gear"></i>
+          </a>
+
+          <div class="dropdown-menu dropdown-menu-end mt-2 pga-topnav-dropdown">
+            <div class="pga-dropdown-section">Navigation</div>
+
+            <a class="dropdown-item" href="/dashboard.html">
+              <span class="pga-dropdown-icon"><i class="bi bi-pie-chart-fill"></i></span>
+              Dashboard
+            </a>
+
+            <a class="dropdown-item" href="/llm.html">
+              <span class="pga-dropdown-icon"><i class="bi bi-cpu"></i></span>
+              LLM Settings
+            </a>
+
+            <a class="dropdown-item" href="/lint.html">
+              <span class="pga-dropdown-icon"><i class="bi bi-code-slash"></i></span>
+              Format SQL
+            </a>
+
+            <div role="separator" class="dropdown-divider"></div>
+            <div class="pga-dropdown-section">Personal tools</div>
+
+            <a class="dropdown-item" href="/myqueries.html">
+              <span class="pga-dropdown-icon"><i class="bi bi-journal-bookmark"></i></span>
+              My queries
+            </a>
+
+            <a class="dropdown-item" href="/pgtune.html">
+              <span class="pga-dropdown-icon"><i class="bi bi-sliders"></i></span>
+              PG Tune
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</nav>

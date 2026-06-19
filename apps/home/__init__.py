@@ -10,3 +10,4 @@ blueprint = Blueprint(
     __name__,
     url_prefix=''
 )
+

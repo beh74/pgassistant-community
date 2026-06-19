@@ -25,13 +25,17 @@ Base page
 <meta name="msapplication-TileColor" content="#ffffff">
 <meta name="theme-color" content="#ffffff">
 
- 
-<link type="text/css" href="{{ config.ASSETS_ROOT }}/css/volt.css" rel="stylesheet"> 
-
-<!-- Specific Page JS goes HERE  -->    
-{% block stylesheets %}{% endblock stylesheets %}
-
+<!-- Base CSS -->
+<link type="text/css" href="{{ config.ASSETS_ROOT }}/css/volt.css" rel="stylesheet">
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/pga.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+
+<!-- pgAssistant global UI -->
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant-sidebar.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+
+<!-- Specific Page CSS goes HERE -->
+{% block stylesheets %}{% endblock stylesheets %}
 
 </head>
 <body>
@@ -52,7 +56,7 @@ Base page
 
   {% include 'includes/scripts.html' %}
     
-  <!-- Specific Page JS goes HERE  -->
+  <!-- Specific Page JS goes HERE -->
   {% block javascripts %}{% endblock javascripts %}  
       
 </body>

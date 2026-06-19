@@ -4,383 +4,89 @@
 
 {% block stylesheets %}
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 <style>
-
-/* ---------------------------------- */
-/* Helpers / misc */
-/* ---------------------------------- */
-.topquery-sql {
-  font-family: monospace;
-  font-size: 0.83rem;
-  line-height: 1.32;
-  white-space: pre-wrap;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  background: #f8f9fa;
-  border-radius: 0.65rem;
-  padding: 0.7rem;
-  border: 1px solid #edf0f2;
-  min-height: 6.2rem;
-}
-
-.topquery-sql:hover {
-  -webkit-line-clamp: unset;
-  overflow: auto;
-  max-height: 320px;
-}
-
-.rank-query-metric-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-bottom: 0.9rem;
-}
-
-.rank-query-metric-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  font-size: 0.82rem;
-  line-height: 1;
-}
-
-.rank-query-metric-chip .label {
-  color: #6c757d;
-  font-weight: 500;
-}
-
-.rank-query-metric-chip .value {
-  color: #212529;
-  font-weight: 700;
-}
-
-.summary-help-icon {
-  font-size: 0.8rem;
-  color: var(--bs-secondary-color);
-  cursor: help;
-  opacity: 0.85;
-}
-
-.summary-help-icon:hover {
-  opacity: 1;
-}
-
-.rankqueries-help-btn {
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-/* ---------------------------------- */
-/* Filters card */
-/* ---------------------------------- */
-.rankqueries-filters-card .card-body {
-  padding: 1.25rem;
-}
-
-.rankqueries-toolbar {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: 1rem 1.25rem;
-  align-items: end;
-}
-
-.rankqueries-field {
-  min-width: 0;
-}
-
-.rankqueries-field label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 0.45rem;
-}
-
-.rankqueries-field .form-control,
-.rankqueries-field .form-select {
-  min-height: 44px;
-  border-radius: 0.75rem;
-}
-
-.rankqueries-actions {
-  display: flex;
-  gap: 0.6rem;
-  align-items: end;
-}
-
-.rankqueries-actions .btn {
-  min-height: 44px;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  padding: 0 1rem;
-}
-
-.rankqueries-actions .btn-primary {
-  min-width: 100px;
-}
-
-.rankqueries-actions .btn-outline-secondary {
-  min-width: 90px;
-}
-
-@media (max-width: 1199.98px) {
-  .rankqueries-toolbar {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 767.98px) {
-  .rankqueries-toolbar {
-    grid-template-columns: 1fr;
+  /* Keep Rank Queries SQL blocks aligned with ddl.html / dark SQL blocks.
+     pgassistant.css contains legacy .topquery-sql rules with !important and line-clamp,
+     so this override is scoped to this page and intentionally explicit. */
+  .pg-query-ranking-page .rank-query-sql.topquery-sql {
+    display: block !important;
+    background: #0b1220 !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(148, 163, 184, .18) !important;
+    border-radius: .9rem !important;
+    padding: .95rem 1rem !important;
+    margin: 0 0 1rem 0 !important;
+    min-height: 0 !important;
+    max-height: 11rem !important;
+    overflow: auto !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+    font-size: .84rem !important;
+    line-height: 1.55 !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03) !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: initial !important;
   }
 
-  .rankqueries-actions {
-    justify-content: stretch;
+  .pg-query-ranking-page .rank-query-sql.topquery-sql code {
+    color: inherit !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    font: inherit !important;
   }
 
-  .rankqueries-actions .btn {
-    flex: 1;
+  .pg-query-ranking-page .rank-query-sql.topquery-sql::selection,
+  .pg-query-ranking-page .rank-query-sql.topquery-sql code::selection {
+    background: rgba(56, 189, 248, .32) !important;
+    color: #fff !important;
   }
-}
-
-/* ---------------------------------- */
-/* Header */
-/* ---------------------------------- */
-.rankqueries-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
-
-.rankqueries-subtitle {
-  color: var(--bs-secondary-color);
-  margin-bottom: 0;
-}
-
-/* ---------------------------------- */
-/* Summary cards */
-/* ---------------------------------- */
-.rankqueries-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.rankqueries-summary-card {
-  background: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  min-width: 180px;
-  box-shadow: 0 .125rem .25rem rgba(0,0,0,.04);
-}
-
-.rankqueries-summary-label {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--bs-secondary-color);
-  margin-bottom: 0.15rem;
-}
-
-.rankqueries-summary-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--bs-body-color);
-}
-
-/* ---------------------------------- */
-/* Query cards */
-/* ---------------------------------- */
-.rank-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
-  gap: 1.25rem;
-  align-items: stretch;
-}
-
-.rank-query-col {
-  min-width: 0;
-}
-
-@media (max-width: 575.98px) {
-  .rank-cards-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-}
-
-.rank-query-card {
-  border: 1px solid var(--bs-border-color);
-  border-radius: 1rem;
-  transition: transform .12s ease, box-shadow .12s ease;
-}
-
-.rank-query-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 .5rem 1rem rgba(0,0,0,.08);
-}
-
-.rank-query-card .card-header {
-  background: var(--bs-tertiary-bg);
-  border-bottom: 1px solid var(--bs-border-color);
-  padding: 0.8rem 1rem;
-  border-top-left-radius: 1rem;
-  border-top-right-radius: 1rem;
-}
-
-.rank-query-card .card-body {
-  padding: 1rem;
-}
-
-.rank-priority-badge {
-  font-size: 0.72rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  font-weight: 700;
-}
-
-.rank-query-score {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--bs-body-color);
-}
-
-.rank-query-reason {
-  font-size: 0.96rem;
-  color: var(--bs-body-color);
-  line-height: 1.45;
-  margin-bottom: 0.85rem;
-}
-
-/* ---------------------------------- */
-/* Signals */
-/* ---------------------------------- */
-.rank-query-signals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-}
-
-.rank-signal-badge {
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.3rem 0.55rem;
-}
-
-.rank-signal-high-load {
-  background: rgba(220, 53, 69, .10);
-  color: #dc3545;
-}
-
-.rank-signal-slow {
-  background: rgba(255, 193, 7, .16);
-  color: #9a6b00;
-}
-
-.rank-signal-poor-cache {
-  background: rgba(13, 110, 253, .10);
-  color: #0d6efd;
-}
-
-.rank-signal-temp {
-  background: rgba(111, 66, 193, .10);
-  color: #6f42c1;
-}
-
-.rank-signal-unstable {
-  background: rgba(108, 117, 125, .12);
-  color: #495057;
-}
-
-.rank-signal-high-calls {
-  background: rgba(25, 135, 84, .10);
-  color: #198754;
-}
-
-/* ---------------------------------- */
-/* Footer */
-/* ---------------------------------- */
-.rank-query-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* ---------------------------------- */
-/* Empty state */
-/* ---------------------------------- */
-.rank-empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  border: 1px dashed var(--bs-border-color);
-  border-radius: 1rem;
-}
-
-.rank-empty-state .empty-title {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 0.35rem;
-}
-
-.rank-empty-state .empty-text {
-  color: var(--bs-secondary-color);
-}
-
-/* ---------------------------------- */
-/* Cache colors */
-/* ---------------------------------- */
-.text-cache-danger {
-  color: #dc3545 !important;
-}
-
-.text-cache-warning {
-  color: #9a6b00 !important;
-}
-
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="container-fluid py-4 ps-3 pe-3">
+<div class="pg-page pg-query-ranking-page">
 
-  <div class="rankqueries-header-row">
+  <div class="pg-page-header">
     <div>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <h1 class="h4 mb-1">Rank Queries</h1>
-
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary rankqueries-help-btn"
-          data-bs-toggle="modal"
-          data-bs-target="#rankHelpModal"
-        >
-          <i class="bi bi-info-circle me-1"></i>
-          How ranking works
-        </button>
-      </div>
-
-      <p class="rankqueries-subtitle">
-        Quickly identify the queries that deserve investigation first.
-        Scores and priority levels are computed relative to workload intensity and may be less relevant on low-activity systems.
+      <div class="pg-eyebrow">Query tuning</div>
+      <h1 class="pg-title">Query ranking</h1>
+      <p class="pg-subtitle">
+        Prioritize the queries that deserve investigation first. Scores are relative to the current workload snapshot
+        and should be interpreted with execution pattern and business context.
       </p>
+    </div>
+
+    <div class="pg-actions">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-primary rankqueries-help-btn"
+        data-bs-toggle="modal"
+        data-bs-target="#rankHelpModal"
+      >
+        <i class="bi bi-info-circle me-1"></i>
+        How ranking works
+      </button>
     </div>
   </div>
 
+  <section class="pg-hero query-workload-hero">
+    <div>
+      <div class="pg-hero-title">Investigation queue</div>
+      <p class="pg-hero-text">
+        Start with Critical and High queries, then use the signals to understand whether the issue is load,
+        latency, cache efficiency, temp usage, or execution instability.
+      </p>
+    </div>
+  </section>
+
   {% if ranked_queries is defined and ranked_queries %}
-    <div class="rankqueries-summary">
-      <div class="rankqueries-summary-card">
-        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+    <div class="pg-summary-grid">
+      <div class="pg-summary-card is-info">
+        <span class="pg-summary-label d-inline-flex align-items-center gap-1">
           Queries ranked
           <i
             class="bi bi-question-circle summary-help-icon"
@@ -388,12 +94,12 @@
             data-bs-placement="top"
             title="Number of queries currently included in this ranking view."
           ></i>
-          <span class="rankqueries-summary-value ">{{ ranked_queries|length }}</span>
+          <span class="pg-summary-value ">{{ ranked_queries|length }}</span>
         </span>
       </div>
 
-      <div class="rankqueries-summary-card">
-        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+      <div class="pg-summary-card is-critical">
+        <span class="pg-summary-label d-inline-flex align-items-center gap-1">
           Critical
           <i
             class="bi bi-question-circle summary-help-icon"
@@ -401,14 +107,14 @@
             data-bs-placement="top"
             title="Queries with the highest priority score based on workload contribution, execution cost, cache efficiency, and other ranking signals."
           ></i>
-          <span class="rankqueries-summary-value">
+          <span class="pg-summary-value">
             {{ ranked_queries | selectattr("priority_level", "equalto", "Critical") | list | length }}
           </span>
         </span>
       </div>
 
-      <div class="rankqueries-summary-card">
-        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+      <div class="pg-summary-card is-high">
+        <span class="pg-summary-label d-inline-flex align-items-center gap-1">
           High priority
           <i
             class="bi bi-question-circle summary-help-icon"
@@ -416,14 +122,14 @@
             data-bs-placement="top"
             title="Queries considered important to review, but below the Critical threshold."
           ></i>
-          <span class="rankqueries-summary-value">
+          <span class="pg-summary-value">
             {{ ranked_queries | selectattr("priority_level", "equalto", "High") | list | length }}
           </span>
         </span>
       </div>
 
-      <div class="rankqueries-summary-card">
-        <span class="rankqueries-summary-label d-inline-flex align-items-center gap-1">
+      <div class="pg-summary-card is-violet">
+        <span class="pg-summary-label d-inline-flex align-items-center gap-1">
           Top 10 workload share
           <i
             class="bi bi-question-circle summary-help-icon"
@@ -431,7 +137,7 @@
             data-bs-placement="top"
             title="Percentage of total execution time represented by the first 10 ranked queries."
           ></i>
-          <span class="rankqueries-summary-value">
+          <span class="pg-summary-value">
             {% set total_all = ranked_queries | map(attribute='total_exec_time') | map('float') | sum %}
             {% set total_top10 = ranked_queries[:10] | map(attribute='total_exec_time') | map('float') | sum %}
             {% if total_all > 0 %}
@@ -445,8 +151,7 @@
     </div>
   {% endif %}
 
-  <div class="card shadow-sm mb-4 rankqueries-filters-card">
-    <div class="card-body">
+  <div class="pg-toolbar-card rankqueries-filters-card">
       <div class="rankqueries-toolbar">
 
         <div class="rankqueries-field">
@@ -531,7 +236,6 @@
         </div>
 
       </div>
-    </div>
   </div>
 
   {% if ranked_queries is defined and ranked_queries %}
@@ -551,7 +255,7 @@
           data-share-calls="{{ row.share_calls if row.share_calls is defined else 0 }}"
           data-share-io="{{ row.share_io if row.share_io is defined else 0 }}"
         >
-          <div class="card shadow-sm h-100 rank-query-card">
+          <div class="card h-100 rank-query-card">
 
             <div class="card-header d-flex justify-content-between align-items-center">
               <div class="d-flex align-items-center gap-2">
@@ -571,7 +275,7 @@
             </div>
 
             <div class="card-body d-flex flex-column">
-              <div class="topquery-sql mb-3">{{ row.query }}</div>
+              <pre class="topquery-sql rank-query-sql"><code>{{ row.query }}</code></pre>
 
               <div class="rank-query-reason mb-3">
                 {{ row.reason if row.reason else "Moderate resource usage" }}
@@ -720,7 +424,7 @@
     </div>
 
   {% else %}
-    <div class="rank-empty-state">
+    <div class="rank-empty-state pg-empty-state">
       <div class="empty-title">No ranked queries available</div>
       <p class="empty-text">
         No query matched the current filters, or no pg_stat_statements data is available.

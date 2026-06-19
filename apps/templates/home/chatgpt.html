@@ -5,188 +5,491 @@
 {% block stylesheets %}
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/pygment.css" rel="stylesheet">
 <style>
-  .llm-page-header {
-    margin-bottom: 1.5rem;
+  .llm-result-page {
+    padding: 1.5rem;
+    min-height: calc(100vh - 1px);
+    background:
+      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34rem),
+      radial-gradient(circle at top left, rgba(8, 145, 178, 0.08), transparent 28rem),
+      var(--ga-bg, #f4f7fb);
   }
 
-  .llm-muted {
-    color: #6c757d;
+  .llm-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.25rem;
+    margin-bottom: 1rem;
   }
 
-  .llm-summary-card,
-  .llm-section-card {
-    border: 0;
-    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
-    border-radius: 1rem;
-    background: #fff;
-  }
-
-  .llm-kpi {
-    border-radius: 0.85rem;
-    background: #f8f9fa;
-    padding: 1rem;
-    height: 100%;
-  }
-
-  .llm-kpi-label {
-    font-size: 0.8rem;
+  .llm-result-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    width: fit-content;
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.10);
+    color: var(--ga-primary-dark, #1d4ed8);
+    font-size: .72rem;
+    font-weight: 850;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: #6c757d;
-    margin-bottom: 0.35rem;
+    letter-spacing: .08em;
+    margin-bottom: .65rem;
   }
 
-  .llm-kpi-value {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 0;
+  .llm-result-title {
+    margin: 0;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    color: var(--ga-text, #0f172a);
   }
 
-  .llm-accordion .accordion-item {
-    border: 0;
-    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
-    border-radius: 1rem;
+  .llm-result-subtitle {
+    color: var(--ga-muted, #64748b);
+    margin: .35rem 0 0 0;
+    font-size: .98rem;
+  }
+
+  .llm-result-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(280px, .75fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .llm-result-command-main,
+  .llm-result-command-side,
+  .llm-result-panel {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1.35rem;
+    box-shadow: var(--ga-shadow-md, 0 18px 48px rgba(15, 23, 42, 0.09));
+    position: relative;
     overflow: hidden;
-    background: #fff;
   }
 
-  .llm-accordion .accordion-item + .accordion-item {
-    margin-top: 1rem;
-  }
-
-  .llm-accordion .accordion-button {
-    background: #fff;
-    font-weight: 600;
-    padding: 1rem 1.25rem;
-    box-shadow: none;
-  }
-
-  .llm-accordion .accordion-button:not(.collapsed) {
-    color: #0d6efd;
-    background: #fff;
-    box-shadow: none;
-  }
-
-  .llm-accordion .accordion-body {
+  .llm-result-command-main,
+  .llm-result-command-side {
     padding: 1.25rem;
-    border-top: 1px solid rgba(17, 24, 39, 0.06);
   }
 
-  .llm-rendered-content {
-    color: #334155;
+  .llm-result-command-main::after {
+    content: "";
+    position: absolute;
+    right: -4rem;
+    top: -4rem;
+    width: 12rem;
+    height: 12rem;
+    border-radius: 50%;
+    background: rgba(37, 99, 235, .08);
+  }
+
+  .llm-result-command-title {
+    margin: 0;
+    color: var(--ga-text, #0f172a);
+    font-size: 1.25rem;
+    font-weight: 850;
+    letter-spacing: -.025em;
+    position: relative;
+    z-index: 1;
+  }
+
+  .llm-result-command-copy {
+    color: var(--ga-muted-strong, #475569);
+    margin: .55rem 0 0;
+    max-width: 58rem;
+    line-height: 1.5;
+    position: relative;
+    z-index: 1;
+  }
+
+  .llm-result-meta-list {
+    display: grid;
+    gap: .65rem;
+  }
+
+  .llm-result-meta-item {
+    display: grid;
+    grid-template-columns: 2.15rem minmax(0, 1fr);
+    gap: .7rem;
+    align-items: center;
+    padding: .75rem;
+    border-radius: 1rem;
+    background: var(--ga-surface-soft, #f8fafc);
+    border: 1px solid var(--ga-border, #dbe4ef);
+  }
+
+  .llm-result-meta-icon {
+    width: 2.15rem;
+    height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: .75rem;
+    color: #fff;
+    font-weight: 850;
+    background: linear-gradient(135deg, var(--ga-primary, #2563eb), #0ea5e9);
+  }
+
+  .llm-result-meta-label {
+    font-weight: 850;
+    color: var(--ga-text, #0f172a);
+    line-height: 1.2;
+  }
+
+  .llm-result-meta-hint {
+    font-size: .82rem;
+    color: var(--ga-muted, #64748b);
+    margin-top: .1rem;
+  }
+
+  .llm-result-tabs {
+    display: inline-flex;
+    gap: .35rem;
+    padding: .35rem;
+    background: rgba(255, 255, 255, .82);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    margin-bottom: 1rem;
+  }
+
+  .llm-result-tab-btn {
+    border: 0;
+    background: transparent;
+    padding: .65rem 1rem;
+    font-weight: 850;
+    color: var(--ga-muted, #64748b);
+    border-radius: 999px;
+    transition: all .16s ease;
+  }
+
+  .llm-result-tab-btn:hover {
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: rgba(37, 99, 235, .06);
+  }
+
+  .llm-result-tab-btn.active {
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: var(--ga-primary-soft, #dbeafe);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15);
+  }
+
+  .llm-result-tab-panel {
+    display: none;
+  }
+
+  .llm-result-tab-panel.active {
+    display: block;
+  }
+
+  .llm-result-panel {
+    padding: 1.15rem;
+  }
+
+  .llm-result-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .75rem;
+    margin-bottom: .9rem;
+  }
+
+  .llm-result-panel-title {
+    font-weight: 900;
+    color: var(--ga-text, #0f172a);
+    font-size: 1.02rem;
+    letter-spacing: -.02em;
+  }
+
+  .llm-result-panel-subtitle {
+    color: var(--ga-muted, #64748b);
+    font-size: .86rem;
+    margin-top: .15rem;
+  }
+
+  .llm-result-content {
+    color: var(--ga-slate, #334155);
     line-height: 1.6;
   }
 
-  .llm-rendered-content p:last-child {
+  .llm-result-content p:last-child,
+  .llm-result-content ul:last-child,
+  .llm-result-content ol:last-child {
     margin-bottom: 0;
   }
 
-  .llm-rendered-content pre {
-    margin-bottom: 0;
-    border-radius: 0.85rem;
+  .llm-result-content h1,
+  .llm-result-content h2,
+  .llm-result-content h3,
+  .llm-result-content h4,
+  .llm-result-content h5,
+  .llm-result-content h6 {
+    color: var(--ga-text, #0f172a);
+    font-weight: 850;
+    letter-spacing: -.02em;
+    margin-top: 1.2rem;
+  }
+
+  .llm-result-content h1:first-child,
+  .llm-result-content h2:first-child,
+  .llm-result-content h3:first-child,
+  .llm-result-content h4:first-child,
+  .llm-result-content h5:first-child,
+  .llm-result-content h6:first-child {
+    margin-top: 0;
+  }
+
+  .llm-result-content table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .9rem;
+  }
+
+  .llm-result-content th,
+  .llm-result-content td {
+    padding: .65rem .8rem;
+    border-bottom: 1px solid var(--ga-border, #dbe4ef);
+    vertical-align: top;
+  }
+
+  .llm-result-content tr:last-child th,
+  .llm-result-content tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .llm-result-content th {
+    background: var(--ga-surface-soft, #f8fafc);
+    color: var(--ga-muted-strong, #475569);
+    font-size: .78rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+
+  .llm-result-content blockquote {
+    border-left: 4px solid var(--ga-primary, #2563eb);
+    background: var(--ga-surface-soft, #f8fafc);
+    color: var(--ga-slate, #334155);
+    border-radius: .65rem;
+    padding: .75rem 1rem;
+    margin: 1rem 0;
+  }
+
+  .llm-result-content code:not(pre code) {
+    background: var(--ga-primary-soft, #dbeafe);
+    color: var(--ga-primary-dark, #1d4ed8);
+    border-radius: .4rem;
+    padding: .15rem .35rem;
+    font-size: .88em;
+  }
+
+  .llm-result-content pre {
+    margin: 1rem 0 0;
+    border-radius: .9rem;
     overflow: auto;
+    background: #0b1220 !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(148, 163, 184, .18);
+    padding: .9rem 1rem;
+    max-height: 520px;
+  }
+
+  .llm-result-content pre code {
+    background: transparent !important;
+    color: inherit !important;
+    padding: 0;
+    border-radius: 0;
+    white-space: pre;
+  }
+
+  .llm-result-copy-btn,
+  .copy-btn {
+    border: 1px solid var(--ga-border-strong, #c8d4e3);
+    color: var(--ga-slate, #334155);
+    font-weight: 850;
+    background: rgba(255, 255, 255, .85);
+    border-radius: .65rem;
+    padding: .38rem .7rem;
+    font-size: .78rem;
+    line-height: 1;
+  }
+
+  .llm-result-copy-btn:hover,
+  .copy-btn:hover {
+    border-color: var(--ga-primary, #2563eb);
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: var(--ga-primary-soft, #dbeafe);
   }
 
   .code-wrapper {
     position: relative;
   }
 
-  .copy-btn {
+  .code-wrapper .copy-btn {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    padding: 0.3rem 0.65rem;
-    font-size: 0.75rem;
-    background: #fff;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    border-radius: 0.55rem;
-    cursor: pointer;
-    opacity: 0.9;
-    transition: all 0.15s ease;
+    top: .7rem;
+    right: .7rem;
     z-index: 2;
   }
 
-  .copy-btn:hover {
-    opacity: 1;
-    background: #f8f9fa;
+  @media (max-width: 1100px) {
+    .llm-result-command {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .llm-result-page {
+      padding: 1rem;
+    }
+
+    .llm-result-tabs {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-radius: 1rem;
+    }
+
+    .llm-result-tab-btn {
+      border-radius: .75rem;
+    }
   }
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="llm-result-page">
 
-  <div class="llm-page-header">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-      <div>
-        <h1 class="h4 mb-1">{{ title }}</h1>
-        <p class="llm-muted mb-0">
-          Review the prompt sent to the LLM and the generated response.
-        </p>
-      </div>
+  <div class="llm-result-header">
+    <div>
+      <div class="llm-result-eyebrow">LLM workspace</div>
+      <h3 class="llm-result-title">{{ title }}</h3>
+      <p class="llm-result-subtitle">
+        Review the prompt sent to the LLM and inspect the generated response.
+      </p>
     </div>
   </div>
 
-  <div class="accordion llm-accordion" id="llmAccordion">
+  <section class="llm-result-command" aria-label="LLM result overview">
+    <div class="llm-result-command-main">
+      <div class="llm-result-eyebrow">Generated analysis</div>
+      <h4 class="llm-result-command-title">
+        The response is displayed first; the original prompt remains available for audit and reproducibility.
+      </h4>
+      <p class="llm-result-command-copy">
+        Use the tabs to switch between the LLM response and the prompt. Code blocks can be copied individually.
+      </p>
+    </div>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingQuery">
-        <button
-          class="accordion-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#collapseQuery"
-          aria-expanded="false"
-          aria-controls="collapseQuery">
-          LLM Query
-        </button>
-      </h2>
-      <div
-        id="collapseQuery"
-        class="accordion-collapse collapse"
-        aria-labelledby="headingQuery"
-        data-bs-parent="#llmAccordion">
-        <div class="accordion-body">
-          <div class="llm-rendered-content">
-            {{ chatgpt_query|safe }}
+    <aside class="llm-result-command-side">
+      <div class="llm-result-meta-list">
+        <div class="llm-result-meta-item">
+          <span class="llm-result-meta-icon">1</span>
+          <div>
+            <div class="llm-result-meta-label">Review response</div>
+            <div class="llm-result-meta-hint">Validate assumptions and recommendations before acting.</div>
+          </div>
+        </div>
+        <div class="llm-result-meta-item">
+          <span class="llm-result-meta-icon">2</span>
+          <div>
+            <div class="llm-result-meta-label">Audit prompt</div>
+            <div class="llm-result-meta-hint">Check the input context that produced the answer.</div>
           </div>
         </div>
       </div>
-    </div>
+    </aside>
+  </section>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingResponse">
-        <button
-          class="accordion-button"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#collapseResponse"
-          aria-expanded="true"
-          aria-controls="collapseResponse">
-          LLM Response
-        </button>
-      </h2>
-      <div
-        id="collapseResponse"
-        class="accordion-collapse collapse show"
-        aria-labelledby="headingResponse"
-        data-bs-parent="#llmAccordion">
-        <div class="accordion-body">
-          <div class="llm-rendered-content">
-            {{ chatgpt_response|safe }}
-          </div>
-        </div>
-      </div>
-    </div>
-
+  <div class="llm-result-tabs" role="tablist" aria-label="LLM result views">
+    <button
+      type="button"
+      class="llm-result-tab-btn active"
+      data-llm-tab="response"
+      role="tab"
+      aria-controls="llmResponsePanel"
+      aria-selected="true"
+    >
+      LLM Response
+    </button>
+    <button
+      type="button"
+      class="llm-result-tab-btn"
+      data-llm-tab="query"
+      role="tab"
+      aria-controls="llmQueryPanel"
+      aria-selected="false"
+    >
+      LLM Query
+    </button>
   </div>
+
+  <section id="llmResponsePanel" class="llm-result-tab-panel active" role="tabpanel">
+    <div class="llm-result-panel">
+      <div class="llm-result-panel-header">
+        <div>
+          <div class="llm-result-panel-title">LLM Response</div>
+          <div class="llm-result-panel-subtitle">Generated answer returned by the configured LLM provider.</div>
+        </div>
+      </div>
+      <div class="llm-result-content">
+        {{ chatgpt_response|safe }}
+      </div>
+    </div>
+  </section>
+
+  <section id="llmQueryPanel" class="llm-result-tab-panel" role="tabpanel">
+    <div class="llm-result-panel">
+      <div class="llm-result-panel-header">
+        <div>
+          <div class="llm-result-panel-title">LLM Query</div>
+          <div class="llm-result-panel-subtitle">Prompt and context sent to the model.</div>
+        </div>
+      </div>
+      <div class="llm-result-content">
+        {{ chatgpt_query|safe }}
+      </div>
+    </div>
+  </section>
+
 </div>
 {% endblock content %}
 
 {% block javascripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  document.querySelectorAll('pre code').forEach(function (codeBlock) {
+  const tabButtons = Array.from(document.querySelectorAll(".llm-result-tab-btn"));
+  const tabPanels = {
+    response: document.getElementById("llmResponsePanel"),
+    query: document.getElementById("llmQueryPanel")
+  };
+
+  function showTab(tabName) {
+    tabButtons.forEach(function (button) {
+      const active = button.dataset.llmTab === tabName;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    Object.keys(tabPanels).forEach(function (key) {
+      if (!tabPanels[key]) return;
+      tabPanels[key].classList.toggle("active", key === tabName);
+    });
+  }
+
+  tabButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      showTab(button.dataset.llmTab);
+    });
+  });
+
+  document.querySelectorAll('.llm-result-content pre code').forEach(function (codeBlock) {
     const pre = codeBlock.parentNode;
     if (!pre || pre.parentNode.classList.contains('code-wrapper')) return;
 
@@ -200,17 +503,19 @@ document.addEventListener("DOMContentLoaded", function () {
     button.type = 'button';
     button.textContent = 'Copy';
 
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', async function () {
       const code = codeBlock.innerText;
       try {
         await navigator.clipboard.writeText(code);
-        button.textContent = 'Copied!';
-        setTimeout(() => {
+        button.textContent = 'Copied';
+        button.classList.add('btn-success');
+        setTimeout(function () {
           button.textContent = 'Copy';
+          button.classList.remove('btn-success');
         }, 1500);
       } catch (err) {
         button.textContent = 'Error';
-        setTimeout(() => {
+        setTimeout(function () {
           button.textContent = 'Copy';
         }, 1500);
       }

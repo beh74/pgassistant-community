@@ -37,10 +37,12 @@ Base page
 <!-- Notyf -->
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/vendor/notyf/notyf.min.css" rel="stylesheet">
 
-<!-- Volt CSS -->
+<!-- Base CSS -->
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/volt.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 
-<!-- Specific Page JS goes HERE  -->    
+<!-- Specific Page CSS goes HERE -->
 {% block stylesheets %}{% endblock stylesheets %}
 
 </head>
@@ -50,7 +52,7 @@ Base page
 
     {% include 'includes/scripts.html' %}
 
-  <!-- Specific Page JS goes HERE  -->
+  <!-- Specific Page JS goes HERE -->
   {% block javascripts %}{% endblock javascripts %}  
   
 </body>

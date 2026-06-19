@@ -3,361 +3,8 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block stylesheets %}
-
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
-<style>
-  .dashboard-page-header {
-    margin-bottom: 1.5rem;
-  }
-
-  .dashboard-muted {
-    color: #6c757d;
-  }
-
-  .dashboard-card {
-    border: 1px solid rgba(17, 24, 39, 0.06);
-    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.06);
-    border-radius: 1rem;
-    background: #fff;
-    overflow: hidden;
-  }
-
-  .dashboard-card .card-header {
-    background: #fbfcfd;
-    border-bottom: 1px solid rgba(17, 24, 39, 0.06);
-    padding: 0.95rem 1.2rem;
-    font-weight: 700;
-    color: #243447;
-  }
-
-  .dashboard-card .card-body {
-    padding: 1.2rem;
-  }
-
-  .dashboard-section-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-  }
-
-  .dashboard-section-title i {
-    color: #336791;
-    font-size: 1rem;
-  }
-
-  .dashboard-kpi-card {
-    position: relative;
-  }
-
-  .dashboard-kpi-card .card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .dashboard-kpi-top {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-  }
-
-  .dashboard-kpi-icon {
-    width: 2.75rem;
-    height: 2.75rem;
-    min-width: 2.75rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.85rem;
-    background: #f4f7fb;
-    color: #336791;
-    border: 1px solid rgba(51, 103, 145, 0.08);
-    font-size: 1.2rem;
-  }
-
-  .dashboard-kpi-label {
-    font-size: 0.82rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: #6b7280;
-    margin-bottom: 0.15rem;
-  }
-
-  .dashboard-kpi-value {
-    font-size: 1.65rem;
-    font-weight: 800;
-    line-height: 1.1;
-    margin-bottom: 0;
-    color: #1f2937;
-  }
-
-  .dashboard-kpi-subtext {
-    color: #6c757d;
-    margin-bottom: 0;
-  }
-
-  .dashboard-status-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-weight: 700;
-    font-size: 0.95rem;
-  }
-
-  .dashboard-status-good {
-    color: #198754;
-  }
-
-  .dashboard-status-warn {
-    color: #b7791f;
-  }
-
-  .dashboard-status-bad {
-    color: #dc3545;
-  }
-
-  .dashboard-profile-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.9rem;
-    margin-bottom: 1rem;
-  }
-
-  .dashboard-profile-row:last-child {
-    margin-bottom: 0;
-  }
-
-  .dashboard-profile-icon {
-    width: 2.4rem;
-    height: 2.4rem;
-    min-width: 2.4rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.8rem;
-    background: #f8f9fa;
-    border: 1px solid rgba(17, 24, 39, 0.06);
-    color: #336791;
-    font-size: 1.1rem;
-  }
-
-  .dashboard-profile-content {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .dashboard-profile-label {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-weight: 700;
-    margin-bottom: 0.3rem;
-    text-transform: capitalize;
-    color: #243447;
-  }
-
-  .dashboard-progress-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-bottom: 0.35rem;
-    flex-wrap: wrap;
-  }
-
-  .dashboard-progress {
-    height: 10px;
-    border-radius: 999px;
-    background: #edf2f7;
-    overflow: hidden;
-  }
-
-  .dashboard-progress .progress-bar {
-    background: linear-gradient(90deg, #336791 0%, #4f85ad 100%);
-    border-radius: 999px;
-  }
-
-  .dashboard-item-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.8rem 0;
-  }
-
-  .dashboard-item-row + .dashboard-item-row {
-    border-top: 1px solid rgba(17, 24, 39, 0.06);
-  }
-
-  .dashboard-item-main {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    min-width: 0;
-  }
-
-  .dashboard-item-icon {
-    width: 2.1rem;
-    height: 2.1rem;
-    min-width: 2.1rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.7rem;
-    background: #f8f9fa;
-    border: 1px solid rgba(17, 24, 39, 0.06);
-    color: #336791;
-    font-size: 1rem;
-  }
-
-  .dashboard-item-label {
-    font-weight: 700;
-    margin-bottom: 0;
-    color: #243447;
-  }
-
-  .dashboard-item-label a {
-    text-decoration: none;
-  }
-
-  .dashboard-item-value {
-    font-size: 0.9rem;
-    color: #6b7280;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .label-with-help {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .help-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #6c757d;
-    font-size: 0.9rem;
-    cursor: help;
-  }
-
-  .dashboard-side-list .d-flex + .d-flex {
-    border-top: 1px solid rgba(17, 24, 39, 0.06);
-  }
-
-  .dashboard-side-list .d-flex {
-    padding: 0.95rem 0;
-  }
-
-  .dashboard-side-list .d-flex:first-child {
-    padding-top: 0;
-  }
-
-  .dashboard-side-list .d-flex:last-child {
-    padding-bottom: 0;
-  }
-
-  .dashboard-side-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.65rem;
-    font-weight: 700;
-    color: #243447;
-  }
-
-  .dashboard-side-title i {
-    font-size: 1.1rem;
-  }
-
-  .dashboard-side-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-weight: 700;
-    text-decoration: none;
-  }
-
-  .dashboard-helper-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 0.75rem;
-  }
-
-  .dashboard-helper-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.65rem;
-    padding: 0.8rem;
-    border: 1px solid rgba(17, 24, 39, 0.06);
-    border-radius: 0.8rem;
-    background: #f8f9fa;
-  }
-
-  .dashboard-helper-icon {
-    width: 2rem;
-    height: 2rem;
-    min-width: 2rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.65rem;
-    background: #fff;
-    border: 1px solid rgba(17, 24, 39, 0.06);
-    color: #336791;
-    font-size: 1rem;
-  }
-
-  .dashboard-helper-label {
-    font-size: 0.85rem;
-    font-weight: 700;
-    margin-bottom: 0.15rem;
-    text-transform: capitalize;
-    color: #243447;
-  }
-
-  .dashboard-helper-desc {
-    font-size: 0.78rem;
-    color: #6c757d;
-    line-height: 1.35;
-    margin-bottom: 0;
-  }
-
-  .dashboard-badge-soft {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.76rem;
-    font-weight: 700;
-    border: 1px solid transparent;
-  }
-
-  .dashboard-badge-soft.good {
-    background: rgba(25, 135, 84, 0.10);
-    color: #198754;
-    border-color: rgba(25, 135, 84, 0.18);
-  }
-
-  .dashboard-badge-soft.warn {
-    background: rgba(255, 193, 7, 0.15);
-    color: #9a6b00;
-    border-color: rgba(255, 193, 7, 0.25);
-  }
-
-  .dashboard-badge-soft.bad {
-    background: rgba(220, 53, 69, 0.10);
-    color: #dc3545;
-    border-color: rgba(220, 53, 69, 0.18);
-  }
-
-  .dashboard-modal-divider {
-    margin: 1.5rem 0;
-  }
-</style>
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 {% endblock stylesheets %}
 
 {% block content %}
@@ -419,93 +66,28 @@
 
 {% macro query_type_helpers() %}
   <div class="dashboard-helper-grid">
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('select') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">select</div>
-        <p class="dashboard-helper-desc">Read-only queries returning rows.</p>
+    {% set helpers = [
+      ('select', 'Read-only queries returning rows.'),
+      ('insert', 'New rows inserted into tables.'),
+      ('update', 'Existing rows modified.'),
+      ('delete', 'Rows removed from tables.'),
+      ('upsert', 'Insert-or-update operations, typically using ON CONFLICT.'),
+      ('ddl', 'Schema changes such as CREATE, ALTER, DROP or TRUNCATE.'),
+      ('maintenance', 'Administrative operations like VACUUM, ANALYZE, EXPLAIN or COPY.'),
+      ('session', 'Session-level commands such as SET, SHOW, PREPARE or EXECUTE.'),
+      ('transaction', 'Transaction control statements like BEGIN, COMMIT or ROLLBACK.'),
+      ('call', 'Stored procedure calls.'),
+      ('other', 'Statements that do not fit the main categories or could not be classified.')
+    ] %}
+    {% for query_type, description in helpers %}
+      <div class="dashboard-helper-item">
+        <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class(query_type) }}"></i></div>
+        <div>
+          <div class="dashboard-helper-label">{{ query_type }}</div>
+          <p class="dashboard-helper-desc">{{ description }}</p>
+        </div>
       </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('insert') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">insert</div>
-        <p class="dashboard-helper-desc">New rows inserted into tables.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('update') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">update</div>
-        <p class="dashboard-helper-desc">Existing rows modified.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('delete') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">delete</div>
-        <p class="dashboard-helper-desc">Rows removed from tables.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('upsert') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">upsert</div>
-        <p class="dashboard-helper-desc">Insert-or-update operations, typically using ON CONFLICT.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('ddl') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">ddl</div>
-        <p class="dashboard-helper-desc">Schema changes such as CREATE, ALTER, DROP or TRUNCATE.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('maintenance') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">maintenance</div>
-        <p class="dashboard-helper-desc">Administrative operations like VACUUM, ANALYZE, EXPLAIN or COPY.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('session') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">session</div>
-        <p class="dashboard-helper-desc">Session-level commands such as SET, SHOW, PREPARE or EXECUTE.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('transaction') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">transaction</div>
-        <p class="dashboard-helper-desc">Transaction control statements like BEGIN, COMMIT or ROLLBACK.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('call') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">call</div>
-        <p class="dashboard-helper-desc">Stored procedure calls.</p>
-      </div>
-    </div>
-
-    <div class="dashboard-helper-item">
-      <div class="dashboard-helper-icon"><i class="bi {{ query_type_icon_class('other') }}"></i></div>
-      <div>
-        <div class="dashboard-helper-label">other</div>
-        <p class="dashboard-helper-desc">Statements that do not fit the main categories or could not be classified.</p>
-      </div>
-    </div>
+    {% endfor %}
   </div>
 {% endmacro %}
 
@@ -513,381 +95,299 @@
 {% set more_profile_calls = dbinfo['profile'][4:] %}
 {% set top_profile_time = dbinfo['profile'][:4] %}
 {% set more_profile_time = dbinfo['profile'][4:] %}
+{% set cache_value = dbinfo['cache'] | float %}
+{% set issue_total = (dbinfo['issue_no_pk'] | int) + (dbinfo['issue_idx_fk_missing'] | int) + (dbinfo['issue_idx_redundant'] | int) + (dbinfo['issue_idx_fk_datatype'] | int) %}
+{% set ns = namespace(score=100, issue_penalty=issue_total * 4) %}
+{% if cache_value < 95 %}{% set ns.score = ns.score - 15 %}{% elif cache_value < 99 %}{% set ns.score = ns.score - 5 %}{% endif %}
+{% if ns.issue_penalty > 30 %}{% set ns.issue_penalty = 30 %}{% endif %}
+{% set ns.score = ns.score - ns.issue_penalty %}
+{% if dbinfo['conflicts'] | int > 0 %}{% set ns.score = ns.score - 10 %}{% endif %}
+{% if ns.score < 0 %}{% set ns.score = 0 %}{% endif %}
+{% set health_arc = ns.score * 3.6 %}
 
-<div class="container-fluid py-4">
+<div class="pg-page dashboard-page">
 
-  <div class="dashboard-page-header">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+  <div class="pg-page-header">
+    <div>
+      <div class="pg-eyebrow"><i class="bi bi-speedometer2"></i> Database overview</div>
+      <h1 class="pg-title">Dashboard</h1>
+      <p class="pg-subtitle">
+        PostgreSQL health overview, workload distribution, schema design issues, and client activity.
+      </p>
+    </div>
+
+    <div class="pg-actions">
+      <a href="/global/advisor" class="btn btn-primary btn-sm">
+        <i class="bi bi-stars me-1"></i> Open Global Advisor
+      </a>
+      <a href="/topqueries.html" class="btn btn-outline-primary btn-sm">
+        Review query activity
+      </a>
+    </div>
+  </div>
+
+  <div class="pg-hero dashboard-command-hero">
+    <div class="dashboard-health-card">
+      <div class="dashboard-health-score" style="--dashboard-health: {{ health_arc }}deg;">
+        <strong>{{ ns.score }}</strong>
+        <span>/ 100</span>
+      </div>
       <div>
-        <h1 class="h4 mb-1">Dashboard</h1>
-        <p class="dashboard-muted mb-0">
-          Overview of PostgreSQL health, workload distribution, schema issues, and client activity.
+        <div class="dashboard-health-title">pgAssistant conclusion</div>
+        <p class="dashboard-health-text">
+          {% if issue_total > 0 and cache_value < 95 %}
+            Schema issues and cache efficiency both require attention. Start with design findings, then inspect expensive workload patterns.
+          {% elif issue_total > 0 %}
+            The database is operational, but schema design findings should be reviewed before they affect joins, writes, or maintenance cost.
+          {% elif cache_value < 95 %}
+            Schema checks look clean, but cache efficiency is below the usual comfort zone. Review read-heavy queries and memory settings.
+          {% elif dbinfo['conflicts'] | int > 0 %}
+            Core indicators are healthy, but conflicts were detected. Review conflict sources before they become operational noise.
+          {% else %}
+            Core indicators look healthy. Use Query Ranking to identify the next workload optimization opportunities.
+          {% endif %}
         </p>
+      </div>
+    </div>
+
+    <div class="dashboard-next-actions">
+      <a href="/global/advisor" class="dashboard-action-pill">
+        <span class="dashboard-action-main"><i class="bi bi-stars"></i> Review recommendations</span>
+        <span class="dashboard-action-meta">{{ issue_total }} schema issue(s)</span>
+      </a>
+      <a href="/rankqueries.html" class="dashboard-action-pill">
+        <span class="dashboard-action-main"><i class="bi bi-trophy"></i> Prioritize queries</span>
+        <span class="dashboard-action-meta">ranking</span>
+      </a>
+      <a href="/pgtune.html" class="dashboard-action-pill">
+        <span class="dashboard-action-main"><i class="bi bi-sliders"></i> Check configuration</span>
+        <span class="dashboard-action-meta">pgTune</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="dashboard-kpi-grid">
+    <div class="pg-card pg-card-body dashboard-kpi-card">
+      <div class="dashboard-kpi-icon"><i class="bi bi-database"></i></div>
+      <div>
+        <div class="dashboard-kpi-label">Database version</div>
+        <a target="_blank" href="https://www.postgresql.org/docs/release/" class="text-decoration-none">
+          <h2 class="dashboard-kpi-value">{{ dbinfo['version'] }}</h2>
+        </a>
+        <p class="dashboard-kpi-subtext">Uptime: <strong>{{ dbinfo['uptime'] }}</strong></p>
+      </div>
+    </div>
+
+    <div class="pg-card pg-card-body dashboard-kpi-card">
+      <div class="dashboard-kpi-icon"><i class="bi bi-hdd-rack"></i></div>
+      <div>
+        <div class="dashboard-kpi-label">Database size</div>
+        <h2 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h2>
+        <p class="dashboard-kpi-subtext">Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a></p>
+      </div>
+    </div>
+
+    <div class="pg-card pg-card-body dashboard-kpi-card">
+      <div class="dashboard-kpi-icon"><i class="bi bi-speedometer2"></i></div>
+      <div>
+        <div class="dashboard-kpi-label">Hit cache ratio</div>
+        <a href="/cache_table.html" class="text-decoration-none">
+          <h2 class="dashboard-kpi-value">{{ dbinfo['cache'] }}%</h2>
+        </a>
+        {% if cache_value >= 99 %}
+          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Excellent</span>
+        {% elif cache_value >= 95 %}
+          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Good</span>
+        {% else %}
+          <span class="dashboard-status bad"><i class="bi bi-x-circle-fill"></i> Needs attention</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="pg-card pg-card-body dashboard-kpi-card">
+      <div class="dashboard-kpi-icon"><i class="bi bi-shield-check"></i></div>
+      <div>
+        <div class="dashboard-kpi-label">Schema findings</div>
+        <h2 class="dashboard-kpi-value">{{ issue_total }}</h2>
+        {% if issue_total == 0 %}
+          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Clean</span>
+        {% elif issue_total <= 3 %}
+          <span class="dashboard-status warn"><i class="bi bi-exclamation-circle-fill"></i> Review</span>
+        {% else %}
+          <span class="dashboard-status bad"><i class="bi bi-exclamation-triangle-fill"></i> Action needed</span>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card dashboard-card dashboard-kpi-card h-100">
-        <div class="card-body">
-          <div class="dashboard-kpi-top">
-            <div class="dashboard-kpi-icon">
-              <i class="bi bi-database"></i>
-            </div>
-            <div>
-              <div class="dashboard-kpi-label">Database version</div>
-              <a target="_blank" href="https://www.postgresql.org/docs/release/" class="text-decoration-none">
-                <h3 class="dashboard-kpi-value">{{ dbinfo['version'] }}</h3>
-              </a>
-            </div>
-          </div>
-          <p class="dashboard-kpi-subtext mb-0">
-            Uptime: <strong>{{ dbinfo['uptime'] }}</strong>
-          </p>
+  <div class="dashboard-section-grid">
+    <div class="dashboard-main-grid">
+
+      <div class="pg-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title">
+            <i class="bi bi-bar-chart-line"></i>
+            <span>Workload profile by calls</span>
+            <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows the 4 most frequent query categories. Click More to see all categories and their meaning."></i>
+          </span>
         </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card dashboard-card dashboard-kpi-card h-100">
-        <div class="card-body">
-          <div class="dashboard-kpi-top">
-            <div class="dashboard-kpi-icon">
-              <i class="bi bi-hdd-rack"></i>
+        <div class="pg-card-body dashboard-profile-list">
+          {% for table in top_profile_calls %}
+            <div class="dashboard-profile-row">
+              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
+              <div class="dashboard-profile-content">
+                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                <div class="dashboard-progress-meta">
+                  <span>{{ table['percentage_calls'] }}%</span>
+                  <span>{{ humanize_number(table['total_calls']) }} calls</span>
+                </div>
+                <div class="progress dashboard-progress">
+                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+              </div>
             </div>
-            <div>
-              <div class="dashboard-kpi-label">Database size</div>
-              <h3 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h3>
-            </div>
-          </div>
-          <p class="dashboard-kpi-subtext mb-0">
-            Shared buffers (25% of RAM):
-            <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a>
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card dashboard-card dashboard-kpi-card h-100">
-        <div class="card-body">
-          <div class="dashboard-kpi-top">
-            <div class="dashboard-kpi-icon">
-              <i class="bi bi-speedometer2"></i>
-            </div>
-            <div>
-              <div class="dashboard-kpi-label">Hit Cache Ratio</div>
-              <a href="/cache_table.html" class="text-decoration-none">
-                <h3 class="dashboard-kpi-value">{{ dbinfo['cache'] }} %</h3>
-              </a>
-            </div>
-          </div>
-
-          {% if dbinfo['cache'] >= 99 %}
-            <div class="dashboard-status-inline dashboard-status-good">
-              <i class="bi bi-check-circle-fill"></i>
-              Excellent
-            </div>
-          {% elif dbinfo['cache'] >= 95 %}
-            <div class="dashboard-status-inline dashboard-status-good">
-              <i class="bi bi-check-circle-fill"></i>
-              Good
-            </div>
-          {% else %}
-            <div class="dashboard-status-inline dashboard-status-bad">
-              <i class="bi bi-x-circle-fill"></i>
-              Needs attention
+          {% endfor %}
+          {% if more_profile_calls %}
+            <div class="mt-3">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileCallsModal">More</button>
             </div>
           {% endif %}
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="row g-4">
-    <div class="col-12 col-xl-8">
-      <div class="row g-4">
-
-        <div class="col-12 col-xxl-6">
-          <div class="card dashboard-card h-100">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <span class="label-with-help">
-                <span class="dashboard-section-title">
-                  <i class="bi bi-bar-chart-line"></i>
-                  <span>Profile - Calls</span>
-                </span>
-                <i
-                  class="bi bi-question-circle help-icon"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="Shows the 4 most frequent query categories. Click More to see all categories and their meaning."
-                ></i>
-              </span>
-            </div>
-            <div class="card-body">
-              {% for table in top_profile_calls %}
-              <div class="dashboard-profile-row">
-                <div class="dashboard-profile-icon">
-                  <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
-                </div>
-                <div class="dashboard-profile-content">
-                  <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-                  <div class="dashboard-progress-meta">
-                    <span>{{ table['percentage_calls'] }} %</span>
-                    <span>{{ humanize_number(table['total_calls']) }} calls</span>
-                    
-                  </div>
-                  <div class="progress dashboard-progress">
-                    <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                  </div>
-                </div>
-              </div>
-              {% endfor %}
-
-              {% if more_profile_calls %}
-              <div class="mt-3">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profileCallsModal">
-                  More
-                </button>
-              </div>
-              {% endif %}
-            </div>
-          </div>
+      <div class="pg-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title">
+            <i class="bi bi-stopwatch"></i>
+            <span>Workload profile by time</span>
+            <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows the 4 query categories consuming the most execution time. Click More to see all categories and their meaning."></i>
+          </span>
         </div>
-
-        <div class="col-12 col-xxl-6">
-          <div class="card dashboard-card h-100">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <span class="label-with-help">
-                <span class="dashboard-section-title">
-                  <i class="bi bi-stopwatch"></i>
-                  <span>Profile - Time consumed</span>
-                </span>
-                <i
-                  class="bi bi-question-circle help-icon"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="Shows the 4 query categories consuming the most execution time. Click More to see all categories and their meaning."
-                ></i>
-              </span>
-            </div>
-            <div class="card-body">
-              {% for table in top_profile_time %}
-              <div class="dashboard-profile-row">
-                <div class="dashboard-profile-icon">
-                  <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
+        <div class="pg-card-body dashboard-profile-list">
+          {% for table in top_profile_time %}
+            <div class="dashboard-profile-row">
+              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
+              <div class="dashboard-profile-content">
+                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                <div class="dashboard-progress-meta">
+                  <span>{{ table['percentage_exec_time'] }}%</span>
+                  <span>{% if table['total_exec_time'] is defined %}{{ humanize_ms(table['total_exec_time']) }}{% endif %}</span>
                 </div>
-                <div class="dashboard-profile-content">
-                  <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-                  <div class="dashboard-progress-meta">
-                    <span>{{ table['percentage_exec_time'] }} %</span>
-                    <span>
-                      {% if table['total_exec_time'] is defined %}
-                        {{ humanize_ms(table['total_exec_time']) }}
-                      {% endif %}
-                    </span>
-                  </div>
-                  <div class="progress dashboard-progress">
-                    <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                  </div>
+                <div class="progress dashboard-progress">
+                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
               </div>
-              {% endfor %}
-
-              {% if more_profile_time %}
-              <div class="mt-3">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profileTimeModal">
-                  More
-                </button>
-              </div>
-              {% endif %}
             </div>
-          </div>
+          {% endfor %}
+          {% if more_profile_time %}
+            <div class="mt-3">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileTimeModal">More</button>
+            </div>
+          {% endif %}
         </div>
-
-        <div class="col-12 col-xxl-6">
-          <div class="card dashboard-card h-100">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <span class="dashboard-section-title">
-                <i class="bi bi-table"></i>
-                <span>Top 5 tables</span>
-              </span>
-              <a href="/generic/table_size" class="btn btn-sm btn-primary">See all</a>
-            </div>
-            <div class="card-body">
-              {% for table in dbinfo['table_size'] %}
-              <div class="dashboard-item-row">
-                <div class="dashboard-item-main">
-                  <div class="dashboard-item-icon">
-                    <i class="bi bi-grid-3x3-gap"></i>
-                  </div>
-                  <div>
-                    <div class="dashboard-item-label">{{ table['table_name'] }}</div>
-                  </div>
-                </div>
-                <div class="dashboard-item-value">
-                  {{ table['size'] }}<br>
-                  <small title="{{ format_integer(table['row_count']) }} rows">
-                  ≈{{ humanize_number(table['row_count']) }} rows
-                  </small>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-xxl-6">
-          <div class="card dashboard-card h-100">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <span class="dashboard-section-title">
-                <i class="bi bi-pc-display"></i>
-                <span>Top 5 clients</span>
-              </span>
-              <a href="/generic/database_activity_grouped" class="btn btn-sm btn-primary">See all</a>
-            </div>
-            <div class="card-body">
-              {% for client in dbinfo['top_clients'] %}
-              <div class="dashboard-item-row">
-                <div class="dashboard-item-main">
-                  <div class="dashboard-item-icon">
-                    <i class="bi bi-display"></i>
-                  </div>
-                  <div>
-                    <div class="dashboard-item-label">{{ client['client_addr'] }}</div>
-                  </div>
-                </div>
-                <div class="dashboard-item-value">
-                  <span title="{{ format_integer(client['total_connections']) }} connections">
-                    {{ humanize_number(client['total_connections']) }} connection(s)
-                  </span><br>
-                  <small title="{{ format_integer(client['active_connections']) }} active">
-                    {{ humanize_number(client['active_connections']) }} active(s)
-                  </small>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
       </div>
+
+      <div class="pg-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title"><i class="bi bi-table"></i><span>Largest tables</span></span>
+          <a href="/tables_cards.html" class="btn btn-sm btn-outline-primary">See all</a>
+        </div>
+        <div class="pg-card-body dashboard-row-list">
+          {% for table in dbinfo['table_size'] %}
+            <div class="dashboard-row-item">
+              <div class="dashboard-row-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+              <div class="dashboard-row-main">
+                <div class="dashboard-row-label">{{ table['table_name'] }}</div>
+              </div>
+              <div class="dashboard-row-value">
+                {{ table['size'] }}<br>
+                <small title="{{ format_integer(table['row_count']) }} rows">≈{{ humanize_number(table['row_count']) }} rows</small>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="pg-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title"><i class="bi bi-pc-display"></i><span>Top clients</span></span>
+          <a href="/generic/database_activity_grouped" class="btn btn-sm btn-outline-primary">See all</a>
+        </div>
+        <div class="pg-card-body dashboard-row-list">
+          {% for client in dbinfo['top_clients'] %}
+            <div class="dashboard-row-item">
+              <div class="dashboard-row-icon"><i class="bi bi-display"></i></div>
+              <div class="dashboard-row-main">
+                <div class="dashboard-row-label">{{ client['client_addr'] }}</div>
+              </div>
+              <div class="dashboard-row-value">
+                <span title="{{ format_integer(client['total_connections']) }} connections">{{ humanize_number(client['total_connections']) }} connection(s)</span><br>
+                <small title="{{ format_integer(client['active_connections']) }} active">{{ humanize_number(client['active_connections']) }} active(s)</small>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
     </div>
 
-    <div class="col-12 col-xl-4">
-
-      <div class="mb-4">
-        <div class="card dashboard-card">
-          <div class="card-body dashboard-side-list">
-
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="dashboard-side-title">
-                <i class="bi bi-people-fill text-success"></i>
-                <span>Connections</span>
-              </div>
-              <a href="/generic/database_activity" class="dashboard-side-link">
-                {{ dbinfo['connexions'] }} / {{ dbinfo['max_connexions'] }}
-                <i class="bi bi-arrow-right-circle"></i>
-              </a>
-            </div>
-
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="dashboard-side-title">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <span>Conflicts</span>
-              </div>
-              <a href="/generic/database_conflicts" class="dashboard-side-link">
-                {{ dbinfo['conflicts'] }}
-                <i class="bi bi-arrow-right-circle"></i>
-              </a>
-            </div>
-
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="dashboard-side-title">
-                <i class="bi bi-code-slash text-primary"></i>
-                <span>Running queries</span>
-              </div>
-              <a href="/generic/database_running_queries" class="dashboard-side-link">
-                #2
-                <i class="bi bi-arrow-right-circle"></i>
-              </a>
-            </div>
-
+    <div class="dashboard-side-column">
+      <div class="pg-card mb-3">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title"><i class="bi bi-activity"></i><span>Operational activity</span></span>
+        </div>
+        <div class="pg-card-body dashboard-side-list">
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-people-fill text-success"></i><span>Connections</span></div>
+            <a href="/generic/database_activity" class="dashboard-side-link">{{ dbinfo['connexions'] }} / {{ dbinfo['max_connexions'] }} <i class="bi bi-arrow-right-circle"></i></a>
+          </div>
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i><span>Conflicts</span></div>
+            <a href="/generic/database_conflicts" class="dashboard-side-link">{{ dbinfo['conflicts'] }} <i class="bi bi-arrow-right-circle"></i></a>
+          </div>
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-code-slash text-primary"></i><span>Running queries</span></div>
+            <a href="/generic/database_running_queries" class="dashboard-side-link">#2 <i class="bi bi-arrow-right-circle"></i></a>
           </div>
         </div>
       </div>
 
-      <div class="mb-4">
-        <div class="card dashboard-card">
-          <div class="card-header">
-            <span class="dashboard-section-title">
-              <i class="bi bi-shield-exclamation"></i>
-              <span>Issues on schema</span>
-            </span>
+      <div class="pg-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>Schema & design checks</span></span>
+          <a href="/tools?cat=issues" class="btn btn-sm btn-outline-primary">Open issues</a>
+        </div>
+        <div class="pg-card-body dashboard-row-list">
+          <div class="dashboard-row-item">
+            <div class="dashboard-row-icon">
+              {% if dbinfo['issue_no_pk'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
+            </div>
+            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_no_pk">Tables without primary keys</a></div></div>
+            <div class="dashboard-row-value">{{ dbinfo['issue_no_pk'] }}</div>
           </div>
-          <div class="card-body">
-
-            <div class="dashboard-item-row">
-              <div class="dashboard-item-main">
-                <div class="dashboard-item-icon">
-                  {% if dbinfo['issue_no_pk'] > 0 %}
-                    <i class="bi bi-x-circle-fill text-danger"></i>
-                  {% else %}
-                    <i class="bi bi-check-circle-fill text-success"></i>
-                  {% endif %}
-                </div>
-                <div class="dashboard-item-label"><a href="/generic/issue_no_pk">Tables without primary keys</a></div>
-              </div>
-              <div class="dashboard-item-value">{{ dbinfo['issue_no_pk'] }}</div>
+          <div class="dashboard-row-item">
+            <div class="dashboard-row-icon">
+              {% if dbinfo['issue_idx_fk_missing'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
             </div>
-
-            <div class="dashboard-item-row">
-              <div class="dashboard-item-main">
-                <div class="dashboard-item-icon">
-                  {% if dbinfo['issue_idx_fk_missing'] > 0 %}
-                    <i class="bi bi-x-circle-fill text-danger"></i>
-                  {% else %}
-                    <i class="bi bi-check-circle-fill text-success"></i>
-                  {% endif %}
-                </div>
-                <div class="dashboard-item-label"><a href="/generic/issue_idx_fk_missing">Missing indexes on foreign keys</a></div>
-              </div>
-              <div class="dashboard-item-value">{{ dbinfo['issue_idx_fk_missing'] }}</div>
+            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_fk_missing">Missing indexes on foreign keys</a></div></div>
+            <div class="dashboard-row-value">{{ dbinfo['issue_idx_fk_missing'] }}</div>
+          </div>
+          <div class="dashboard-row-item">
+            <div class="dashboard-row-icon">
+              {% if dbinfo['issue_idx_redundant'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
             </div>
-
-            <div class="dashboard-item-row">
-              <div class="dashboard-item-main">
-                <div class="dashboard-item-icon">
-                  {% if dbinfo['issue_idx_redundant'] > 0 %}
-                    <i class="bi bi-x-circle-fill text-danger"></i>
-                  {% else %}
-                    <i class="bi bi-check-circle-fill text-success"></i>
-                  {% endif %}
-                </div>
-                <div class="dashboard-item-label"><a href="/generic/issue_idx_redundant">Redundant indexes</a></div>
-              </div>
-              <div class="dashboard-item-value">{{ dbinfo['issue_idx_redundant'] }}</div>
+            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_redundant">Redundant indexes</a></div></div>
+            <div class="dashboard-row-value">{{ dbinfo['issue_idx_redundant'] }}</div>
+          </div>
+          <div class="dashboard-row-item">
+            <div class="dashboard-row-icon">
+              {% if dbinfo['issue_idx_fk_datatype'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
             </div>
-
-            <div class="dashboard-item-row">
-              <div class="dashboard-item-main">
-                <div class="dashboard-item-icon">
-                  {% if dbinfo['issue_idx_fk_datatype'] > 0 %}
-                    <i class="bi bi-x-circle-fill text-danger"></i>
-                  {% else %}
-                    <i class="bi bi-check-circle-fill text-success"></i>
-                  {% endif %}
-                </div>
-                <div class="dashboard-item-label"><a href="/generic/issue_idx_fk_datatype">Datatype on foreign keys are different</a></div>
-              </div>
-              <div class="dashboard-item-value">{{ dbinfo['issue_idx_fk_datatype'] }}</div>
-            </div>
-
+            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_fk_datatype">Foreign-key datatype mismatch</a></div></div>
+            <div class="dashboard-row-value">{{ dbinfo['issue_idx_fk_datatype'] }}</div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
@@ -896,30 +396,25 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="h5 modal-title" id="profileCallsModalLabel">Profile - Calls</h2>
+          <h2 class="h5 modal-title" id="profileCallsModalLabel">Workload profile by calls</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           {% for table in dbinfo['profile'] %}
-          <div class="dashboard-profile-row">
-            <div class="dashboard-profile-icon">
-              <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
-            </div>
-            <div class="dashboard-profile-content">
-              <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-              <div class="dashboard-progress-meta">
-                <span>{{ table['percentage_calls'] }} %</span>
-                <span title="{{ format_integer(table['total_calls']) }} calls">
-                  {{ humanize_number(table['total_calls']) }} calls
-                </span>
-              </div>
-              <div class="progress dashboard-progress">
-                <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+            <div class="dashboard-profile-row">
+              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
+              <div class="dashboard-profile-content">
+                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                <div class="dashboard-progress-meta">
+                  <span>{{ table['percentage_calls'] }}%</span>
+                  <span title="{{ format_integer(table['total_calls']) }} calls">{{ humanize_number(table['total_calls']) }} calls</span>
+                </div>
+                <div class="progress dashboard-progress">
+                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
               </div>
             </div>
-          </div>
           {% endfor %}
-
           <hr class="dashboard-modal-divider">
           {{ query_type_helpers() }}
         </div>
@@ -933,32 +428,25 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="h5 modal-title" id="profileTimeModalLabel">Profile - Time consumed</h2>
+          <h2 class="h5 modal-title" id="profileTimeModalLabel">Workload profile by time</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           {% for table in dbinfo['profile'] %}
-          <div class="dashboard-profile-row">
-            <div class="dashboard-profile-icon">
-              <i class="bi {{ query_type_icon_class(table['query_type']) }}"></i>
-            </div>
-            <div class="dashboard-profile-content">
-              <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-              <div class="dashboard-progress-meta">
-                <span>{{ table['percentage_exec_time'] }} %</span>
-                <span>
-                  {% if table['total_exec_time'] is defined %}
-                    {{ humanize_ms(table['total_exec_time']) }}
-                  {% endif %}
-                </span>
-              </div>
-              <div class="progress dashboard-progress">
-                <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+            <div class="dashboard-profile-row">
+              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
+              <div class="dashboard-profile-content">
+                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+                <div class="dashboard-progress-meta">
+                  <span>{{ table['percentage_exec_time'] }}%</span>
+                  <span>{% if table['total_exec_time'] is defined %}{{ humanize_ms(table['total_exec_time']) }}{% endif %}</span>
+                </div>
+                <div class="progress dashboard-progress">
+                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
               </div>
             </div>
-          </div>
           {% endfor %}
-
           <hr class="dashboard-modal-divider">
           {{ query_type_helpers() }}
         </div>

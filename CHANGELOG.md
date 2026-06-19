@@ -1,7 +1,11 @@
-
-
-
 # Change Log
+
+## [3.0.0] - 2026-06-19
+
+## Improvements
+
+Review all the GUI with a more modern design.
+Split route.py code.
 
 ## [2.9.5] - 2026-06-17
 

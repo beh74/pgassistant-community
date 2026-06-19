@@ -4,148 +4,381 @@
 
 {% block stylesheets %}
 <style>
-  .llm-settings-page-header { margin-bottom: 1.5rem; }
-  .llm-settings-muted { color: #6c757d; }
-
-  .llm-settings-card {
-    border: 0;
-    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
-    border-radius: 1rem;
-    background: #fff;
+  /* Scoped styles for LLM settings only. Do not rely on global LLM rules. */
+  .llm-page {
+    padding: 1.5rem;
+    background:
+      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34rem),
+      radial-gradient(circle at top left, rgba(8, 145, 178, 0.08), transparent 28rem),
+      var(--ga-bg, #f4f7fb);
+    min-height: calc(100vh - 1px);
   }
 
-  .llm-settings-section-title {
-    font-size: 0.9rem;
-    font-weight: 600;
+  .llm-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.15rem;
+  }
+
+  .llm-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    width: fit-content;
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.10);
+    color: var(--ga-primary-dark, #1d4ed8);
+    font-size: .72rem;
+    font-weight: 850;
     text-transform: uppercase;
-    color: #6c757d;
-    margin-bottom: 1rem;
+    letter-spacing: .08em;
+    margin-bottom: .65rem;
   }
 
-  .llm-settings-box {
-    background: #f8f9fa;
-    border-radius: 0.85rem;
+  .llm-title {
+    margin: 0;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    color: var(--ga-text, #0f172a);
+  }
+
+  .llm-subtitle {
+    color: var(--ga-muted, #64748b);
+    margin: .35rem 0 0;
+    font-size: .98rem;
+  }
+
+  .llm-layout {
+    max-width: 980px;
+  }
+
+  .llm-card {
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: var(--ga-radius, 1.15rem);
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+    overflow: hidden;
+  }
+
+  .llm-card-body {
+    padding: 1.25rem;
+  }
+
+  .llm-form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .llm-section {
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     padding: 1rem;
   }
 
-  .help-icon {
-    font-size: 0.7rem;
-    border: 1px solid #ccc;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    text-align: center;
+  .llm-section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    margin-bottom: .95rem;
+  }
+
+  .llm-section-icon {
+    width: 2.3rem;
+    height: 2.3rem;
+    min-width: 2.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: .85rem;
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: var(--ga-primary-soft, #dbeafe);
+    border: 1px solid rgba(37, 99, 235, .16);
+    font-size: 1rem;
+  }
+
+  .llm-section-title {
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--ga-text, #0f172a);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+
+  .llm-section-subtitle {
+    color: var(--ga-muted, #64748b);
+    font-size: .88rem;
+    margin-top: .15rem;
+  }
+
+  .llm-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .9rem;
+    align-items: end;
+  }
+
+  .llm-grid-full {
+    grid-column: 1 / -1;
+  }
+
+  .llm-field .form-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    margin-bottom: .45rem;
+    color: var(--ga-slate, #334155);
+    font-size: .82rem;
+    font-weight: 850;
+  }
+
+  .llm-field .form-control,
+  .llm-field .form-select {
+    min-height: 2.75rem;
+    border-radius: .85rem;
+    border-color: var(--ga-border, #dbe4ef);
+    color: var(--ga-text, #0f172a);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  }
+
+  .llm-field .form-control:focus,
+  .llm-field .form-select:focus {
+    border-color: rgba(37, 99, 235, .45);
+    box-shadow: 0 0 0 .2rem rgba(37, 99, 235, .10);
+  }
+
+  .llm-field .form-text {
+    color: var(--ga-muted, #64748b);
+    line-height: 1.45;
+    margin-top: .45rem;
+  }
+
+  .llm-help-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--ga-border-strong, #c8d4e3);
+    background: #fff;
+    color: var(--ga-primary-dark, #1d4ed8);
+    font-size: .72rem;
+    font-weight: 900;
     cursor: help;
+    line-height: 1;
+  }
+
+  .llm-input-action {
+    min-width: 3rem;
+    border-color: var(--ga-border-strong, #c8d4e3);
+    color: var(--ga-slate, #334155);
+    font-weight: 850;
+    border-top-right-radius: .85rem !important;
+    border-bottom-right-radius: .85rem !important;
+  }
+
+  .llm-input-action:hover,
+  .llm-input-action:focus {
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: var(--ga-primary-soft, #dbeafe);
+    border-color: rgba(37, 99, 235, .28);
+  }
+
+  .llm-action-field {
+    min-width: 220px;
+  }
+
+  .llm-action-btn {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    border-radius: .85rem;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .llm-status {
+    min-height: 1.2rem;
+    color: var(--ga-muted, #64748b);
+  }
+
+  .llm-footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .25rem;
+  }
+
+  .llm-save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    min-height: 2.75rem;
+    padding-inline: 1.15rem;
+    border-radius: .85rem;
+  }
+
+  @media (max-width: 992px) {
+    .llm-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .llm-action-field {
+      min-width: 0;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .llm-page {
+      padding: 1rem;
+    }
+
+    .llm-card-body,
+    .llm-section {
+      padding: 1rem;
+    }
+
+    .llm-footer-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
   }
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="llm-page">
 
-  <!-- Header -->
-  <div class="llm-settings-page-header">
-    <h1 class="h4 mb-1">LLM Settings</h1>
-    <p class="llm-settings-muted mb-0">
-      Configure your LLM provider, model and behavior.
-    </p>
+  <div class="llm-header">
+    <div>
+      <div class="llm-eyebrow">Tools & AI</div>
+      <h1 class="llm-title">LLM Settings</h1>
+      <p class="llm-subtitle">
+        Configure your LLM provider, model and behavior.
+      </p>
+    </div>
   </div>
 
-  <div class="row">
-    <div class="col-12 col-xl-8">
+  <div class="llm-layout">
+    <div class="llm-card">
+      <div class="llm-card-body">
 
-      <div class="card llm-settings-card">
-        <div class="card-body p-4">
+        <form method="POST" class="llm-form">
 
-          <form method="POST">
+          <!-- CONNECTION -->
+          <section class="llm-section">
+            <div class="llm-section-header">
+              <div class="llm-section-icon"><i class="bi bi-plug"></i></div>
+              <div>
+                <div class="llm-section-title">Connection</div>
+                <div class="llm-section-subtitle">Endpoint and authentication used to contact the LLM provider.</div>
+              </div>
+            </div>
 
-            <!-- CONNECTION -->
-            <div class="mb-4">
-              <div class="llm-settings-section-title">Connection</div>
-
-              <div class="llm-settings-box">
-                <div class="mb-3">
-                  <label class="form-label">
-                    LLM URI
-                    <span class="help-icon" data-bs-toggle="tooltip" title="URI of the LLM endpoint (OpenAI compatible or Ollama)">?</span>
-                  </label>
-                  <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
-                  <div class="form-text">
-                    Example: http://host.docker.internal:11434/v1/ when running Ollama locally alongside the pgAssistant Docker image. Make sure to set OLLAMA_HOST=0.0.0.0:11434.
-                  </div>
+            <div class="llm-grid">
+              <div class="llm-field llm-grid-full">
+                <label class="form-label" for="llm_uri">
+                  <span>LLM URI</span>
+                  <span class="llm-help-icon" data-bs-toggle="tooltip" title="URI of the LLM endpoint (OpenAI compatible or Ollama)">?</span>
+                </label>
+                <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
+                <div class="form-text">
+                  Example: http://host.docker.internal:11434/v1/ when running Ollama locally alongside the pgAssistant Docker image. Make sure to set OLLAMA_HOST=0.0.0.0:11434.
                 </div>
+              </div>
 
-                <div class="mb-3">
-                  <label class="form-label">API Key</label>
-                  <div class="input-group">
-                    <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
-                    <button type="button" class="btn btn-outline-secondary" id="toggleApiKey">👁</button>
-                  </div>
-                </div>
-
-                <!-- TEST CONNECTION -->
-                <div class="mt-3">
-                  <button type="button" class="btn btn-outline-primary" id="testConnectionBtn">
-                    Test connection
-                    <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+              <div class="llm-field">
+                <label class="form-label" for="llm_api_key">API Key</label>
+                <div class="input-group">
+                  <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
+                  <button type="button" class="btn btn-outline-secondary llm-input-action" id="toggleApiKey" aria-label="Toggle API key visibility">
+                    <i class="bi bi-eye"></i>
                   </button>
-
-                  <div id="test-status" class="small mt-2"></div>
                 </div>
+              </div>
 
+              <div class="llm-field llm-action-field">
+                <label class="form-label">Connection test</label>
+                <button type="button" class="btn ga-outline-action llm-action-btn" id="testConnectionBtn">
+                  <i class="bi bi-wifi"></i>
+                  Test connection
+                  <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                </button>
+                <div id="test-status" class="small mt-2 llm-status"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- MODEL -->
+          <section class="llm-section">
+            <div class="llm-section-header">
+              <div class="llm-section-icon"><i class="bi bi-cpu"></i></div>
+              <div>
+                <div class="llm-section-title">Model</div>
+                <div class="llm-section-subtitle">Select the model returned by the configured endpoint.</div>
               </div>
             </div>
 
-            <!-- MODEL -->
-            <div class="mb-4">
-              <div class="llm-settings-section-title">Model</div>
+            <div class="llm-grid">
+              <div class="llm-field llm-grid-full">
+                <label class="form-label" for="llm_model">Model</label>
 
-              <div class="llm-settings-box">
-                <div class="mb-3">
-                  <label class="form-label">Model</label>
+                <div class="input-group">
+                  <select class="form-select" id="llm_model" name="llm_model">
+                    {% if llm_model %}
+                      <option selected value="{{ llm_model }}">{{ llm_model }}</option>
+                    {% else %}
+                      <option selected disabled>-- Select a model --</option>
+                    {% endif %}
+                  </select>
 
-                  <div class="input-group">
-                    <select class="form-select" id="llm_model" name="llm_model">
-                      {% if llm_model %}
-                        <option selected value="{{ llm_model }}">{{ llm_model }}</option>
-                      {% else %}
-                        <option selected disabled>-- Select a model --</option>
-                      {% endif %}
-                    </select>
-
-                    <button type="button" class="btn btn-outline-secondary" id="fetchModelsBtn">
-                      <span id="fetch-icon">🔍</span>
-                      <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none"></span>
-                    </button>
-                  </div>
-
-                  <div id="model-status" class="small mt-2"></div>
+                  <button type="button" class="btn btn-outline-secondary llm-input-action" id="fetchModelsBtn" aria-label="Fetch available models">
+                    <span id="fetch-icon"><i class="bi bi-search"></i></span>
+                    <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none"></span>
+                  </button>
                 </div>
+
+                <div id="model-status" class="small mt-2 llm-status"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SQL GUIDELINES -->
+          <section class="llm-section">
+            <div class="llm-section-header">
+              <div class="llm-section-icon"><i class="bi bi-braces"></i></div>
+              <div>
+                <div class="llm-section-title">SQL behavior</div>
+                <div class="llm-section-subtitle">Guidelines used when pgAssistant asks the LLM to review SQL or table definitions.</div>
               </div>
             </div>
 
-            <!-- SQL GUIDELINES -->
-            <div class="mb-4">
-              <div class="llm-settings-section-title">SQL behavior</div>
-
-              <div class="llm-settings-box">
-                <label class="form-label">SQL conventions URL</label>
+            <div class="llm-grid">
+              <div class="llm-field llm-grid-full">
+                <label class="form-label" for="llm_sql_guidelines">SQL conventions URL</label>
                 <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
-                  <div class="form-text">
-                    This guidelines will be used to instruct the LLM on Table defintion helper menu - Check conventions
-                  </div>              
+                <div class="form-text">
+                  This guidelines will be used to instruct the LLM on Table advisor menu - Check conventions
+                </div>
               </div>
             </div>
+          </section>
 
-            <button class="btn btn-primary" type="submit">
+          <div class="llm-footer-actions">
+            <button class="btn ga-primary-action llm-save-btn" type="submit">
+              <i class="bi bi-check2-circle"></i>
               Save
             </button>
+          </div>
 
-          </form>
+        </form>
 
-        </div>
       </div>
-
     </div>
   </div>
 
@@ -166,7 +399,7 @@ document.addEventListener("DOMContentLoaded", function () {
     toggleBtn.addEventListener("click", () => {
       const isHidden = apiKeyInput.type === "password";
       apiKeyInput.type = isHidden ? "text" : "password";
-      toggleBtn.textContent = isHidden ? "🙈" : "👁";
+      toggleBtn.innerHTML = isHidden ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
     });
   }
 

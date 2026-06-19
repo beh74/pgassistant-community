@@ -5,59 +5,7 @@
 
 {% block stylesheets %}
 <link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
-<style>
-.table-health-header{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
-.table-health-subtitle{color:var(--bs-secondary-color);margin:0}
-.health-summary{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem}
-.health-summary-card{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.75rem 1rem;min-width:170px;box-shadow:0 .125rem .25rem rgba(0,0,0,.04)}
-.health-summary-label{display:block;font-size:.78rem;color:var(--bs-secondary-color)}
-.health-summary-value{font-size:1.1rem;font-weight:700}
-.health-filters .card-body{padding:1.25rem}
-.health-toolbar{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:1rem 1.25rem;align-items:end}
-.health-field{min-width:0}
-.health-field label{display:block;font-weight:600;margin-bottom:.45rem}
-.health-field .form-control,.health-field .form-select{min-height:44px;border-radius:.75rem}
-.health-toolbar .btn{min-height:44px;border-radius:.75rem;font-weight:600}
-.health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1.25rem;align-items:stretch}
-.health-item{min-width:0}
-.health-card{border:1px solid var(--bs-border-color);border-radius:1rem;transition:transform .12s ease,box-shadow .12s ease}
-.health-card:hover{transform:translateY(-2px);box-shadow:0 .5rem 1rem rgba(0,0,0,.08)}
-.health-card .card-header{background:var(--bs-tertiary-bg);border-bottom:1px solid var(--bs-border-color);padding:.8rem 1rem;border-radius:1rem 1rem 0 0}
-.health-card .card-body{padding:1rem}
-.schema-badge,.status-badge{display:inline-flex;align-items:center;padding:.35rem .6rem;border-radius:999px;font-size:.72rem;font-weight:700;line-height:1}
-.schema-badge{background:rgba(108,117,125,.12);color:#495057}
-.status-healthy{background:rgba(25,135,84,.12);color:#198754}
-.status-analyze{background:#0dcaf0;color:#212529}
-.status-never{background:#ffc107;color:#212529}
-.status-dead{background:#dc3545;color:#fff}
-.table-name{word-break:break-word;font-size:1rem}
-.metric-chips{display:flex;flex-wrap:wrap;gap:.65rem;margin-bottom:1rem}
-.metric-chip{display:inline-flex;align-items:baseline;gap:.45rem;padding:.45rem .9rem;border-radius:999px;background:#f8f9fa;border:1px solid #e9ecef;font-size:.82rem;line-height:1}
-.metric-chip .label{color:#6c757d;font-weight:500}
-.metric-chip .value{color:#212529;font-weight:700;white-space:nowrap}
-.metric-danger{color:#dc3545!important}
-.metric-warning{color:#9a6b00!important}
-.maintenance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin-bottom:1rem}
-.maintenance-item{border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.65rem .75rem}
-.maintenance-label{display:block;font-size:.72rem;color:var(--bs-secondary-color);margin-bottom:.2rem}
-.maintenance-value{display:block;font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
-.health-details{border-top:1px solid var(--bs-border-color);padding-top:.85rem}
-.health-details dl{display:grid;grid-template-columns:minmax(150px,1fr) minmax(120px,auto);gap:.45rem 1rem;margin:0;font-size:.82rem}
-.health-details dt{color:var(--bs-secondary-color);font-weight:500}
-.health-details dd{text-align:right;font-weight:600;margin:0}
-.health-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:auto}
-.health-actions .btn{flex:1 1 auto}
-.pagination-wrapper{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.5rem}
-.pagination-info{color:var(--bs-secondary-color);font-size:.95rem}
-.pagination-controls{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.page-number{min-width:42px}
-.health-empty{text-align:center;padding:3rem 1rem;border:1px dashed var(--bs-border-color);border-radius:1rem}
-.command-preview{font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-word;background:var(--bs-tertiary-bg);border:1px solid var(--bs-border-color);border-radius:.75rem;padding:.85rem}
-.maintenance-exec-result{white-space:pre-wrap;font-size:.95rem;background:var(--bs-tertiary-bg);padding:15px;border-radius:.75rem;border:1px solid var(--bs-border-color)}
-@media(max-width:1399.98px){.health-toolbar{grid-template-columns:2fr 1fr 1fr}}
-@media(max-width:767.98px){.health-toolbar{grid-template-columns:1fr}.health-toolbar .btn{width:100%}}
-@media(max-width:575.98px){.health-grid{grid-template-columns:1fr}.maintenance-grid{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 {% endblock stylesheets %}
 
 {% macro format_count(n) -%}

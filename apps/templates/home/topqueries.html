@@ -3,229 +3,7 @@
 {% block title %} Top queries {% endblock %}
 
 {% block stylesheets %}
-<style>
-.topqueries-toolbar {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
-
-.topqueries-search-group {
-  flex: 0 1 380px;
-  min-width: 250px;
-}
-
-.topqueries-toolbar-right {
-  display: flex;
-  align-items: end;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.topqueries-sort-group {
-  flex: 0 0 auto;
-  min-width: 190px;
-}
-
-.topqueries-pages-group {
-  flex: 0 0 auto;
-  min-width: 140px;
-}
-
-.topqueries-search-group .form-control,
-.topqueries-sort-group .form-select,
-.topqueries-pages-group .form-select {
-  height: 38px;
-}
-
-@media (max-width: 992px) {
-  .topqueries-toolbar {
-    align-items: stretch;
-  }
-
-  .topqueries-search-group,
-  .topqueries-toolbar-right {
-    width: 100%;
-  }
-
-  .topqueries-toolbar-right {
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 768px) {
-  .topqueries-toolbar-right {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .topqueries-sort-group,
-  .topqueries-pages-group {
-    width: 100%;
-  }
-}
-
-.topqueries-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 1rem;
-}
-
-@media (max-width: 992px) {
-  .topqueries-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.topquery-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 0.9rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.05);
-  height: 100%;
-}
-
-.topquery-card .card-body {
-  padding: 1rem;
-}
-
-.query-card-item.d-none {
-  display: none !important;
-}
-
-.topquery-sql {
-  font-family: monospace;
-  font-size: 0.83rem;
-  line-height: 1.32;
-  white-space: pre-wrap;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  background: #f8f9fa;
-  border-radius: 0.65rem;
-  padding: 0.7rem;
-  border: 1px solid #edf0f2;
-  min-height: 6.2rem;
-}
-
-.topquery-sql:hover {
-  -webkit-line-clamp: unset;
-  overflow: auto;
-  max-height: 320px;
-}
-
-.table-badge {
-  display: inline-block;
-  padding: 0.28rem 0.6rem;
-  border-radius: 999px;
-  background: #eef2f7 !important;
-  color: #1f2937 !important;
-  border: 1px solid #cbd5e1 !important;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.table-filter-btn {
-  cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
-}
-
-.table-filter-btn:hover {
-  background: #dbe7f3 !important;
-}
-
-.table-filter-btn:active {
-  transform: translateY(1px);
-}
-
-.metrics-inline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.metric-inline-item {
-  background: #fbfcfd;
-  border: 1px solid #edf0f2;
-  border-radius: 999px;
-  padding: 0.28rem 0.58rem;
-  font-size: 0.80rem;
-}
-
-.metric-inline-label {
-  color: #6c757d;
-  margin-right: 0.3rem;
-}
-
-.metric-inline-value {
-  font-weight: 600;
-  color: #111827;
-  white-space: nowrap;
-}
-
-.cache-badge {
-  min-width: 84px;
-  text-align: center;
-}
-
-.perf-badge {
-  min-width: 74px;
-  text-align: center;
-}
-
-.query-full {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: monospace;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 0.75rem;
-  padding: 0.9rem;
-}
-
-.details-table th {
-  width: 220px;
-  white-space: nowrap;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-top: 1.5rem;
-}
-
-.pagination-info {
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.page-number {
-  min-width: 42px;
-}
-
-.no-results {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: #6b7280;
-}
-</style>
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 {% endblock stylesheets %}
 
 {% block content %}
@@ -234,47 +12,58 @@
   window.columnDescriptions = {{ column_descriptions | tojson | safe }};
 </script>
 
-<div class="py-4">
-  <div class="mb-3 mb-lg-0">
-    <h1 class="h4">Top queries</h1>
-    <p class="mb-0">You need to enable pg_stat_statements module to track statistics of SQL planning and execution</p>
-  </div>
-    <div class="d-flex justify-content-end my-3">
-
-        {% if rows is not defined or rows|length == 0 %}
-        <button onclick="location.href='/enable_pg_statistics.html'" type="button" class="btn btn-primary d-inline-flex align-items-center me-2">
-          <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4.5 12.75 6 6 9-13.5"></path>
-          </svg>
-          Enable module
-        </button>
-        {% endif %}
-
-        {% if rows is defined and rows|length > 0 %}
-        <button onclick="location.href='/reset_pg_statistics.html'" type="button" class="btn btn-danger d-inline-flex align-items-center me-2">
-          <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
-          </svg>
-          Reset
-        </button>
-        {% endif %}
-
-        <button id="refreshBtn" onclick="refreshPage()" type="button" class="btn btn-secondary d-inline-flex align-items-center">
-          <span id="refreshSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
-
-          <svg id="refreshIcon" class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
-                </path>
-          </svg>
-
-          <span id="refreshText">Refresh</span>
-        </button>
-
+<div class="pg-page pg-query-activity-page">
+  <div class="pg-page-header">
+    <div>
+      <div class="pg-eyebrow">Query tuning</div>
+      <h1 class="pg-title">Query activity</h1>
+      <p class="pg-subtitle">
+        Inspect the most active statements captured by pg_stat_statements, then drill down into detailed metrics or launch query analysis.
+      </p>
     </div>
 
-<div class="card border-0 shadow mb-4">
-  <div class="card-body">
+    <div class="query-page-actions">
+      {% if rows is not defined or rows|length == 0 %}
+      <button onclick="location.href='/enable_pg_statistics.html'" type="button" class="btn btn-primary d-inline-flex align-items-center">
+        <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4.5 12.75 6 6 9-13.5"></path>
+        </svg>
+        Enable module
+      </button>
+      {% endif %}
+
+      {% if rows is defined and rows|length > 0 %}
+      <button onclick="location.href='/reset_pg_statistics.html'" type="button" class="btn btn-outline-danger d-inline-flex align-items-center">
+        <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+        </svg>
+        Reset
+      </button>
+      {% endif %}
+
+      <button id="refreshBtn" onclick="refreshPage()" type="button" class="btn btn-outline-primary d-inline-flex align-items-center">
+        <span id="refreshSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+
+        <svg id="refreshIcon" class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+              d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
+          </path>
+        </svg>
+        <span id="refreshText">Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <section class="pg-hero query-workload-hero">
+    <div>
+      <div class="pg-hero-title">Workload activity snapshot</div>
+      <p class="pg-hero-text">
+        Sort by total time, latency, call volume, or cache efficiency to understand how the current workload consumes PostgreSQL resources.
+      </p>
+    </div>
+  </section>
+
+<div class="pg-toolbar-card">
 
     <div class="topqueries-toolbar">
       <div class="topqueries-search-group">
@@ -492,7 +281,6 @@
       </div>
     </div>
 
-  </div>
 </div>
 
 <div class="modal fade" id="queryDetailsModal" tabindex="-1" aria-labelledby="queryDetailsModalLabel" aria-hidden="true">
