@@ -140,40 +140,15 @@ def analyze_query(querid):
                     # generate mermaid code
                     mermaid_code, err = graph.build_mermaid_erd_from_explain_stats(statistics, session)
                 elif request.form.get('action') == 'chatgpt':
-
-                    sql_query = session.get("full_query", sql_query)  # Use the full query with parameters if available
-                    sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
-
-                    rows = database.generic_select_with_sql(session, sql_query_analyze)
-                    statistics = dbanalyze.decode_explain_json_with_buffers(
-                        rows[0]["QUERY PLAN"],
-                        include_top_nodes=True,
-                        top_n=20
-                    )
-
-                    # Use tables derived from the last ANALYZE (if available), otherwise fall back to SQL parsing
-                    tables_from_analyze = dbanalyze.tables_from_decode_stats(statistics)
-                    tables_from_sql = sqlhelper.get_tables(sql_query)
-                    tables_for_llm = dbanalyze.union_tables(tables_from_analyze, tables_from_sql)                  
-
-                    chatgpt = llm.get_llm_query_for_query_analyze(
-                        db_config=session,
-                        sql_query=sql_query_analyze,
-                        rows=rows,
-                        database=session['db_name'],
-                        host=session["db_host"],
-                        user=session["db_user"],
-                        port=session["db_port"],
-                        password=session["db_password"],
-                        table_genius=tables_for_llm
-                    )
+                    posted_prompt = (request.form.get("chatgpt") or "").strip()
+                    
 
                     try:
-                        chatgpt_response = llm.query_chatgpt(chatgpt)
+                        chatgpt_response = llm.query_chatgpt(posted_prompt)
                         return render_template(
                             'home/chatgpt.html',
                             chatgpt_response=chatgpt_response,
-                            chatgpt_query=llm.render_markdown(chatgpt)
+                            chatgpt_query=llm.render_markdown(posted_prompt)
                         )
                     except Exception as e1:
                         tb = traceback.format_exc()

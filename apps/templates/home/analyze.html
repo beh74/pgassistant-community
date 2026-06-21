@@ -2,84 +2,21 @@
 {% block title %}Analyze query{% endblock %}
 
 {% block stylesheets %}
-<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
 <style>
-  /* Analyze critical styles: kept in-template to avoid Bootstrap/layout rules
-     overriding the unified pgAssistant look on this complex page. */
-  .analyze-page {
-    padding: 1.5rem;
-    background:
-      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34rem),
-      radial-gradient(circle at top left, rgba(8, 145, 178, 0.08), transparent 28rem),
-      var(--ga-bg, #f4f7fb);
-    min-height: calc(100vh - 1px);
+  :root {
+    --pg-blue: #336791;
+    --pg-blue-soft: #f8fbff;
+    --pg-border: rgba(17, 24, 39, 0.08);
+    --pg-muted: #6c757d;
+    --pg-text: #334155;
   }
 
-  .analyze-page-header { margin-bottom: 1rem; }
-  .analyze-page-header h1 {
-    margin: 0;
-    font-weight: 850;
-    letter-spacing: -0.035em;
-    color: var(--ga-text, #0f172a);
-  }
-  .analyze-muted { color: var(--ga-muted, #64748b); }
-
-  .analyze-tabs-wrap {
-    display: block;
-    width: 100%;
-    margin: .75rem 0 1.35rem;
+  .analyze-page-header {
+    margin-bottom: 1.5rem;
   }
 
-  .pga-tabs.analyze-tabs {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: .35rem;
-    width: fit-content;
-    max-width: 100%;
-    padding: .35rem;
-    margin: 0;
-    background: rgba(255, 255, 255, .86);
-    border: 1px solid var(--ga-border, #dbe4ef);
-    border-radius: 999px;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-  }
-
-  .pga-tabs.analyze-tabs .pga-tab-btn {
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: auto;
-    margin: 0;
-    border: 0;
-    border-radius: 999px;
-    padding: .65rem 1rem;
-    background: transparent;
-    color: var(--ga-muted, #64748b);
-    font-weight: 850;
-    line-height: 1.15;
-    white-space: nowrap;
-    text-align: center;
-    box-shadow: none;
-    transition: color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
-  }
-
-  .pga-tabs.analyze-tabs .pga-tab-btn:hover,
-  .pga-tabs.analyze-tabs .pga-tab-btn:focus {
-    color: var(--ga-primary-dark, #1d4ed8);
-    background: rgba(37, 99, 235, .06);
-    outline: none;
-  }
-
-  .pga-tabs.analyze-tabs .pga-tab-btn.active,
-  .pga-tabs.analyze-tabs .pga-tab-btn[aria-selected="true"] {
-    color: var(--ga-primary-dark, #1d4ed8);
-    background: var(--ga-primary-soft, #dbeafe);
-    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15);
+  .analyze-muted {
+    color: var(--pg-muted);
   }
 
   .analyze-summary-card,
@@ -87,199 +24,889 @@
   .advisor-card,
   .kpi-card,
   .insight-card {
-    background: rgba(255, 255, 255, .92);
-    border: 1px solid var(--ga-border, #dbe4ef) !important;
-    border-radius: var(--ga-radius, 1.15rem) !important;
-    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06)) !important;
+    border: 0;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: #fff;
   }
 
-  .analyze-section-card > .card-body,
-  .analyze-summary-card > .card-body { padding: 1.25rem !important; }
-
-  .analyze-section-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  .analyze-subtle-box {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.85rem;
+    padding: 1rem;
   }
 
-  #insights .insight-card,
-  #insights .kpi-card {
+  .analyze-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pg-muted);
+    margin-bottom: 1rem;
+  }
+
+  .analyze-sql-block {
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0;
+  }
+
+  .analyze-nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: none;
+  }
+
+  .analyze-nav-tabs .nav-link {
+    display: inline-flex !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1rem;
+    color: #495057;
+    background: #f8f9fa;
+    font-weight: 500;
+  }
+
+  .analyze-nav-tabs .nav-link.active {
+    background: #ffffff;
+    color: #0d6efd;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+  }
+
+  .analyze-kpi {
+    border-radius: 0.85rem;
+    background: #f8f9fa;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .analyze-kpi-label,
+  .kpi-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pg-muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .analyze-kpi-value,
+  .kpi-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .pg-badge {
+    background: var(--pg-blue);
+    color: #fff;
+    padding: 0.55rem 0.8rem;
+    border-radius: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .pg-pill,
+  .metric-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.82rem;
+    background: #fff;
+    color: #334155;
+  }
+
+  .chip-label {
+    color: var(--pg-muted);
+  }
+
+  .muted-small {
+    font-size: 0.85rem;
+    color: var(--pg-muted);
+  }
+
+  .progress.pg-progress {
+    height: 10px;
+    border-radius: 999px;
+  }
+
+  .progress.pg-progress .progress-bar {
+    background: var(--pg-blue);
+  }
+
+  .insight-callout {
+    border-left: 4px solid #0d6efd;
+    background: var(--pg-blue-soft);
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .insight-card-title,
+  .tune-tab-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+
+  .insight-card-text,
+  .tune-tab-card-text {
+    color: var(--pg-muted);
+    margin-bottom: 1rem;
+  }
+
+  .analyze-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .analyze-textarea-code {
+    font-family: var(--bs-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-size: 0.875rem;
+    white-space: pre;
+    resize: vertical;
+  }
+
+  .advisor-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2a44;
+  }
+
+  .advisor-summary {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: #46566f;
+  }
+
+  .advisor-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.72rem;
+    border-radius: 999px;
+    background: #f4f7fb;
+    border: 1px solid #dde5f0;
+  }
+
+  .advisor-meta-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #708198;
+  }
+
+  .advisor-meta-value {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #24324a;
+  }
+
+  .advisor-confidence-wrap {
+    text-align: right;
+    min-width: 110px;
+  }
+
+  .advisor-confidence-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #708198;
+    margin-bottom: 0.35rem;
+  }
+
+  .advisor-confidence-badge {
+    display: inline-block;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .advisor-confidence-safe {
+    background: #1f5faa;
+    color: #ffffff;
+  }
+
+  .advisor-confidence-review {
+    background: #77a9df;
+    color: #0f2742;
+  }
+
+  .advisor-confidence-none {
+    background: #dbe8f6;
+    color: #335273;
+  }
+
+  .advisor-details {
+    margin-top: 0.75rem;
+    border-top: 1px dashed #d8e1ee;
+    padding-top: 0.85rem;
+  }
+
+  .advisor-details-summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #39557a;
+    user-select: none;
+  }
+
+  .advisor-details-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advisor-details-summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 0.45rem;
+    color: #6a89ac;
+    transition: transform 0.15s ease;
+  }
+
+  .advisor-details[open] .advisor-details-summary::before {
+    transform: rotate(90deg);
+  }
+
+  .advisor-section {
+    padding: 0.9rem 1rem;
+    border: 1px solid #e4ebf4;
+    border-radius: 0.85rem;
+    background: #fbfcfe;
+  }
+
+  .advisor-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #60738e;
+    margin-bottom: 0.45rem;
+  }
+
+  .advisor-text-block {
+    color: #334155;
+    line-height: 1.55;
+  }
+
+  .advisor-code-block {
+    background: #f6f8fc;
+    border: 1px solid #dde5f0;
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    overflow-x: auto;
+  }
+
+  .advisor-code-block code {
+    color: #c72574;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .advisor-code-block-strong {
+    background: #f8fafc;
+    border-color: #d8e1ee;
+  }
+
+  .advisor-code-inline code {
+    color: #334155;
+    background: #f3f6fb;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.45rem;
+  }
+
+  .advisor-column-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid #d8e1ee;
+    background: #ffffff;
+    color: #26364d;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .advisor-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: #eef6ff;
+    border: 1px solid #cfe3fb;
+    color: #214f7a;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .advisor-order-callout {
+    border-left: 4px solid var(--pg-blue);
+    background: #f8fbff;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .advisor-order-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid #cfe3fb;
+    background: #ffffff;
+    color: #26364d;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .advisor-order-direction {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #e8f1fb;
+    color: #29577f;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .advisor-index-shape {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .advisor-index-shape-separator {
+    color: #708198;
+    font-weight: 700;
+  }
+
+  .advisor-copy-btn {
+    border: 1px solid #d8e1ee;
+    background: #fff;
+    border-radius: 0.6rem;
+    padding: 0.3rem 0.55rem;
+  }
+
+  .advisor-copy-btn:hover {
+    background: #f4f7fb;
+  }
+
+  .suggestions-box {
+    display: none;
+    position: absolute;
+    z-index: 10;
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.125rem 0.5rem rgba(17, 24, 39, 0.08);
+  }
+
+  .suggestion-item {
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+
+  .suggestion-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .search-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #888;
+  }
+
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  .stats-help-btn {
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 999px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .column-stats-card {
+    border: 1px solid #e4ebf4;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 0.75rem 0.9rem;
+  }
+
+  .column-stats-raw {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: #26364d;
+    word-break: break-word;
+  }
+
+  .column-stats-hint {
+    color: var(--pg-muted);
+    font-size: 0.82rem;
+    margin-top: 0.35rem;
+  }
+
+  .stats-help-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .stats-help-table th,
+  .stats-help-table td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    vertical-align: top;
+  }
+
+  .stats-help-table th:first-child {
+    width: 11rem;
+  }
+
+  .stats-help-table code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-help-term {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 700;
+    color: #214f7a;
+  }
+
+
+  .stats-summary-box {
+    border: 1px solid #cfe3fb;
+    background: #f8fbff;
+    border-radius: 0.85rem;
+    padding: 0.9rem 1rem;
+    margin-top: 0.85rem;
+  }
+
+  .stats-summary-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #29577f;
+    margin-bottom: 0.4rem;
+  }
+
+  .stats-summary-text {
+    color: #334155;
+    line-height: 1.5;
+    margin-bottom: 0;
+  }
+
+  .stats-summary-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.7rem;
+  }
+
+  .stats-summary-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid #d8e1ee;
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.78rem;
+  }
+
+
+
+  /* pgAssistant aligned overrides for Analyze page */
+  .analyze-page {
+    padding: 1.5rem;
+    background:
+      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34rem),
+      radial-gradient(circle at top left, rgba(8, 145, 178, 0.08), transparent 28rem),
+      var(--ga-bg, var(--pga-bg, #f4f7fb));
+    min-height: calc(100vh - 1px);
+  }
+
+  .analyze-page-header h1 {
+    color: var(--ga-text, #0f172a);
+    font-weight: 850;
+    letter-spacing: -0.035em;
+  }
+
+  .analyze-muted,
+  .muted-small {
+    color: var(--ga-muted, var(--pga-muted, #64748b));
+  }
+
+  .analyze-summary-card,
+  .analyze-section-card,
+  .advisor-card,
+  .kpi-card,
+  .insight-card {
     position: relative;
     overflow: hidden;
-    background: rgba(255, 255, 255, .94);
-    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%) !important;
+    border: 1px solid var(--ga-border, var(--pga-border, #dbe4ef)) !important;
+    border-radius: var(--ga-radius, var(--pga-radius-lg, 1.15rem)) !important;
+    box-shadow: var(--ga-shadow-sm, var(--pga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06))) !important;
   }
 
-  #insights .insight-card::before,
-  #insights .kpi-card::before {
+  .analyze-section-card::before,
+  .advisor-card::before,
+  .insight-card::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
+    left: 0;
+    top: .9rem;
+    bottom: .9rem;
     width: 4px;
+    border-radius: 999px;
     background: linear-gradient(180deg, var(--ga-primary, #2563eb), var(--ga-cyan, #0891b2));
   }
 
-  #insights .insight-card:hover,
-  #insights .kpi-card:hover,
-  .advisor-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--ga-border-strong, #c8d4e3) !important;
-    box-shadow: var(--ga-shadow-md, 0 18px 48px rgba(15, 23, 42, 0.09)) !important;
+  .analyze-section-card > .card-body,
+  .advisor-card > .card-body,
+  .insight-card > .card-body {
+    position: relative;
+    z-index: 1;
   }
 
-  #insights .insight-card .card-body,
-  #insights .kpi-card .card-body { padding: 1.15rem 1.25rem 1.15rem 1.35rem !important; }
+  .analyze-subtle-box,
+  .advisor-section,
+  .index-stats-kpi,
+  .index-stats-section {
+    background: var(--ga-surface-soft, #f8fafc);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .95rem;
+    padding: 1rem;
+  }
 
+  .analyze-section-title,
   .analyze-kpi-label,
   .kpi-title,
-  .analyze-section-title,
-  .advisor-section-title {
-    font-size: .74rem;
-    font-weight: 850;
-    letter-spacing: .06em;
-    text-transform: uppercase;
+  .advisor-section-title,
+  .advisor-meta-label,
+  .advisor-confidence-label,
+  .index-stats-kpi-label,
+  .index-stats-section-title {
     color: var(--ga-muted-strong, #475569);
+    font-size: .75rem;
+    font-weight: 850;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .analyze-sql-block,
+  .advisor-code-block {
+    background: #0b1220 !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(148, 163, 184, .18) !important;
+    border-radius: .9rem !important;
+    padding: 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: auto;
+    margin-bottom: 0;
+  }
+
+  .advisor-code-block code,
+  .analyze-sql-block code {
+    color: inherit !important;
+  }
+
+  .analyze-tabs.nav.nav-tabs,
+  .analyze-nav-tabs.nav.nav-tabs {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: .35rem !important;
+    padding: .35rem !important;
+    width: auto !important;
+    background: rgba(255, 255, 255, .82) !important;
+    border: 1px solid var(--ga-border, #dbe4ef) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .04) !important;
+    margin-bottom: 0 !important;
+  }
+
+  .analyze-tabs.nav.nav-tabs .nav-link,
+  .analyze-nav-tabs.nav.nav-tabs .nav-link {
+    display: inline-flex !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: .65rem 1rem !important;
+    font-weight: 800 !important;
+    color: var(--ga-muted, #64748b) !important;
+    border-radius: 999px !important;
+    transition: all .16s ease !important;
+  }
+
+  .analyze-tabs.nav.nav-tabs .nav-link:hover,
+  .analyze-nav-tabs.nav.nav-tabs .nav-link:hover {
+    color: var(--ga-primary-dark, #1d4ed8) !important;
+    background: rgba(37, 99, 235, .06) !important;
+  }
+
+  .analyze-tabs.nav.nav-tabs .nav-link.active,
+  .analyze-nav-tabs.nav.nav-tabs .nav-link.active {
+    color: var(--ga-primary-dark, #1d4ed8) !important;
+    background: var(--ga-primary-soft, #dbeafe) !important;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15) !important;
   }
 
   .analyze-kpi-value,
   .kpi-value {
     color: var(--ga-text, #0f172a);
+    font-size: 1.15rem;
     font-weight: 900;
-    letter-spacing: -.03em;
+    letter-spacing: -.035em;
   }
 
-  .pg-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    padding: .45rem .75rem;
-    border-radius: 999px;
-    color: var(--ga-primary-dark, #1d4ed8);
-    background: var(--ga-primary-soft, #dbeafe);
-    font-weight: 850;
-  }
-
+  .pg-badge,
   .pg-pill,
   .metric-chip,
-  .stats-summary-chip,
-  .advisor-column-pill,
-  .advisor-order-pill,
   .advisor-meta-pill,
-  .advisor-type-badge {
+  .advisor-type-badge,
+  .advisor-column-pill,
+  .advisor-order-pill {
     display: inline-flex;
     align-items: center;
     gap: .35rem;
     border-radius: 999px;
-    border: 1px solid var(--ga-border, #dbe4ef);
-    background: var(--ga-surface-soft, #f8fafc);
-    color: var(--ga-slate, #334155);
-    font-weight: 800;
+    font-weight: 850;
   }
 
+  .pg-badge {
+    background: linear-gradient(135deg, var(--ga-primary, #2563eb), var(--ga-cyan, #0891b2));
+    color: #fff;
+    padding: .55rem .8rem;
+  }
+
+  .pg-pill,
   .metric-chip,
-  .stats-summary-chip { padding: .32rem .62rem; font-size: .78rem; }
-  .advisor-meta-pill { padding: .42rem .72rem; }
-  .advisor-type-badge { padding: .35rem .65rem; color: #075985; background: var(--ga-cyan-soft, #cffafe); }
-
-  .progress.pg-progress {
-    height: .48rem;
-    background: #e2e8f0;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .progress.pg-progress .progress-bar {
-    background: linear-gradient(90deg, var(--ga-slate, #334155), var(--ga-primary, #2563eb));
-  }
-
-  .insight-callout,
-  .analyze-subtle-box,
-  .advisor-section,
-  .stats-summary-box,
-  .column-stats-card {
-    background: var(--ga-surface-soft, #f8fafc);
+  .advisor-meta-pill,
+  .advisor-column-pill,
+  .advisor-order-pill {
+    background: #ffffff;
     border: 1px solid var(--ga-border, #dbe4ef);
-    border-radius: .95rem;
-  }
-  .insight-callout,
-  .stats-summary-box { border-left: 4px solid var(--ga-primary, #2563eb); padding: .85rem 1rem; }
-  .analyze-subtle-box,
-  .advisor-section,
-  .column-stats-card { padding: .85rem 1rem; }
-
-  .analyze-sql-block,
-  .analyze-suggested-sql,
-  .advisor-code-block,
-  .advisor-code-block-strong,
-  .query-modal-code,
-  .mono {
-    background: #0b1220 !important;
-    color: #e5e7eb !important;
-    border: 1px solid rgba(148, 163, 184, .18) !important;
-    border-radius: .9rem !important;
-    padding: .9rem 1rem !important;
-    overflow: auto !important;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+    color: var(--ga-slate, #334155);
+    padding: .35rem .65rem;
+    font-size: .82rem;
   }
 
-  .advisor-code-block code,
-  .advisor-code-block-strong code,
-  .analyze-sql-block code {
-    color: #e5e7eb !important;
-    background: transparent !important;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
-  }
-
-  .advisor-title,
-  .insight-card-title,
-  .tune-tab-card-title {
+  .advisor-title {
     color: var(--ga-text, #0f172a);
+    font-size: 1.12rem;
     font-weight: 900;
-    letter-spacing: -.025em;
+    letter-spacing: -.02em;
   }
+
   .advisor-summary,
-  .insight-card-text,
-  .tune-tab-card-text { color: var(--ga-muted-strong, #475569); line-height: 1.5; }
+  .advisor-text-block {
+    color: var(--ga-slate, #334155);
+    line-height: 1.55;
+  }
+
+  .advisor-meta-value {
+    color: var(--ga-text, #0f172a);
+    font-size: .86rem;
+    font-weight: 850;
+  }
+
+  .advisor-type-badge {
+    background: var(--ga-primary-soft, #dbeafe);
+    border: 1px solid rgba(37, 99, 235, .16);
+    color: var(--ga-primary-dark, #1d4ed8);
+    padding: .35rem .65rem;
+    font-size: .76rem;
+    text-transform: uppercase;
+  }
 
   .advisor-confidence-badge {
     display: inline-flex;
-    align-items: center;
     border-radius: 999px;
     padding: .45rem .75rem;
+    font-size: .8rem;
     font-weight: 900;
   }
   .advisor-confidence-safe { background: var(--ga-green-soft, #dcfce7); color: #166534; }
   .advisor-confidence-review { background: var(--ga-amber-soft, #fef3c7); color: #92400e; }
-  .advisor-confidence-none { background: #e2e8f0; color: var(--ga-slate, #334155); }
+  .advisor-confidence-none { background: #e2e8f0; color: #334155; }
 
-  .advisor-copy-btn,
-  .copy-query-btn {
-    border: 1px solid var(--ga-border-strong, #c8d4e3) !important;
-    color: var(--ga-slate, #334155) !important;
-    background: rgba(255, 255, 255, .75) !important;
-    border-radius: .65rem !important;
-    font-weight: 850 !important;
+  .advisor-details {
+    margin-top: .75rem;
+    border-top: 1px dashed var(--ga-border, #dbe4ef);
+    padding-top: .85rem;
   }
 
-  @media (max-width: 768px) {
+  .advisor-details-summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: .92rem;
+    font-weight: 850;
+    color: var(--ga-primary-dark, #1d4ed8);
+    user-select: none;
+  }
+
+  .advisor-details-summary::-webkit-details-marker { display: none; }
+  .advisor-details-summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: .45rem;
+    color: var(--ga-primary, #2563eb);
+    transition: transform .15s ease;
+  }
+  .advisor-details[open] .advisor-details-summary::before { transform: rotate(90deg); }
+
+  .advisor-order-callout,
+  .insight-callout,
+  .stats-summary-box {
+    border-left: 4px solid var(--ga-primary, #2563eb);
+    background: #f8fbff;
+    border-radius: .85rem;
+    padding: .9rem 1rem;
+  }
+
+  .advisor-index-stats-btn {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: var(--ga-primary-dark, #1d4ed8);
+    font: inherit;
+    font-weight: 900;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .advisor-index-stats-btn:hover,
+  .advisor-index-stats-btn:focus {
+    color: var(--ga-cyan, #0891b2);
+    outline: none;
+  }
+
+  .advisor-copy-btn {
+    border: 1px solid var(--ga-border-strong, #c8d4e3);
+    background: rgba(255, 255, 255, .75);
+    border-radius: .7rem;
+    padding: .35rem .65rem;
+    font-weight: 800;
+  }
+
+  .advisor-copy-btn:hover {
+    background: var(--ga-primary-soft, #dbeafe);
+    color: var(--ga-primary-dark, #1d4ed8);
+  }
+
+  .progress.pg-progress {
+    height: .55rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+  }
+
+  .progress.pg-progress .progress-bar {
+    background: linear-gradient(90deg, var(--ga-primary, #2563eb), var(--ga-cyan, #0891b2));
+  }
+
+  .index-stats-modal .modal-content,
+  #columnStatsHelpModal .modal-content,
+  #modalSubscribe .modal-content {
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: var(--ga-radius, 1.15rem);
+    box-shadow: var(--ga-shadow-md, 0 18px 48px rgba(15, 23, 42, .09));
+  }
+
+  .index-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .85rem;
+  }
+
+  .index-stats-kpi-value {
+    margin-top: .25rem;
+    color: var(--ga-text, #0f172a);
+    font-size: 1.05rem;
+    font-weight: 900;
+    word-break: break-word;
+  }
+
+  .index-stats-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+  }
+
+  .index-stats-definition { max-height: 26rem; }
+
+  @media (max-width: 992px) {
+    .index-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 576px) {
     .analyze-page { padding: 1rem; }
-    .pga-tabs.analyze-tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      width: 100%;
-      border-radius: 1rem;
+    .analyze-tabs.nav.nav-tabs,
+    .analyze-nav-tabs.nav.nav-tabs {
+      width: 100% !important;
+      border-radius: 1rem !important;
     }
-    .pga-tabs.analyze-tabs .pga-tab-btn {
-      width: 100%;
-      border-radius: .75rem;
-      white-space: normal;
+    .analyze-tabs.nav.nav-tabs .nav-link,
+    .analyze-nav-tabs.nav.nav-tabs .nav-link {
+      border-radius: .75rem !important;
     }
   }
+
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="analyze-page">
+<div class="container-fluid py-4">
 
   <div class="analyze-page-header">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
@@ -394,15 +1021,15 @@
 
 {% if rows %}
 
-  <div class="mb-4 analyze-tabs-wrap" aria-label="Analyze sections">
-    <div class="pga-tabs analyze-tabs" id="analyzeTabs" role="tablist">
-      <button class="pga-tab-btn active" id="insights-tab" data-pga-tab-target="#insights" type="button" role="tab" aria-controls="insights" aria-selected="true">Query Plan Insights</button>
-      <button class="pga-tab-btn" id="graph-tab" data-pga-tab-target="#graph" type="button" role="tab" aria-controls="graph" aria-selected="false">Relational View</button>
-      <button class="pga-tab-btn" id="stats-tab" data-pga-tab-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">Statistics</button>
-      <button class="pga-tab-btn" id="advisor-tab" data-pga-tab-target="#advisor" type="button" role="tab" aria-controls="advisor" aria-selected="false">Advisor</button>
-      <button class="pga-tab-btn" id="query-tab" data-pga-tab-target="#query-tab-pane" type="button" role="tab" aria-controls="query-tab-pane" aria-selected="false">Query</button>
+  <nav class="mb-4">
+    <div class="nav nav-tabs analyze-nav-tabs" id="analyzeTabs" role="tablist">
+      <button class="nav-link active" id="insights-tab" data-bs-toggle="tab" data-bs-target="#insights" type="button" role="tab" aria-controls="insights" aria-selected="true">Query Plan Insights</button>
+      <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph" type="button" role="tab" aria-controls="graph" aria-selected="false">Relational View</button>
+      <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">Statistics</button>
+      <button class="nav-link" id="advisor-tab" data-bs-toggle="tab" data-bs-target="#advisor" type="button" role="tab" aria-controls="advisor" aria-selected="false">Advisor</button>
+      <button class="nav-link" id="query-tab" data-bs-toggle="tab" data-bs-target="#query-tab-pane" type="button" role="tab" aria-controls="query-tab-pane" aria-selected="false">Query</button>
     </div>
-  </div>
+  </nav>
 
   <div class="tab-content" id="analyzeTabsContent">
 
@@ -653,7 +1280,15 @@
                         {% if rec.used_index_name %}
                           <span class="advisor-meta-pill">
                             <span class="advisor-meta-label">Index used</span>
-                            <span class="advisor-meta-value">{{ rec.used_index_name }}</span>
+                            <button
+                              type="button"
+                              class="advisor-meta-value advisor-index-stats-btn"
+                              data-bs-toggle="modal"
+                              data-bs-target="#indexStatsModal"
+                              data-index-name="{{ rec.used_index_name | e }}"
+                              data-schema-name="{{ rec.schema | e }}"
+                              title="Show index statistics"
+                            >{{ rec.used_index_name }}</button>
                           </span>
                         {% endif %}
                         {% if rec.candidate_columns %}
@@ -724,7 +1359,7 @@
                       <div class="advisor-section-title mb-0">Suggested index</div>
                       <button class="btn btn-sm copy-btn advisor-copy-btn" data-sql="{{ rec.create_index_sql }}" title="Copy SQL" type="button">Copy</button>
                     </div>
-                    <div class="advisor-code-block advisor-code-block-strong ga-sql-block analyze-suggested-sql">
+                    <div class="advisor-code-block advisor-code-block-strong">
                       <code class="small d-block">{{ rec.create_index_sql }}</code>
                     </div>
                   </div>
@@ -1107,6 +1742,45 @@
     </div>
   </div>
 
+
+
+  <div class="modal fade index-stats-modal" id="indexStatsModal" tabindex="-1" aria-labelledby="indexStatsModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="indexStatsModalTitle">Index statistics</h5>
+            <div class="text-muted small mt-1" id="indexStatsModalSubtitle">Usage, cache behavior, table scan context, and recommendation.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="indexStatsModalLoading" class="alert alert-info mb-0">Loading index statistics...</div>
+          <div id="indexStatsModalError" class="alert alert-warning d-none mb-0"></div>
+          <div id="indexStatsModalContent" class="d-none">
+            <div class="index-stats-badges mb-3" id="indexStatsBadges"></div>
+            <div class="index-stats-grid mb-3">
+              <div class="index-stats-kpi"><div class="index-stats-kpi-label">Index scans</div><div class="index-stats-kpi-value" id="indexStatsIdxScan">—</div></div>
+              <div class="index-stats-kpi"><div class="index-stats-kpi-label">Index size</div><div class="index-stats-kpi-value" id="indexStatsSize">—</div></div>
+              <div class="index-stats-kpi"><div class="index-stats-kpi-label">Cache hit ratio</div><div class="index-stats-kpi-value" id="indexStatsCacheHit">—</div></div>
+              <div class="index-stats-kpi"><div class="index-stats-kpi-label">Physical reads</div><div class="index-stats-kpi-value" id="indexStatsBlocksRead">—</div></div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-lg-6"><div class="index-stats-section h-100"><div class="index-stats-section-title">Index usage</div><div class="table-responsive"><table class="table table-sm mb-0 align-middle"><tbody id="indexStatsUsageTable"></tbody></table></div></div></div>
+              <div class="col-12 col-lg-6"><div class="index-stats-section h-100"><div class="index-stats-section-title">Table scan context</div><div class="table-responsive"><table class="table table-sm mb-0 align-middle"><tbody id="indexStatsTableContext"></tbody></table></div></div></div>
+            </div>
+            <div class="index-stats-section mb-3"><div class="index-stats-section-title">Recommendation</div><div id="indexStatsRecommendation" class="small text-muted"></div></div>
+            <div class="index-stats-section">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2"><div class="index-stats-section-title mb-0">Index definition</div><button class="btn btn-sm advisor-copy-btn" type="button" id="copyIndexDefinitionBtn">Copy</button></div>
+              <pre class="advisor-code-block index-stats-definition mb-0"><code id="indexStatsDefinition">—</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
       <div class="modal-content py-xl-4">
@@ -1139,32 +1813,6 @@
 {% block javascripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('#analyzeTabs [data-pga-tab-target]').forEach(function (tabButton) {
-    tabButton.addEventListener('click', function (event) {
-      event.preventDefault();
-
-      const targetSelector = this.getAttribute('data-pga-tab-target');
-      const targetPane = targetSelector ? document.querySelector(targetSelector) : null;
-      if (!targetPane) return;
-
-      document.querySelectorAll('#analyzeTabs .pga-tab-btn').forEach(function (button) {
-        button.classList.remove('active');
-        button.setAttribute('aria-selected', 'false');
-      });
-
-      document.querySelectorAll('#analyzeTabsContent > .tab-pane').forEach(function (pane) {
-        pane.classList.remove('show', 'active');
-      });
-
-      this.classList.add('active');
-      this.setAttribute('aria-selected', 'true');
-      targetPane.classList.add('show', 'active');
-
-      if (this.id === 'graph-tab') {
-        document.dispatchEvent(new CustomEvent('pgassistant:analyze-graph-tab-shown'));
-      }
-    });
-  });
 
   function parseColumnStatsLine(statLine) {
     const result = {
@@ -1335,6 +1983,185 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+
+
+  function escapeHtml(value) {
+    return (value || '').toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatIndexStatValue(value, suffix) {
+    if (value === null || value === undefined || value === '') return '—';
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && value !== true && value !== false) {
+      return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (suffix || '');
+    }
+    return String(value) + (suffix || '');
+  }
+
+  function setIndexStatsState(state, message) {
+    const loading = document.getElementById('indexStatsModalLoading');
+    const error = document.getElementById('indexStatsModalError');
+    const content = document.getElementById('indexStatsModalContent');
+    if (loading) loading.classList.toggle('d-none', state !== 'loading');
+    if (error) {
+      error.classList.toggle('d-none', state !== 'error');
+      error.textContent = message || '';
+    }
+    if (content) content.classList.toggle('d-none', state !== 'content');
+  }
+
+  function indexStatsRow(label, value) {
+    return `<tr><th class="text-muted" style="width: 48%;">${escapeHtml(label)}</th><td>${escapeHtml(formatIndexStatValue(value))}</td></tr>`;
+  }
+
+  function renderIndexStats(indexStats) {
+    const title = document.getElementById('indexStatsModalTitle');
+    const subtitle = document.getElementById('indexStatsModalSubtitle');
+    const badges = document.getElementById('indexStatsBadges');
+    const usageTable = document.getElementById('indexStatsUsageTable');
+    const tableContext = document.getElementById('indexStatsTableContext');
+    const recommendation = document.getElementById('indexStatsRecommendation');
+    const definition = document.getElementById('indexStatsDefinition');
+
+    const qualifiedName = indexStats.qualified_index_name || [indexStats.schemaname, indexStats.index_name].filter(Boolean).join('.');
+    const tableName = [indexStats.schemaname, indexStats.table_name].filter(Boolean).join('.');
+    if (title) title.textContent = qualifiedName || 'Index statistics';
+    if (subtitle) subtitle.textContent = tableName ? `Attached to ${tableName}` : 'Usage, cache behavior, table scan context, and recommendation.';
+
+    const idxScanEl = document.getElementById('indexStatsIdxScan');
+    const sizeEl = document.getElementById('indexStatsSize');
+    const cacheHitEl = document.getElementById('indexStatsCacheHit');
+    const blocksReadEl = document.getElementById('indexStatsBlocksRead');
+    if (idxScanEl) idxScanEl.textContent = formatIndexStatValue(indexStats.idx_scan);
+    if (sizeEl) sizeEl.textContent = indexStats.index_size_pretty || formatIndexStatValue(indexStats.index_size_bytes, ' bytes');
+    if (cacheHitEl) cacheHitEl.textContent = indexStats.cache_hit_pct === null || indexStats.cache_hit_pct === undefined ? '—' : formatIndexStatValue(indexStats.cache_hit_pct, '%');
+    if (blocksReadEl) blocksReadEl.textContent = formatIndexStatValue(indexStats.idx_blks_read);
+
+    if (badges) {
+      const badgeHtml = [];
+      if (indexStats.severity) badgeHtml.push(`<span class="pg-pill">Severity ${escapeHtml(indexStats.severity)}</span>`);
+      if (indexStats.index_type) badgeHtml.push(`<span class="pg-pill">${escapeHtml(indexStats.index_type)}</span>`);
+      if (indexStats.indisprimary) badgeHtml.push('<span class="pg-pill">Primary key</span>');
+      if (indexStats.indisunique) badgeHtml.push('<span class="pg-pill">Unique</span>');
+      if (indexStats.indisvalid === false) badgeHtml.push('<span class="pg-pill">Invalid</span>');
+      if (indexStats.bloat_status) badgeHtml.push(`<span class="pg-pill">Bloat ${escapeHtml(indexStats.bloat_status)}</span>`);
+      badges.innerHTML = badgeHtml.join('');
+    }
+
+    if (usageTable) {
+      usageTable.innerHTML =
+        indexStatsRow('Indexed columns', indexStats.indexed_columns) +
+        indexStatsRow('idx_scan', indexStats.idx_scan) +
+        indexStatsRow('idx_tup_read', indexStats.idx_tup_read) +
+        indexStatsRow('idx_tup_fetch', indexStats.idx_tup_fetch) +
+        indexStatsRow('Avg tuples / index scan', indexStats.avg_tuples_read_per_index_scan) +
+        indexStatsRow('idx_blks_hit', indexStats.idx_blks_hit) +
+        indexStatsRow('idx_blks_read', indexStats.idx_blks_read) +
+        indexStatsRow('Total index block access', indexStats.total_index_block_access);
+    }
+
+    if (tableContext) {
+      tableContext.innerHTML =
+        indexStatsRow('Table size', indexStats.table_size_pretty || indexStats.table_size_bytes) +
+        indexStatsRow('Table seq_scan', indexStats.table_seq_scan) +
+        indexStatsRow('Table seq_tup_read', indexStats.table_seq_tup_read) +
+        indexStatsRow('Avg tuples / seq scan', indexStats.avg_tuples_read_per_seq_scan) +
+        indexStatsRow('Table idx_scan', indexStats.table_idx_scan) +
+        indexStatsRow('Live tuples', indexStats.n_live_tup) +
+        indexStatsRow('Dead tuples', indexStats.n_dead_tup) +
+        indexStatsRow('Stats reset', indexStats.stats_reset);
+    }
+
+    if (recommendation) recommendation.textContent = indexStats.recommendation_action || indexStats.recommendation_short || 'No recommendation available for this index.';
+    if (definition) definition.textContent = indexStats.index_definition || 'No index definition available.';
+
+    const copyBtn = document.getElementById('copyIndexDefinitionBtn');
+    if (copyBtn) copyBtn.setAttribute('data-index-definition', indexStats.index_definition || '');
+
+    setIndexStatsState('content');
+  }
+
+  async function loadIndexStats(indexName, schemaName) {
+    setIndexStatsState('loading');
+
+    const rawIndexName = (indexName || '').trim();
+    const rawSchemaName = (schemaName || '').trim();
+
+    if (!rawIndexName) {
+      setIndexStatsState('error', 'No index name was provided.');
+      return;
+    }
+
+    let effectiveSchemaName = rawSchemaName;
+    let effectiveIndexName = rawIndexName;
+
+    if (rawIndexName.includes('.')) {
+      const parts = rawIndexName.split('.');
+      if (parts.length >= 2) {
+        effectiveSchemaName = parts[0];
+        effectiveIndexName = parts.slice(1).join('.');
+      }
+    }
+
+    const apiUrl = effectiveSchemaName
+      ? `/api/v1/indexe_stats/${encodeURIComponent(effectiveSchemaName)}/${encodeURIComponent(effectiveIndexName)}`
+      : `/api/v1/indexe_stats/${encodeURIComponent(effectiveIndexName)}`;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const rawText = await response.text();
+
+      if (!contentType.includes('application/json')) {
+        throw new Error(`API did not return JSON. HTTP ${response.status}. Called URL: ${apiUrl}`);
+      }
+
+      const data = JSON.parse(rawText);
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      const indexStats = Array.isArray(data.indexes) && data.indexes.length > 0 ? data.indexes[0] : null;
+      if (!indexStats) throw new Error('No statistics were returned for this index.');
+
+      renderIndexStats(indexStats);
+    } catch (err) {
+      setIndexStatsState('error', err.message || 'Unable to load index statistics.');
+    }
+  }
+
+  document.querySelectorAll('.advisor-index-stats-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      loadIndexStats(this.getAttribute('data-index-name'), this.getAttribute('data-schema-name'));
+    });
+  });
+
+  const copyIndexDefinitionBtn = document.getElementById('copyIndexDefinitionBtn');
+  if (copyIndexDefinitionBtn) {
+    copyIndexDefinitionBtn.addEventListener('click', async function () {
+      const definition = this.getAttribute('data-index-definition') || '';
+      if (!definition) return;
+      try {
+        await navigator.clipboard.writeText(definition);
+        const original = this.innerText;
+        this.innerText = '✅';
+        setTimeout(() => { this.innerText = original; }, 1000);
+      } catch (err) {
+        console.error('Clipboard error:', err);
+      }
+    });
+  }
+
+
   document.querySelectorAll('.suggestion-select').forEach(select => {
     const table = select.getAttribute('data-table');
     const column = select.getAttribute('data-column');
@@ -1499,16 +2326,31 @@ function myButtonAnalyze(el) {
 
 function myButtonAnalyzeOpenAI(el) {
   const form = document.getElementById("form_analyse");
+
   if (form.checkValidity()) {
     document.querySelectorAll('input[id^="final-"]').forEach(hidden => {
       const param = hidden.id.replace('final-', '');
       syncFinalParamValue(param);
     });
 
+    const textarea = document.getElementById("chatgpt");
+
+    let chatgptInput = form.querySelector('input[name="chatgpt"]');
+    if (!chatgptInput) {
+      chatgptInput = document.createElement("input");
+      chatgptInput.type = "hidden";
+      chatgptInput.name = "chatgpt";
+      chatgptInput.id = "chatgpt-submit-value";
+      form.appendChild(chatgptInput);
+    }
+
+    chatgptInput.value = textarea ? textarea.value : "";
+
     document.getElementById("analyzeopenai").disabled = true;
     document.getElementById("analyzeopenai").innerHTML =
       '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing ...';
-    document.getElementById("action").value = 'chatgpt';
+
+    document.getElementById("action").value = "chatgpt";
     form.submit();
   } else {
     form.reportValidity();
@@ -1565,14 +2407,10 @@ function myButtonDDL(el) {
     const graphTab = document.getElementById('graph-tab');
 
     if (graphTab) {
-      graphTab.addEventListener('click', async () => {
+      graphTab.addEventListener('shown.bs.tab', async () => {
         await renderMermaid();
       });
     }
-
-    document.addEventListener('pgassistant:analyze-graph-tab-shown', () => {
-      renderMermaid().catch(console.warn);
-    });
 
     if (document.querySelector('#graph.show')) {
       renderMermaid();

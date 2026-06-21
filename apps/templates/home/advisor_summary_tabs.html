@@ -39,12 +39,17 @@
   low_risk=0,
   manual_review=0,
   auto_apply=0,
-  quick_wins=0
+  quick_wins=0,
+  dev_team=0,
+  ops_team=0,
+  unknown_team=0
 ) %}
 
 {% for rec in recommendations %}
   {% set priority = rec.priority or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
   {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
+  {% set team = rec.team.value if rec.team.value is defined else rec.team %}
+  {% if team == 'DEV' %}{% set ns.dev_team = ns.dev_team + 1 %}{% elif team == 'OPS' %}{% set ns.ops_team = ns.ops_team + 1 %}{% else %}{% set ns.unknown_team = ns.unknown_team + 1 %}{% endif %}
   {% if priority == 'HIGH' %}{% set ns.high = ns.high + 1 %}{% endif %}
   {% if priority == 'MEDIUM' %}{% set ns.medium = ns.medium + 1 %}{% endif %}
   {% if priority == 'LOW' %}{% set ns.low = ns.low + 1 %}{% endif %}
@@ -180,6 +185,18 @@
         <div class="ga-summary-value">{{ recommendations|length }}</div>
         <div class="ga-summary-label">Total recommendations</div>
         <div class="ga-summary-hint">Detected across enabled checks.</div>
+      </div>
+
+      <div class="ga-summary-card ga-kpi-high">
+        <div class="ga-summary-value">{{ ns.dev_team }}</div>
+        <div class="ga-summary-label">DEV advices</div>
+        <div class="ga-summary-hint">Schema, SQL and application-facing findings.</div>
+      </div>
+
+      <div class="ga-summary-card ga-kpi-risk">
+        <div class="ga-summary-value">{{ ns.ops_team }}</div>
+        <div class="ga-summary-label">OPS advices</div>
+        <div class="ga-summary-hint">Operations, configuration and lifecycle findings.</div>
       </div>
 
       <div class="ga-summary-card ga-kpi-high">
@@ -354,6 +371,27 @@
           </div>
         </div>
 
+        <div class="ga-summary-panel-subtitle" style="margin-top: 1rem; margin-bottom: .6rem;">Recommendations by team</div>
+        <div class="ga-dist-list">
+          <div class="ga-dist-row">
+            <div class="ga-dist-label">DEV</div>
+            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.dev_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
+            <div class="ga-dist-count">{{ ns.dev_team }}</div>
+          </div>
+          <div class="ga-dist-row">
+            <div class="ga-dist-label">OPS</div>
+            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.ops_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
+            <div class="ga-dist-count">{{ ns.ops_team }}</div>
+          </div>
+          {% if ns.unknown_team > 0 %}
+            <div class="ga-dist-row">
+              <div class="ga-dist-label">Unassigned</div>
+              <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.unknown_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
+              <div class="ga-dist-count">{{ ns.unknown_team }}</div>
+            </div>
+          {% endif %}
+        </div>
+
         <div class="ga-summary-panel-subtitle" style="margin-top: 1rem; margin-bottom: .6rem;">Recommendations by outcome</div>
         <div class="ga-dist-list">
           {% for outcome_item in recommendations | map(attribute='outcome_id') | select | unique | sort %}
@@ -391,6 +429,15 @@
           class="form-control"
           placeholder="Search schema, table, index, SQL..."
         >
+      </div>
+
+      <div>
+        <label class="form-label">Team</label>
+        <select id="gaTeamFilter" class="form-select">
+          <option value="">All teams</option>
+          <option value="DEV">DEV</option>
+          <option value="OPS">OPS</option>
+        </select>
       </div>
 
       <div>
@@ -486,6 +533,7 @@
         {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
         {% set action = rec.action_type.value if rec.action_type.value is defined else rec.action_type %}
         {% set action_safety = rec.action_safety.value if rec.action_safety.value is defined else rec.action_safety %}
+        {% set team = rec.team.value if rec.team.value is defined else rec.team %}
         {% set priority = rec.priority.value or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
         {% set label = rec.label or rec.source or category %}
 
@@ -506,6 +554,7 @@
           data-outcome="{{ outcome or '' }}"
           data-risk="{{ risk or '' }}"
           data-action="{{ action or '' }}"
+          data-team="{{ team or '' }}"
           data-priority="{{ priority or '' }}"
           data-rank="{{ rec.rank }}"
           data-impact="{{ rec.impact if rec.impact is not none else 0 }}"
@@ -529,6 +578,7 @@
             {{ advisor_group or '' }}
             {{ action or '' }}
             {{ risk or '' }}
+            {{ team or '' }}
           "
         >
 
@@ -577,6 +627,7 @@
 
           <div class="ga-badges">
             <span class="ga-badge ga-badge-category">{{ category }}</span>
+            {% if team %}<span class="ga-badge ga-badge-source">Team {{ team }}</span>{% endif %}
             {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
             {% if action %}<span class="ga-badge ga-badge-action">{{ action }}</span>{% endif %}
             {% if risk %}<span class="ga-badge ga-badge-risk-{{ risk|lower }}">Risk {{ risk }}</span>{% endif %}
@@ -682,6 +733,7 @@
                 "outcome": {{ (outcome or '')|tojson }},
                 "action": {{ (action or '')|tojson }},
                 "risk": {{ (risk or '')|tojson }},
+                "team": {{ (team or '')|tojson }},
                 "comments": {{ (rec.recommendation_note or '')|tojson }},
                 "description": {% if rec.description and "Object:" not in rec.description and rec.description != rec.title %}{{ rec.description|tojson }}{% else %}""{% endif %},
                 "whyItMatters": {{ (rec.why_it_matters or '')|tojson }},
@@ -787,6 +839,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const searchInput = document.getElementById("gaSearch");
+  const teamFilter = document.getElementById("gaTeamFilter");
   const labelFilter = document.getElementById("gaLabelFilter");
   const tableFilter = document.getElementById("gaTableFilter");
   const categoryFilter = document.getElementById("gaCategoryFilter");
@@ -902,6 +955,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (data.outcome) badgeItems.push('<span class="ga-badge ga-badge-outcome">' + escapeHtml(data.outcome) + '</span>');
       if (data.action) badgeItems.push('<span class="ga-badge ga-badge-action">' + escapeHtml(data.action) + '</span>');
       if (data.risk) badgeItems.push('<span class="ga-badge ga-badge-risk-' + escapeHtml(data.risk.toLowerCase()) + '">Risk ' + escapeHtml(data.risk) + '</span>');
+      if (data.team) badgeItems.push('<span class="ga-badge ga-badge-source">Team ' + escapeHtml(data.team) + '</span>');
       badges.innerHTML = badgeItems.join('');
     }
 
@@ -927,6 +981,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function resetFilters(apply) {
     if (searchInput) searchInput.value = "";
+    if (teamFilter) teamFilter.value = "";
     if (labelFilter) labelFilter.value = "";
     if (tableFilter) tableFilter.value = "";
     if (categoryFilter) categoryFilter.value = "";
@@ -942,6 +997,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function applyFilters() {
     const search = normalize(searchInput ? searchInput.value : "");
+    const team = normalize(teamFilter ? teamFilter.value : "");
     const label = normalize(labelFilter ? labelFilter.value : "");
     const table = normalize(tableFilter ? tableFilter.value : "");
     const category = normalize(categoryFilter ? categoryFilter.value : "");
@@ -954,6 +1010,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     cards.forEach(function (card) {
       const cardSearch = normalize(card.dataset.search);
+      const cardTeam = normalize(card.dataset.team);
       const cardLabel = normalize(card.dataset.label);
       const cardTable = normalize(card.dataset.table);
       const cardCategory = normalize(card.dataset.category);
@@ -964,6 +1021,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const visible =
         (!search || cardSearch.includes(search)) &&
+        (!team || cardTeam === team) &&
         (!label || cardLabel === label) &&
         (!table || cardTable === table) &&
         (!category || cardCategory === category) &&
@@ -1028,6 +1086,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   [
     searchInput,
+    teamFilter,
     labelFilter,
     tableFilter,
     categoryFilter,

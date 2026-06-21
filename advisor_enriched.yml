@@ -3,6 +3,7 @@ recommendations:
     label: Foreign key columns with different data types
     source: design_checks
     category_id: DESIGN
+    team: DEV
     object_type: COLUMN
     outcome_id: RELIABILITY
     advisor_group: DATA_MODEL_ISSUES
@@ -199,6 +200,7 @@ recommendations:
   - id: missing_useful_foreign_key_indexes
     label: Missing useful foreign key indexe
     source: index_checks
+    team: DEV
     category_id: INDEX
     object_type: INDEX
     outcome_id: PERFORMANCE
@@ -367,6 +369,7 @@ recommendations:
   - id: redundant_non_unique_indexes_covered_by_unique
     label: Non-unique index covered by unique index
     source: index_checks
+    team: DEV
     category_id: INDEX
     object_type: INDEX
     outcome_id: STORAGE
@@ -533,6 +536,7 @@ recommendations:
   - id: strictly_duplicate_unused_indexes
     label: Strictly duplicate unused index
     source: index_checks
+    team: DEV
     category_id: INDEX
     object_type: INDEX
     outcome_id: STORAGE
@@ -722,6 +726,7 @@ recommendations:
   - id: unused_non_constraint_indexes
     label: Unused index not supporting constraints
     source: index_checks
+    team: DEV
     category_id: INDEX
     object_type: INDEX
     outcome_id: STORAGE
@@ -957,6 +962,7 @@ recommendations:
 
   - id: Tables with potentially stale statistics
     source: statistics_checks
+    team: OPS
     category_id: STATISTICS
     object_type: TABLE
     outcome_id: PERFORMANCE
@@ -1124,6 +1130,7 @@ recommendations:
   - id: Tables with estimated bloat
     source: storage_checks
     category_id: MAINTENANCE
+    team: OPS
     object_type: TABLE
     outcome_id: STORAGE
     advisor_group: MAINTENANCE_RISKS
@@ -1263,6 +1270,7 @@ recommendations:
   - id: Important PostgreSQL settings disabled or suboptimal
     source: configuration_checks
     category_id: CONFIGURATION
+    team: OPS
     object_type: DATABASE
     outcome_id: OPERABILITY
     advisor_group: CONFIGURATION_ISSUES
@@ -1538,6 +1546,7 @@ recommendations:
 
   - id: Invalid or unusable indexes
     source: index_checks
+    team: OPS
     category_id: INDEX
     object_type: INDEX
     outcome_id: RELIABILITY
@@ -1730,6 +1739,7 @@ recommendations:
 
   - id: Tables never vacuumed
     source: maintenance_checks
+    team: OPS
     category_id: MAINTENANCE
     object_type: TABLE
     outcome_id: OPERABILITY
@@ -1922,6 +1932,7 @@ recommendations:
 
   - id: Tables without primary key
     source: schema_checks
+    team: DEV
     category_id: DESIGN
     object_type: TABLE
     outcome_id: RELIABILITY
@@ -2035,6 +2046,7 @@ recommendations:
 
   - id: High index-to-table size ratio
     source: storage_checks
+    team: OPS
     category_id: INDEX
     object_type: TABLE
     outcome_id: STORAGE
@@ -2164,6 +2176,7 @@ recommendations:
   - id: Low or missing foreign key coverage
     source: schema_checks
     category_id: DESIGN
+    team: DEV
     object_type: TABLE
     outcome_id: RELIABILITY
     advisor_group: DATA_MODEL_ISSUES
@@ -2269,6 +2282,7 @@ recommendations:
 
   - id: autovacuum_dead_tuple_vacuum_urgency
     label: Autovacuum dead tuple cleanup urgency
+    team: OPS
     source: maintenance_checks
     category_id: MAINTENANCE
     object_type: TABLE
@@ -2458,6 +2472,7 @@ recommendations:
 
   - id: Sequences approaching maximum value
     source: schema_checks
+    team: OPS
     category_id: DESIGN
     object_type: SEQUENCE
 

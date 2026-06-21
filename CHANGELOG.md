@@ -1,5 +1,16 @@
 # Change Log
 
+## [3.1] - 2026-06-21
+
+## Improvements
+
+- Added index statistics in index advisor and table advisor
+- Added team (DEV or OPS) in the global advisor, user can filter advices by team
+
+## Bug fixes
+
+- On query analyze, the Analyze with LLM is no longer working.
+
 ## [3.0.0] - 2026-06-19
 
 ## Improvements

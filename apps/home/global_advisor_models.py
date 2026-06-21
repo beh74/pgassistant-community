@@ -77,6 +77,11 @@ class ActionSafety(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class AdvisorTeam(str, Enum):
+    DEV = "DEV"
+    OPS = "OPS"
+
+
 class PriorityLevel(str, Enum):
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
@@ -148,6 +153,7 @@ class GlobalRecommendation:
     # Advisor classification metadata
     outcome_id: AdvisorOutcome = AdvisorOutcome.OTHER
     advisor_group: AdvisorGroup = AdvisorGroup.OTHER
+    team: AdvisorTeam = AdvisorTeam.OPS
 
     # Main targeted object
     object_type: ObjectType = ObjectType.OTHER
@@ -213,6 +219,9 @@ class GlobalRecommendation:
         if isinstance(self.advisor_group, str):
             self.advisor_group = AdvisorGroup(self.advisor_group)
 
+        if isinstance(self.team, str):
+            self.team = AdvisorTeam(self.team)
+
         if isinstance(self.risk_level, str):
             self.risk_level = RiskLevel(self.risk_level)
 
@@ -240,6 +249,7 @@ class GlobalRecommendation:
             "recommendation_id": self.recommendation_id,
             "outcome_id": enum_value(self.outcome_id),
             "advisor_group": enum_value(self.advisor_group),
+            "team": enum_value(self.team),
             "object_type": enum_value(self.object_type),
             "object_id": self.object_id,
             "object_name": self.object_name,

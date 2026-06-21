@@ -14,6 +14,7 @@ from . import api_helper
 from . import database
 from . import reporting
 from . import sqlhelper
+from . import indexe_helper
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -231,3 +232,100 @@ def api_apply_recommendations():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+  
+
+@blueprint.route("/api/v1/indexe_stats/<schemaname>/<indexname>", methods=["GET"])
+def api_indexe_stats_by_schema(schemaname, indexname):
+    """
+    Return detailed statistics for one index identified by schema and index name.
+
+    Example:
+      /api/v1/indexe_stats/bookings/segments_pkey
+    """
+    conn = None
+
+    try:
+        if not session.get("db_host") and not session.get("db_uri"):
+            return jsonify({
+                "success": False,
+                "error": "No database connection found in session."
+            }), 400
+
+        conn, status = database.connectdb(session)
+
+        if conn is None or status != "OK":
+            return jsonify({
+                "success": False,
+                "error": status or "Unable to connect to database."
+            }), 500
+
+        qualified_index_name = f"{schemaname}.{indexname}"
+
+        result = indexe_helper.get_index_stats_by_name(
+            conn,
+            qualified_index_name
+        )
+
+        status_code = 200 if result.get("success") else 404
+        return jsonify(result), status_code
+
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+@blueprint.route("/api/v1/table_indexe_stats/<schemaname>/<tablename>", methods=["GET"])
+def api_table_indexe_stats(schemaname, tablename):
+    """
+    Return detailed statistics for all indexes attached to a table.
+
+    Example:
+      /api/v1/table_indexe_stats/public/orders
+    """
+    conn = None
+
+    try:
+        if not session.get("db_host") and not session.get("db_uri"):
+            return jsonify({
+                "success": False,
+                "error": "No database connection found in session."
+            }), 400
+
+        conn, status = database.connectdb(session)
+
+        if conn is None or status != "OK":
+            return jsonify({
+                "success": False,
+                "error": status or "Unable to connect to database."
+            }), 500
+
+        result = indexe_helper.get_table_indexes_stats(
+            conn,
+            schemaname=schemaname,
+            table_name=tablename
+        )
+
+        status_code = 200 if result.get("success") else 404
+        return jsonify(result), status_code
+
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass

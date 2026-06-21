@@ -10,8 +10,10 @@ from .global_advisor_models import (
     ActionType,
     AdvisorGroup,
     AdvisorOutcome,
+    AdvisorTeam,
     GlobalRecommendation,
     ObjectType,
+    PriorityLevel,
     RecommendationCategory,
     RiskLevel,
 )
@@ -162,6 +164,7 @@ def build_recommendation_from_row(
 
         outcome_id=safe_enum_value(AdvisorOutcome, definition.get("outcome_id"), "OTHER"),
         advisor_group=safe_enum_value(AdvisorGroup, definition.get("advisor_group"), "OTHER"),
+        team=safe_enum_value(AdvisorTeam, definition.get("team"), "OPS"),
 
         object_type=ObjectType(definition.get("object_type", "OTHER")),
         object_id=get_mapped_value(row, mapping, "object_id"),
@@ -360,6 +363,7 @@ def run_postgresql_version_recommendation(
         "object_type": "DATABASE",
         "outcome_id": "OPERABILITY",
         "advisor_group": "MAINTENANCE_RISKS",
+        "team": "OPS",
         "risk_level": risk_level,
 
         # Replace OTHER with UPGRADE if ActionType.UPGRADE is available.
@@ -405,12 +409,18 @@ def run_postgresql_version_recommendation(
         "recommendation_note": version_status.recommendation,
     }
 
-    return [
-        build_recommendation_from_row(
-            definition,
-            recommendation_row,
-        )
-    ]
+    recommendation = build_recommendation_from_row(
+        definition,
+        recommendation_row,
+    )
+
+    # Unsupported PostgreSQL major versions are always top-priority OPS items,
+    # independently of the generic confidence/impact/effort scoring formula.
+    if unsupported_branch:
+        recommendation.rank = 100
+        recommendation.priority = PriorityLevel.HIGH
+
+    return [recommendation]
 
 def run_sql_recommendation(
     conn,
@@ -472,6 +482,7 @@ def summarize_recommendations(
     group_counts = _counter_by_attr(sorted_recs, "advisor_group")
     risk_counts = _counter_by_attr(sorted_recs, "risk_level")
     action_type_counts = _counter_by_attr(sorted_recs, "action_type")
+    team_counts = _counter_by_attr(sorted_recs, "team")
 
     quick_wins = [
         rec for rec in sorted_recs
@@ -512,6 +523,7 @@ def summarize_recommendations(
         "group_counts": group_counts,
         "risk_counts": risk_counts,
         "action_type_counts": action_type_counts,
+        "team_counts": team_counts,
         "manual_review_required": len(manual_review),
         "requires_maintenance_window": len(maintenance_window),
         "high_risk": len(high_risk),
