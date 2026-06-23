@@ -96,14 +96,6 @@
 {% set top_profile_time = dbinfo['profile'][:4] %}
 {% set more_profile_time = dbinfo['profile'][4:] %}
 {% set cache_value = dbinfo['cache'] | float %}
-{% set issue_total = (dbinfo['issue_no_pk'] | int) + (dbinfo['issue_idx_fk_missing'] | int) + (dbinfo['issue_idx_redundant'] | int) + (dbinfo['issue_idx_fk_datatype'] | int) %}
-{% set ns = namespace(score=100, issue_penalty=issue_total * 4) %}
-{% if cache_value < 95 %}{% set ns.score = ns.score - 15 %}{% elif cache_value < 99 %}{% set ns.score = ns.score - 5 %}{% endif %}
-{% if ns.issue_penalty > 30 %}{% set ns.issue_penalty = 30 %}{% endif %}
-{% set ns.score = ns.score - ns.issue_penalty %}
-{% if dbinfo['conflicts'] | int > 0 %}{% set ns.score = ns.score - 10 %}{% endif %}
-{% if ns.score < 0 %}{% set ns.score = 0 %}{% endif %}
-{% set health_arc = ns.score * 3.6 %}
 
 <div class="pg-page dashboard-page">
 
@@ -112,7 +104,7 @@
       <div class="pg-eyebrow"><i class="bi bi-speedometer2"></i> Database overview</div>
       <h1 class="pg-title">Dashboard</h1>
       <p class="pg-subtitle">
-        PostgreSQL health overview, workload distribution, schema design issues, and client activity.
+        PostgreSQL health overview, workload distribution, DEV advisor recommendations, and client activity.
       </p>
     </div>
 
@@ -128,24 +120,17 @@
 
   <div class="pg-hero dashboard-command-hero">
     <div class="dashboard-health-card">
-      <div class="dashboard-health-score" style="--dashboard-health: {{ health_arc }}deg;">
-        <strong>{{ ns.score }}</strong>
+      <div id="dashboardDevScoreArc" class="dashboard-health-score" style="--dashboard-health: 0deg;">
+        <strong id="dashboardDevScoreValue">...</strong>
         <span>/ 100</span>
       </div>
       <div>
-        <div class="dashboard-health-title">pgAssistant conclusion</div>
-        <p class="dashboard-health-text">
-          {% if issue_total > 0 and cache_value < 95 %}
-            Schema issues and cache efficiency both require attention. Start with design findings, then inspect expensive workload patterns.
-          {% elif issue_total > 0 %}
-            The database is operational, but schema design findings should be reviewed before they affect joins, writes, or maintenance cost.
-          {% elif cache_value < 95 %}
-            Schema checks look clean, but cache efficiency is below the usual comfort zone. Review read-heavy queries and memory settings.
-          {% elif dbinfo['conflicts'] | int > 0 %}
-            Core indicators are healthy, but conflicts were detected. Review conflict sources before they become operational noise.
-          {% else %}
-            Core indicators look healthy. Use Query Ranking to identify the next workload optimization opportunities.
-          {% endif %}
+        <div class="dashboard-health-title">
+          DEV advisor score
+          <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Score starts at 100 and subtracts penalties by recommendation type, weighted by priority and by the affected share of tables, indexes, foreign keys, or columns."></i>
+        </div>
+        <p id="dashboardDevConclusion" class="dashboard-health-text">
+          Querying database for DEV recommendations...
         </p>
       </div>
     </div>
@@ -153,7 +138,7 @@
     <div class="dashboard-next-actions">
       <a href="/global/advisor" class="dashboard-action-pill">
         <span class="dashboard-action-main"><i class="bi bi-stars"></i> Review recommendations</span>
-        <span class="dashboard-action-meta">{{ issue_total }} schema issue(s)</span>
+        <span id="dashboardDevActionMeta" class="dashboard-action-meta">loading</span>
       </a>
       <a href="/rankqueries.html" class="dashboard-action-pill">
         <span class="dashboard-action-main"><i class="bi bi-trophy"></i> Prioritize queries</span>
@@ -171,7 +156,7 @@
       <div class="dashboard-kpi-icon"><i class="bi bi-database"></i></div>
       <div>
         <div class="dashboard-kpi-label">Database version</div>
-        <a target="_blank" href="https://www.postgresql.org/docs/release/" class="text-decoration-none">
+        <a href="#" id="dashboardVersionAdvisorLink" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#postgresVersionAdvisorModal">
           <h2 class="dashboard-kpi-value">{{ dbinfo['version'] }}</h2>
         </a>
         <p class="dashboard-kpi-subtext">Uptime: <strong>{{ dbinfo['uptime'] }}</strong></p>
@@ -207,15 +192,9 @@
     <div class="pg-card pg-card-body dashboard-kpi-card">
       <div class="dashboard-kpi-icon"><i class="bi bi-shield-check"></i></div>
       <div>
-        <div class="dashboard-kpi-label">Schema findings</div>
-        <h2 class="dashboard-kpi-value">{{ issue_total }}</h2>
-        {% if issue_total == 0 %}
-          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Clean</span>
-        {% elif issue_total <= 3 %}
-          <span class="dashboard-status warn"><i class="bi bi-exclamation-circle-fill"></i> Review</span>
-        {% else %}
-          <span class="dashboard-status bad"><i class="bi bi-exclamation-triangle-fill"></i> Action needed</span>
-        {% endif %}
+        <div class="dashboard-kpi-label">DEV recommendations</div>
+        <h2 id="dashboardDevTotal" class="dashboard-kpi-value">...</h2>
+        <span id="dashboardDevStatus" class="dashboard-status warn"><i class="bi bi-hourglass-split"></i> Querying database</span>
       </div>
     </div>
   </div>
@@ -354,37 +333,17 @@
 
       <div class="pg-card">
         <div class="dashboard-card-header">
-          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>Schema & design checks</span></span>
-          <a href="/tools?cat=issues" class="btn btn-sm btn-outline-primary">Open issues</a>
+          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>DEV advisor</span></span>
+          <a href="/global/advisor" class="btn btn-sm btn-outline-primary">Open advisor</a>
         </div>
-        <div class="pg-card-body dashboard-row-list">
-          <div class="dashboard-row-item">
-            <div class="dashboard-row-icon">
-              {% if dbinfo['issue_no_pk'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
+        <div id="dashboardDevAdvisorBody" class="pg-card-body dashboard-row-list">
+          <div class="dashboard-row-item dashboard-loading-row">
+            <div class="dashboard-row-icon"><i class="bi bi-hourglass-split"></i></div>
+            <div class="dashboard-row-main">
+              <div class="dashboard-row-label">Querying database</div>
+              <div class="dashboard-row-note">Collecting and grouping DEV recommendations from Global Advisor.</div>
             </div>
-            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_no_pk">Tables without primary keys</a></div></div>
-            <div class="dashboard-row-value">{{ dbinfo['issue_no_pk'] }}</div>
-          </div>
-          <div class="dashboard-row-item">
-            <div class="dashboard-row-icon">
-              {% if dbinfo['issue_idx_fk_missing'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
-            </div>
-            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_fk_missing">Missing indexes on foreign keys</a></div></div>
-            <div class="dashboard-row-value">{{ dbinfo['issue_idx_fk_missing'] }}</div>
-          </div>
-          <div class="dashboard-row-item">
-            <div class="dashboard-row-icon">
-              {% if dbinfo['issue_idx_redundant'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
-            </div>
-            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_redundant">Redundant indexes</a></div></div>
-            <div class="dashboard-row-value">{{ dbinfo['issue_idx_redundant'] }}</div>
-          </div>
-          <div class="dashboard-row-item">
-            <div class="dashboard-row-icon">
-              {% if dbinfo['issue_idx_fk_datatype'] > 0 %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
-            </div>
-            <div class="dashboard-row-main"><div class="dashboard-row-label"><a href="/generic/issue_idx_fk_datatype">Foreign-key datatype mismatch</a></div></div>
-            <div class="dashboard-row-value">{{ dbinfo['issue_idx_fk_datatype'] }}</div>
+            <div class="dashboard-row-value">...</div>
           </div>
         </div>
       </div>
@@ -455,6 +414,34 @@
   </div>
   {% endif %}
 
+  <div class="modal fade" id="postgresVersionAdvisorModal" tabindex="-1" aria-labelledby="postgresVersionAdvisorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="h5 modal-title" id="postgresVersionAdvisorModalLabel">PostgreSQL version advisor</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="postgresVersionAdvisorBody" class="dashboard-row-list">
+            <div class="dashboard-row-item dashboard-loading-row">
+              <div class="dashboard-row-icon"><i class="bi bi-hourglass-split"></i></div>
+              <div class="dashboard-row-main">
+                <div class="dashboard-row-label">Querying Global Advisor</div>
+                <div class="dashboard-row-note">Checking PostgreSQL release status and upgrade guidance.</div>
+              </div>
+              <div class="dashboard-row-value">...</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <a href="https://www.postgresql.org/docs/release/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+            PostgreSQL release notes
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 {% endblock content %}
@@ -466,6 +453,423 @@
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
       new bootstrap.Tooltip(tooltipTriggerEl);
     });
+
+    const versionAdvisorModal = document.getElementById("postgresVersionAdvisorModal");
+    const versionAdvisorLink = document.getElementById("dashboardVersionAdvisorLink");
+    if (versionAdvisorLink) {
+      versionAdvisorLink.addEventListener("click", function (event) {
+        event.preventDefault();
+      });
+    }
+    if (versionAdvisorModal) {
+      versionAdvisorModal.addEventListener("shown.bs.modal", loadPostgresVersionAdvisor);
+    }
+
+    loadDevAdvisorSummary();
   });
+
+  function appendTextBlock(container, className, text) {
+    if (!text) {
+      return;
+    }
+
+    const block = document.createElement("p");
+    block.className = className;
+    block.textContent = text;
+    container.appendChild(block);
+  }
+
+  function renderPostgresVersionAdvisorLoading() {
+    const body = document.getElementById("postgresVersionAdvisorBody");
+    if (!body) {
+      return;
+    }
+
+    body.replaceChildren();
+
+    const row = document.createElement("div");
+    row.className = "dashboard-row-item dashboard-loading-row";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "dashboard-row-icon";
+    const icon = document.createElement("i");
+    icon.className = "bi bi-hourglass-split";
+    iconWrap.appendChild(icon);
+
+    const main = document.createElement("div");
+    main.className = "dashboard-row-main";
+
+    const label = document.createElement("div");
+    label.className = "dashboard-row-label";
+    label.textContent = "Querying Global Advisor";
+    main.appendChild(label);
+
+    const note = document.createElement("div");
+    note.className = "dashboard-row-note";
+    note.textContent = "Checking PostgreSQL release status and upgrade guidance.";
+    main.appendChild(note);
+
+    const value = document.createElement("div");
+    value.className = "dashboard-row-value";
+    value.textContent = "...";
+
+    row.appendChild(iconWrap);
+    row.appendChild(main);
+    row.appendChild(value);
+    body.appendChild(row);
+  }
+
+  function buildVersionMetaRow(labelText, valueText) {
+    const row = document.createElement("div");
+    row.className = "dashboard-side-row";
+
+    const label = document.createElement("div");
+    label.className = "dashboard-side-title";
+    label.textContent = labelText;
+
+    const value = document.createElement("div");
+    value.className = "dashboard-side-link";
+    value.textContent = valueText || "-";
+
+    row.appendChild(label);
+    row.appendChild(value);
+    return row;
+  }
+
+  function renderPostgresVersionAdvisor(payload) {
+    const body = document.getElementById("postgresVersionAdvisorBody");
+    if (!body) {
+      return;
+    }
+
+    body.replaceChildren();
+
+    const recommendation = payload.global_advisor_recommendation || {};
+    const level = payload.recommendation_level || "NONE";
+    const statusClass = level === "HIGH" ? "bad" : (level === "MEDIUM" || level === "REVIEW" ? "warn" : "good");
+    const statusText = payload.upgrade_recommended ? "Upgrade recommended" : (level === "REVIEW" ? "Review version" : "Up to date");
+
+    const summary = document.createElement("div");
+    summary.className = "dashboard-version-advisor-summary";
+
+    const title = document.createElement("div");
+    title.className = "dashboard-row-label";
+    title.textContent = recommendation.title || statusText;
+    summary.appendChild(title);
+
+    const badge = document.createElement("span");
+    badge.className = "dashboard-status " + statusClass;
+    const badgeIcon = document.createElement("i");
+    badgeIcon.className = "bi " + (statusClass === "good" ? "bi-check-circle-fill" : statusClass === "warn" ? "bi-exclamation-circle-fill" : "bi-exclamation-triangle-fill");
+    badge.appendChild(badgeIcon);
+    badge.appendChild(document.createTextNode(" " + statusText));
+    summary.appendChild(badge);
+
+    appendTextBlock(summary, "dashboard-row-note mt-3", payload.recommendation);
+    appendTextBlock(summary, "dashboard-row-note", recommendation.why_it_matters);
+    appendTextBlock(summary, "dashboard-row-note", recommendation.fix_strategy);
+    appendTextBlock(summary, "dashboard-row-note", recommendation.expected_benefit);
+
+    body.appendChild(summary);
+
+    const meta = document.createElement("div");
+    meta.className = "dashboard-side-list mt-3";
+    meta.appendChild(buildVersionMetaRow("Installed version", payload.installed_version));
+    meta.appendChild(buildVersionMetaRow("Latest minor", payload.latest_minor_version));
+    meta.appendChild(buildVersionMetaRow("Latest release date", payload.latest_release_date));
+    meta.appendChild(buildVersionMetaRow("Supported branch", payload.supported ? "Yes" : "No"));
+    meta.appendChild(buildVersionMetaRow("End of life", payload.end_of_life_date));
+    body.appendChild(meta);
+  }
+
+  function renderPostgresVersionAdvisorError(message) {
+    const body = document.getElementById("postgresVersionAdvisorBody");
+    if (!body) {
+      return;
+    }
+
+    body.replaceChildren();
+
+    const row = document.createElement("div");
+    row.className = "dashboard-row-item";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "dashboard-row-icon";
+    const icon = document.createElement("i");
+    icon.className = "bi bi-exclamation-triangle text-danger";
+    iconWrap.appendChild(icon);
+
+    const main = document.createElement("div");
+    main.className = "dashboard-row-main";
+
+    const label = document.createElement("div");
+    label.className = "dashboard-row-label";
+    label.textContent = "Unable to load version advisor";
+    main.appendChild(label);
+
+    const note = document.createElement("div");
+    note.className = "dashboard-row-note";
+    note.textContent = message;
+    main.appendChild(note);
+
+    row.appendChild(iconWrap);
+    row.appendChild(main);
+    body.appendChild(row);
+  }
+
+  function loadPostgresVersionAdvisor() {
+    renderPostgresVersionAdvisorLoading();
+
+    fetch("/api/v1/dashboard/postgresql_version", {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || payload.status === "error") {
+            throw new Error(payload.error || payload.message || "PostgreSQL version advisor request failed.");
+          }
+          return payload;
+        });
+      })
+      .then(renderPostgresVersionAdvisor)
+      .catch(function (error) {
+        renderPostgresVersionAdvisorError(error.message || "PostgreSQL version advisor request failed.");
+      });
+  }
+
+  function setDashboardStatus(element, iconClass, text, stateClass) {
+    if (!element) {
+      return;
+    }
+
+    element.classList.remove("good", "warn", "bad");
+    element.classList.add(stateClass);
+    element.replaceChildren();
+
+    const icon = document.createElement("i");
+    icon.className = "bi " + iconClass;
+    element.appendChild(icon);
+    element.appendChild(document.createTextNode(" " + text));
+  }
+
+  function buildDevAdvisorTypeRow(recommendationType) {
+    const row = document.createElement("div");
+    row.className = "dashboard-row-item dashboard-advisor-type-item";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "dashboard-row-icon";
+    const icon = document.createElement("i");
+    icon.className = "bi bi-check-circle-fill text-success";
+    if (recommendationType.highest_priority === "HIGH") {
+      icon.className = "bi bi-exclamation-triangle-fill text-danger";
+    } else if (recommendationType.highest_priority === "MEDIUM") {
+      icon.className = "bi bi-exclamation-circle-fill text-warning";
+    }
+    iconWrap.appendChild(icon);
+
+    const main = document.createElement("div");
+    main.className = "dashboard-row-main";
+
+    const label = document.createElement("div");
+    label.className = "dashboard-row-label";
+    label.textContent = recommendationType.label || recommendationType.recommendation_id || "Advisor recommendation";
+    main.appendChild(label);
+
+    const note = document.createElement("div");
+    note.className = "dashboard-row-note";
+    const priorityCounts = recommendationType.priority_counts || {};
+    const parts = [];
+    if (priorityCounts.HIGH) {
+      parts.push(priorityCounts.HIGH + " HIGH");
+    }
+    if (priorityCounts.MEDIUM) {
+      parts.push(priorityCounts.MEDIUM + " MEDIUM");
+    }
+    if (priorityCounts.LOW) {
+      parts.push(priorityCounts.LOW + " LOW");
+    }
+    note.textContent = parts.join(", ") || "No priority details";
+    main.appendChild(note);
+
+    const rank = document.createElement("div");
+    rank.className = "dashboard-row-value dashboard-recommendation-rank";
+
+    const rankValue = document.createElement("strong");
+    rankValue.textContent = recommendationType.total || 0;
+    rank.appendChild(rankValue);
+    rank.appendChild(document.createElement("br"));
+
+    const totalLabel = document.createElement("small");
+    totalLabel.textContent = recommendationType.total === 1 ? "recommendation" : "recommendations";
+    rank.appendChild(totalLabel);
+
+    row.appendChild(iconWrap);
+    row.appendChild(main);
+    row.appendChild(rank);
+
+    return row;
+  }
+
+  function renderDevAdvisorTypes(summary) {
+    const body = document.getElementById("dashboardDevAdvisorBody");
+    if (!body) {
+      return;
+    }
+
+    body.replaceChildren();
+
+    if (!summary || !summary.total) {
+      const row = document.createElement("div");
+      row.className = "dashboard-row-item";
+
+      const iconWrap = document.createElement("div");
+      iconWrap.className = "dashboard-row-icon";
+      const icon = document.createElement("i");
+      icon.className = "bi bi-check-circle";
+      iconWrap.appendChild(icon);
+
+      const main = document.createElement("div");
+      main.className = "dashboard-row-main";
+
+      const label = document.createElement("div");
+      label.className = "dashboard-row-label";
+      label.textContent = "No DEV recommendation";
+      main.appendChild(label);
+
+      const note = document.createElement("div");
+      note.className = "dashboard-row-note";
+      note.textContent = "Global Advisor did not find any active DEV item for this database.";
+      main.appendChild(note);
+
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      body.appendChild(row);
+      return;
+    }
+
+    (summary.by_type || []).forEach(function (recommendationType) {
+      body.appendChild(buildDevAdvisorTypeRow(recommendationType));
+    });
+  }
+
+  function renderDevAdvisorSummary(payload) {
+    const summary = payload.summary || {};
+    const score = Number(summary.database_score || 0);
+    const total = Number(summary.total || 0);
+    const highPriority = (summary.priority_counts && summary.priority_counts.HIGH) || 0;
+    const mediumPriority = (summary.priority_counts && summary.priority_counts.MEDIUM) || 0;
+    const statusClass = score >= 80 ? "good" : (score >= 55 ? "warn" : "bad");
+
+    const scoreArc = document.getElementById("dashboardDevScoreArc");
+    const scoreValue = document.getElementById("dashboardDevScoreValue");
+    const totalValue = document.getElementById("dashboardDevTotal");
+    const conclusion = document.getElementById("dashboardDevConclusion");
+    const actionMeta = document.getElementById("dashboardDevActionMeta");
+    const status = document.getElementById("dashboardDevStatus");
+
+    if (scoreArc) {
+      scoreArc.style.setProperty("--dashboard-health", String(score * 3.6) + "deg");
+    }
+    if (scoreValue) {
+      scoreValue.textContent = String(score);
+    }
+    if (totalValue) {
+      totalValue.textContent = String(total);
+    }
+    if (actionMeta) {
+      actionMeta.textContent = total === 1 ? "1 item" : String(total) + " items";
+    }
+    if (conclusion) {
+      if (total === 0) {
+        conclusion.textContent = "No active DEV recommendation was found for this database.";
+      } else {
+        conclusion.textContent = "Global Advisor found " + total + " DEV recommendation(s), with " + highPriority + " high priority and " + mediumPriority + " medium priority item(s).";
+      }
+    }
+
+    setDashboardStatus(
+      status,
+      total === 0 ? "bi-check-circle-fill" : "bi-stars",
+      total === 0 ? "No DEV item" : "Advisor ready",
+      total === 0 ? "good" : statusClass
+    );
+
+    renderDevAdvisorTypes(summary);
+  }
+
+  function renderDevAdvisorError(message) {
+    const scoreValue = document.getElementById("dashboardDevScoreValue");
+    const totalValue = document.getElementById("dashboardDevTotal");
+    const conclusion = document.getElementById("dashboardDevConclusion");
+    const actionMeta = document.getElementById("dashboardDevActionMeta");
+    const status = document.getElementById("dashboardDevStatus");
+    const body = document.getElementById("dashboardDevAdvisorBody");
+
+    if (scoreValue) {
+      scoreValue.textContent = "--";
+    }
+    if (totalValue) {
+      totalValue.textContent = "--";
+    }
+    if (conclusion) {
+      conclusion.textContent = message;
+    }
+    if (actionMeta) {
+      actionMeta.textContent = "unavailable";
+    }
+    setDashboardStatus(status, "bi-x-circle-fill", "Advisor unavailable", "bad");
+
+    if (body) {
+      body.replaceChildren();
+
+      const row = document.createElement("div");
+      row.className = "dashboard-row-item";
+
+      const iconWrap = document.createElement("div");
+      iconWrap.className = "dashboard-row-icon";
+      const icon = document.createElement("i");
+      icon.className = "bi bi-exclamation-triangle";
+      iconWrap.appendChild(icon);
+
+      const main = document.createElement("div");
+      main.className = "dashboard-row-main";
+
+      const label = document.createElement("div");
+      label.className = "dashboard-row-label";
+      label.textContent = "Unable to load DEV advisor";
+      main.appendChild(label);
+
+      const note = document.createElement("div");
+      note.className = "dashboard-row-note";
+      note.textContent = message;
+      main.appendChild(note);
+
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      body.appendChild(row);
+    }
+  }
+
+  function loadDevAdvisorSummary() {
+    fetch("/api/v1/dashboard/dev_advisor", {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || payload.status === "error") {
+            throw new Error(payload.error || payload.message || "DEV advisor request failed.");
+          }
+          return payload;
+        });
+      })
+      .then(renderDevAdvisorSummary)
+      .catch(function (error) {
+        renderDevAdvisorError(error.message || "DEV advisor request failed.");
+      });
+  }
 </script>
 {% endblock javascripts %}

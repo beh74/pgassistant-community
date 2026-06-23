@@ -12,11 +12,16 @@
 
     {% if dbinfo['error'] %}
     <div id="database-error" class="alert connect-error-alert d-flex align-items-start mb-4" role="alert">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-diamond me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
-        <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
-        <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
-      </svg>
-      <div>{{ dbinfo['error'] }}</div>
+      <div class="connect-error-icon flex-shrink-0" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" class="bi bi-exclamation-triangle-fill" viewBox="0 0 20 20">
+          <path d="M8.982 1.566a1.13 1.13 0 0 0-1.964 0L.165 13.233c-.457.778.091 1.767.982 1.767h13.706c.89 0 1.438-.99.982-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+        </svg>
+      </div>
+      <div class="connect-error-content">
+        <div class="connect-error-title">Connection failed</div>
+        <div class="connect-error-message">{{ dbinfo['error'] }}</div>
+        <div class="connect-error-hint">Check the host, port, database name, user, password, and connection URI options.</div>
+      </div>
     </div>
     {% endif %}
 

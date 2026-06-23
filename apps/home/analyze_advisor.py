@@ -37,6 +37,7 @@ def analyze_plan_for_safe_indexes(
         scan_findings: List[helpers.ScanFinding] = []
         join_findings: List[helpers.JoinFinding] = []
         order_by_findings: List[helpers.OrderByFinding] = []
+        group_by_findings: List[helpers.GroupByFinding] = []
         alias_map: Dict[str, Dict[str, str]] = {}
 
         helpers.collect_relation_aliases(root, alias_map)
@@ -45,6 +46,7 @@ def analyze_plan_for_safe_indexes(
             scan_findings,
             join_findings,
             order_by_findings=order_by_findings,
+            group_by_findings=group_by_findings,
         )
 
         query_stats = helpers.load_query_stats(con, queryid) if queryid is not None else None
@@ -109,6 +111,33 @@ def analyze_plan_for_safe_indexes(
             )
 
         # ------------------------------------------------------------
+        # GROUP BY / Aggregate-based recommendations
+        # ------------------------------------------------------------
+        for finding in group_by_findings:
+            meta = helpers.load_table_meta(con, finding.schema, finding.table)
+            if meta is None:
+                recommendations.append(
+                    helpers.Recommendation(
+                        schema=finding.schema,
+                        table=finding.table,
+                        confidence="none",
+                        reason="Could not load table metadata for GROUP BY analysis.",
+                        node_type=finding.node_type,
+                        access_path=finding.child_node_type,
+                        used_index_name=finding.child_index_name,
+                        index_cond=finding.child_index_cond,
+                        recheck_cond=finding.child_recheck_cond,
+                        filter_expr=finding.child_filter_expr,
+                        recommendation_type="group_by_index_observation",
+                    )
+                )
+                continue
+
+            recommendations.append(
+                evaluate_group_by_candidate(con, finding, meta, query_stats)
+            )
+
+        # ------------------------------------------------------------
         # Join-based recommendations
         # ------------------------------------------------------------
         for join in join_findings:
@@ -149,6 +178,7 @@ def analyze_plan_for_safe_indexes(
             "scan_findings": [asdict(f) for f in scan_findings],
             "join_findings": [asdict(j) for j in join_findings],
             "order_by_findings": [asdict(o) for o in order_by_findings],
+            "group_by_findings": [asdict(g) for g in group_by_findings],
             "query_stats": asdict(query_stats) if query_stats else None,
         }
 
@@ -1062,6 +1092,159 @@ def evaluate_order_by_candidate(
     )
 
 
+def evaluate_group_by_candidate(
+    con,
+    finding: helpers.GroupByFinding,
+    meta: helpers.TableMeta,
+    query_stats: Optional[helpers.QueryStats] = None,
+) -> helpers.Recommendation:
+    group_columns = helpers.extract_simple_group_keys(
+        finding.group_key,
+        alias=finding.alias,
+        table=finding.table,
+    )
+
+    base_reason = (
+        f"{finding.node_type} GROUP BY above {finding.child_node_type} on "
+        f"{finding.schema}.{finding.table}."
+    )
+    group_context = helpers.build_group_by_context_reason(finding)
+    if group_context:
+        base_reason += " " + group_context + "."
+
+    if not group_columns:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " Group keys are not simple single-table columns, so no safe GROUP BY index recommendation is emitted."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_group_columns=None,
+            recommendation_type="group_by_index_observation",
+        )
+
+    if helpers.is_small_table(meta):
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " Table is small; adding a dedicated GROUP BY index is usually not worth it."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_columns=group_columns,
+            candidate_group_columns=group_columns,
+            recommendation_type="group_by_index_observation",
+        )
+
+    matched_index = helpers.find_equivalent_index(meta.indexes, group_columns)
+    if matched_index:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + f' GROUP BY columns ({", ".join(group_columns)}) are already covered by existing index "{matched_index}".'
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_columns=group_columns,
+            candidate_group_columns=group_columns,
+            existing_index_match=matched_index,
+            stats_reason=load_candidate_stats_reason(con, finding.schema, finding.table, group_columns),
+            recommendation_type="group_by_index_observation",
+        )
+
+    group_is_meaningful = (
+        finding.sort_method is not None
+        or helpers.group_by_spilled_to_disk(finding)
+        or finding.actual_total_time >= 1.0
+        or helpers.is_high_workload(query_stats)
+    )
+
+    if not group_is_meaningful:
+        return helpers.Recommendation(
+            schema=finding.schema,
+            table=finding.table,
+            confidence="none",
+            reason=(
+                base_reason
+                + " The GROUP BY does not look expensive enough and the workload is not significant enough for an automatic index recommendation."
+            ),
+            node_type=finding.node_type,
+            access_path=finding.child_node_type,
+            used_index_name=finding.child_index_name,
+            index_cond=finding.child_index_cond,
+            recheck_cond=finding.child_recheck_cond,
+            filter_expr=finding.child_filter_expr,
+            candidate_columns=group_columns,
+            candidate_group_columns=group_columns,
+            stats_reason=load_candidate_stats_reason(con, finding.schema, finding.table, group_columns),
+            recommendation_type="group_by_index_observation",
+        )
+
+    if helpers.group_by_spilled_to_disk(finding):
+        reason = (
+            base_reason
+            + " The sort used by GROUP BY spilled to disk. A B-tree index matching the GROUP BY columns may avoid or reduce the sort, but review the query shape before creating it."
+        )
+    elif finding.sort_method is not None:
+        reason = (
+            base_reason
+            + " GROUP BY is fed by an explicit sort. A B-tree index matching the GROUP BY columns may let PostgreSQL read rows in grouped order and avoid that sort."
+        )
+    else:
+        reason = (
+            base_reason
+            + " The plan groups rows on a non-small table. An index matching the GROUP BY columns may help, especially if this query is frequent; PostgreSQL may still prefer HashAggregate depending on data distribution."
+        )
+
+    return helpers.Recommendation(
+        schema=finding.schema,
+        table=finding.table,
+        confidence="review",
+        reason=reason,
+        node_type=finding.node_type,
+        access_path=finding.child_node_type,
+        used_index_name=finding.child_index_name,
+        index_cond=finding.child_index_cond,
+        recheck_cond=finding.child_recheck_cond,
+        filter_expr=finding.child_filter_expr,
+        candidate_columns=group_columns,
+        candidate_group_columns=group_columns,
+        create_index_sql=helpers.build_create_index_sql(
+            finding.schema,
+            finding.table,
+            group_columns,
+        ),
+        stats_reason=load_candidate_stats_reason(con, finding.schema, finding.table, group_columns),
+        row_estimation_reason=helpers.build_row_estimation_reason(
+            finding.child_plan_rows,
+            finding.child_actual_rows,
+        ),
+        recommendation_type="group_by_index",
+    )
+
+
 def evaluate_join_candidate(
     con,
     join: helpers.JoinFinding,
@@ -1218,6 +1401,23 @@ def pretty_print_analysis(result: Dict[str, Any]) -> None:
                 print(f"child_index_cond: {order_finding['child_index_cond']}")
             print(f"actual_total_time: {order_finding['actual_total_time']}")
 
+    if result.get("group_by_findings"):
+        print("=" * 80)
+        print("GROUP BY FINDINGS")
+        for group_finding in result["group_by_findings"]:
+            print("-" * 80)
+            print(f"{group_finding['schema']}.{group_finding['table']} ({group_finding['node_type']})")
+            print(f"child_access_path: {group_finding['child_node_type']}")
+            if group_finding.get("strategy"):
+                print(f"strategy: {group_finding['strategy']}")
+            if group_finding.get("group_key"):
+                print(f"group_key: {group_finding['group_key']}")
+            if group_finding.get("child_filter_expr"):
+                print(f"child_filter: {group_finding['child_filter_expr']}")
+            if group_finding.get("child_index_cond"):
+                print(f"child_index_cond: {group_finding['child_index_cond']}")
+            print(f"actual_total_time: {group_finding['actual_total_time']}")
+
     if result.get("join_findings"):
         print("=" * 80)
         print("JOIN FINDINGS")
@@ -1256,6 +1456,8 @@ def pretty_print_analysis(result: Dict[str, Any]) -> None:
             print(f"columns: {rec['candidate_columns']}")
         if rec.get("candidate_order_columns"):
             print(f"order_columns: {rec['candidate_order_columns']}")
+        if rec.get("candidate_group_columns"):
+            print(f"group_columns: {rec['candidate_group_columns']}")
         if rec.get("recommendation_type"):
             print(f"recommendation_type: {rec['recommendation_type']}")
         if rec.get("existing_index_match"):

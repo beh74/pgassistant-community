@@ -92,6 +92,34 @@ class OrderByFinding:
 
 
 @dataclass
+class GroupByFinding:
+    node_type: str
+    strategy: Optional[str]
+    group_key: Optional[List[str]]
+    schema: str
+    table: str
+    alias: Optional[str]
+    child_node_type: str
+    child_index_name: Optional[str]
+    child_index_cond: Optional[str]
+    child_recheck_cond: Optional[str]
+    child_filter_expr: Optional[str]
+    child_actual_rows: float
+    child_plan_rows: float
+    actual_rows: float
+    plan_rows: float
+    actual_loops: float
+    startup_cost: float
+    total_cost: float
+    actual_total_time: float
+    shared_hit_blocks: int
+    shared_read_blocks: int
+    sort_method: Optional[str] = None
+    sort_space_type: Optional[str] = None
+    sort_space_used: Optional[float] = None
+
+
+@dataclass
 class QueryStats:
     queryid: str
     calls: float
@@ -129,6 +157,7 @@ class Recommendation:
     filter_expr: Optional[str] = None
     candidate_columns: Optional[List[str]] = None
     candidate_order_columns: Optional[List[Dict[str, str]]] = None
+    candidate_group_columns: Optional[List[str]] = None
     recommendation_type: Optional[str] = None
     create_index_sql: Optional[str] = None
     existing_index_match: Optional[str] = None
@@ -204,6 +233,7 @@ def walk_plan_collect_findings(
     scan_findings: List[ScanFinding],
     join_findings: List[JoinFinding],
     order_by_findings: Optional[List[OrderByFinding]] = None,
+    group_by_findings: Optional[List[GroupByFinding]] = None,
     parent_node_type: Optional[str] = None,
 ) -> None:
     node_type = node.get("Node Type", "")
@@ -278,7 +308,11 @@ def walk_plan_collect_findings(
     # ------------------------------------------------------------
     # ORDER BY / Sort findings
     # ------------------------------------------------------------
-    if order_by_findings is not None and node_type in {"Sort", "Incremental Sort"}:
+    if (
+        order_by_findings is not None
+        and node_type in {"Sort", "Incremental Sort"}
+        and parent_node_type not in {"Aggregate", "Group"}
+    ):
         child = first_direct_scan_child(node)
         if child is not None:
             order_by_findings.append(
@@ -315,12 +349,55 @@ def walk_plan_collect_findings(
                 )
             )
 
+    # ------------------------------------------------------------
+    # GROUP BY / Aggregate findings
+    # ------------------------------------------------------------
+    if group_by_findings is not None and node.get("Group Key"):
+        child = first_simple_group_child(node)
+        if child is not None:
+            sort_node = child.get("_pga_sort_node")
+            scan_node = child.get("_pga_scan_node", child)
+
+            group_by_findings.append(
+                GroupByFinding(
+                    node_type=node_type,
+                    strategy=node.get("Strategy"),
+                    group_key=node.get("Group Key"),
+                    schema=scan_node["Schema"],
+                    table=scan_node["Relation Name"],
+                    alias=scan_node.get("Alias"),
+                    child_node_type=scan_node.get("Node Type", ""),
+                    child_index_name=scan_node.get("Index Name"),
+                    child_index_cond=scan_node.get("Index Cond"),
+                    child_recheck_cond=scan_node.get("Recheck Cond"),
+                    child_filter_expr=scan_node.get("Filter"),
+                    child_actual_rows=float(scan_node.get("Actual Rows", 0) or 0),
+                    child_plan_rows=float(scan_node.get("Plan Rows", 0) or 0),
+                    actual_rows=float(node.get("Actual Rows", 0) or 0),
+                    plan_rows=float(node.get("Plan Rows", 0) or 0),
+                    actual_loops=float(node.get("Actual Loops", 0) or 0),
+                    startup_cost=float(node.get("Startup Cost", 0) or 0),
+                    total_cost=float(node.get("Total Cost", 0) or 0),
+                    actual_total_time=float(node.get("Actual Total Time", 0) or 0),
+                    shared_hit_blocks=int(node.get("Shared Hit Blocks", 0) or 0),
+                    shared_read_blocks=int(node.get("Shared Read Blocks", 0) or 0),
+                    sort_method=sort_node.get("Sort Method") if sort_node else None,
+                    sort_space_type=sort_node.get("Sort Space Type") if sort_node else None,
+                    sort_space_used=(
+                        float(sort_node.get("Sort Space Used"))
+                        if sort_node and sort_node.get("Sort Space Used") is not None
+                        else None
+                    ),
+                )
+            )
+
     for child in node.get("Plans", []) or []:
         walk_plan_collect_findings(
             child,
             scan_findings,
             join_findings,
             order_by_findings=order_by_findings,
+            group_by_findings=group_by_findings,
             parent_node_type=node_type,
         )
 
@@ -339,6 +416,27 @@ def first_direct_scan_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if child.get("Node Type") in {"Seq Scan", "Index Scan", "Index Only Scan", "Bitmap Heap Scan"} \
        and child.get("Relation Name") and child.get("Schema"):
         return child
+
+    return None
+
+
+def first_simple_group_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    plans = node.get("Plans", []) or []
+    if len(plans) != 1:
+        return None
+
+    child = plans[0]
+    scan = first_direct_scan_child({"Plans": [child]})
+    if scan is not None:
+        return scan
+
+    if child.get("Node Type") in {"Sort", "Incremental Sort"}:
+        scan = first_direct_scan_child(child)
+        if scan is not None:
+            return {
+                "_pga_sort_node": child,
+                "_pga_scan_node": scan,
+            }
 
     return None
 
@@ -1435,6 +1533,15 @@ def extract_simple_sort_keys(
     return result
 
 
+def extract_simple_group_keys(
+    keys: Optional[List[str]],
+    alias: Optional[str],
+    table: str,
+) -> List[str]:
+    order_keys = extract_simple_sort_keys(keys, alias=alias, table=table)
+    return [item["column"] for item in order_keys]
+
+
 def merge_columns_with_order(
     filter_columns: List[str],
     order_columns: List[Dict[str, str]],
@@ -1506,6 +1613,32 @@ def build_sort_context_reason(finding: OrderByFinding) -> str:
 
     if finding.actual_total_time:
         details.append(f"sort_actual_total_time={finding.actual_total_time:.3f} ms")
+
+    return "; ".join(details)
+
+
+def group_by_spilled_to_disk(finding: GroupByFinding) -> bool:
+    return (finding.sort_space_type or "").lower() == "disk"
+
+
+def build_group_by_context_reason(finding: GroupByFinding) -> str:
+    details: List[str] = []
+
+    if finding.strategy:
+        details.append(f"strategy={finding.strategy}")
+
+    if finding.group_key:
+        details.append(f"group_key={finding.group_key}")
+
+    if finding.sort_method:
+        details.append(f"sort_method={finding.sort_method}")
+
+    if finding.sort_space_type:
+        space = f", sort_space_used={finding.sort_space_used:g}kB" if finding.sort_space_used is not None else ""
+        details.append(f"sort_space_type={finding.sort_space_type}{space}")
+
+    if finding.actual_total_time:
+        details.append(f"group_actual_total_time={finding.actual_total_time:.3f} ms")
 
     return "; ".join(details)
 

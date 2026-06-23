@@ -20,6 +20,16 @@ def get_top_10_global_advisor_recommendations(session, yaml_path="advisor_enrich
     return result["recommendations"]
 
 
+def get_dev_advisor_dashboard(session, yaml_path="advisor_enriched.yml"):
+    """Return DEV team advisor data prepared for the dashboard."""
+    return global_advisor.run_dev_advisor_dashboard(session, yaml_path=yaml_path)
+
+
+def get_postgresql_version_advisor(session):
+    """Return PostgreSQL version guidance from the Global Advisor logic."""
+    return global_advisor.get_postgresql_version_advisor(session)
+
+
 """
 curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
   -H "Content-Type: application/json" \

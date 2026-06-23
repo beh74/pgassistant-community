@@ -192,13 +192,14 @@ def normalize_query_for_parameter_analysis(query: str) -> str:
       DATE $3       -> $3::date
       TIMESTAMP $4  -> $4::timestamp
       TEXT $5       -> $5::text
+      INTERVAL $6   -> $6::interval
     """
     if not query:
         return query
 
     normalized = query
 
-    replacements = {
+    typed_literal_replacements = {
         "DATE": "date",
         "TIMESTAMP": "timestamp",
         "INTEGER": "integer",
@@ -211,10 +212,13 @@ def normalize_query_for_parameter_analysis(query: str) -> str:
         "NUMERIC": "numeric",
         "REAL": "real",
         "DOUBLE PRECISION": "double precision",
+        "INTERVAL": "interval",
     }
 
-    # longest first
-    for sql_type, pg_type in sorted(replacements.items(), key=lambda x: -len(x[0])):
+    # pg_stat_statements can emit normalized forms such as DATE $1 or
+    # INTERVAL $2. PostgreSQL accepts DATE '2024-01-01', but not DATE $1, so
+    # generic plans need the parameter written as an explicit cast.
+    for sql_type, pg_type in sorted(typed_literal_replacements.items(), key=lambda x: -len(x[0])):
         pattern = rf"\b{re.escape(sql_type)}\s+\$(\d+)\b"
         normalized = re.sub(
             pattern,
@@ -256,30 +260,176 @@ def extract_ordered_parameters(query: str) -> List[str]:
     return [str(p) for p in params]
 
 
+SQL_IDENTIFIER = r'(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)'
+SQL_COLUMN_REF = rf'{SQL_IDENTIFIER}(?:\s*\.\s*{SQL_IDENTIFIER}){{0,2}}'
+SQL_PARAM_REF = (
+    r'\$(?P<param>\d+)'
+    r'(?:\s*::\s*[A-Za-z_][A-Za-z0-9_\[\]"]*(?:\s+[A-Za-z_][A-Za-z0-9_\[\]"]*)?)?'
+)
+SQL_COMPARISON_OP = r'=|>=|<=|<>|!=|>|<|LIKE|ILIKE'
+
+
+def _clean_sql_identifier(identifier: str) -> str:
+    identifier = (identifier or "").strip()
+    if identifier.startswith('"') and identifier.endswith('"'):
+        return identifier[1:-1].replace('""', '"')
+    return identifier
+
+
+def _normalize_column_ref(column_ref: str) -> str:
+    parts = [
+        _clean_sql_identifier(part)
+        for part in re.split(r"\s*\.\s*", column_ref.strip())
+        if part.strip()
+    ]
+    return ".".join(parts)
+
+
+def _sql_without_comments(query: str) -> str:
+    query = re.sub(r"--[^\n\r]*", " ", query or "")
+    query = re.sub(r"/\*.*?\*/", " ", query, flags=re.DOTALL)
+    return query
+
+
+def extract_query_table_aliases(query: str) -> Dict[str, str]:
+    aliases: Dict[str, str] = {}
+    cleaned = _sql_without_comments(query)
+
+    table_ref = rf'(?P<table>{SQL_IDENTIFIER}(?:\s*\.\s*{SQL_IDENTIFIER})?)'
+    alias_ref = rf'(?P<alias>{SQL_IDENTIFIER})'
+
+    patterns = [
+        rf'\b(?:FROM|JOIN)\s+{table_ref}(?:\s+(?:AS\s+)?{alias_ref})?',
+        rf'\bUPDATE\s+{table_ref}(?:\s+(?:AS\s+)?{alias_ref})?',
+        rf'\bINSERT\s+INTO\s+{table_ref}',
+    ]
+
+    reserved = {
+        "where", "join", "left", "right", "inner", "outer", "full", "cross",
+        "on", "set", "values", "select", "returning", "group", "order",
+        "limit", "having", "union",
+    }
+
+    for pattern in patterns:
+        for match in re.finditer(pattern, cleaned, flags=re.IGNORECASE):
+            table = _normalize_column_ref(match.group("table"))
+            alias = match.groupdict().get("alias")
+            table_key = table.split(".")[-1]
+            aliases[table_key] = table
+
+            if alias:
+                alias_key = _clean_sql_identifier(alias).lower()
+                if alias_key not in reserved:
+                    aliases[_clean_sql_identifier(alias)] = table
+
+    return aliases
+
+
+def _default_table_from_aliases(aliases: Dict[str, str]) -> Optional[str]:
+    unique_tables = []
+    for table in aliases.values():
+        if table not in unique_tables:
+            unique_tables.append(table)
+    return unique_tables[0] if len(unique_tables) == 1 else None
+
+
+def _resolve_column_ref(column_ref: str, aliases: Dict[str, str]) -> str:
+    column_ref = _normalize_column_ref(column_ref)
+    parts = column_ref.split(".")
+
+    if len(parts) >= 3:
+        table = ".".join(parts[-3:-1])
+        return f"{table}.{parts[-1]}"
+
+    if len(parts) == 2:
+        prefix, column = parts
+        table = aliases.get(prefix, prefix)
+        return f"{table}.{column}"
+
+    default_table = _default_table_from_aliases(aliases)
+    return f"{default_table}.{parts[0]}" if default_table else parts[0]
+
+
+def _add_param_column(result: Dict[str, str], param: str, column_ref: str, aliases: Dict[str, str]) -> None:
+    if param and column_ref:
+        result[param] = _resolve_column_ref(column_ref, aliases)
+
+
 def fallback_extract_parameter_columns(query: str) -> Dict[str, str]:
     """
-    Fallback extractor for simple predicates like:
+    Fallback extractor for common PostgreSQL parameter patterns like:
       col = $1
+      $1 = col
       alias.col = $2
       col >= $3::date
+      col BETWEEN $1 AND $2
+      col IN ($1, $2)
+      col = ANY($1)
+      UPDATE table SET col = $1 WHERE id = $2
+      INSERT INTO table (a, b) VALUES ($1, $2)
 
     Returns:
       {'1': 'orders.customer_id', '2': 'orders.employee_id'}
-      or alias-based names when table resolution is not available.
+      or column names when table resolution is not available.
     """
     result: Dict[str, str] = {}
+    cleaned = _sql_without_comments(query)
+    aliases = extract_query_table_aliases(cleaned)
 
-    pattern = re.compile(
-        r'(?P<lhs>(?:[A-Za-z_][A-Za-z0-9_]*\.)?[A-Za-z_][A-Za-z0-9_]*)\s*'
-        r'(=|>=|<=|>|<)\s*'
-        r'\$(?P<param>\d+)(?:::[A-Za-z_][A-Za-z0-9_\[\]"]*(?:\s+[A-Za-z_][A-Za-z0-9_\[\]"]*)?)?',
+    # col = $1, col >= CAST($1 AS type), etc.
+    rhs_param_pattern = re.compile(
+        rf'(?P<lhs>{SQL_COLUMN_REF})\s*(?:{SQL_COMPARISON_OP})\s*'
+        rf'(?:CAST\s*\(\s*)?{SQL_PARAM_REF}',
         flags=re.IGNORECASE,
     )
+    for match in rhs_param_pattern.finditer(cleaned):
+        _add_param_column(result, match.group("param"), match.group("lhs"), aliases)
 
-    for match in pattern.finditer(query):
-        lhs = match.group("lhs")
-        param = match.group("param")
-        result[param] = lhs
+    # $1 = col
+    lhs_param_pattern = re.compile(
+        rf'(?:CAST\s*\(\s*)?{SQL_PARAM_REF}(?:\s+AS\s+[A-Za-z_][A-Za-z0-9_\[\]"]+\s*\))?\s*'
+        rf'(?:{SQL_COMPARISON_OP})\s*(?P<rhs>{SQL_COLUMN_REF})',
+        flags=re.IGNORECASE,
+    )
+    for match in lhs_param_pattern.finditer(cleaned):
+        _add_param_column(result, match.group("param"), match.group("rhs"), aliases)
+
+    # col BETWEEN $1 AND $2
+    between_pattern = re.compile(
+        rf'(?P<lhs>{SQL_COLUMN_REF})\s+BETWEEN\s+{SQL_PARAM_REF}\s+AND\s+'
+        rf'\$(?P<param2>\d+)(?:\s*::\s*[A-Za-z_][A-Za-z0-9_\[\]"]*(?:\s+[A-Za-z_][A-Za-z0-9_\[\]"]*)?)?',
+        flags=re.IGNORECASE,
+    )
+    for match in between_pattern.finditer(cleaned):
+        _add_param_column(result, match.group("param"), match.group("lhs"), aliases)
+        _add_param_column(result, match.group("param2"), match.group("lhs"), aliases)
+
+    # col IN ($1, $2) and col = ANY($1)
+    list_pattern = re.compile(
+        rf'(?P<lhs>{SQL_COLUMN_REF})\s+(?:IN\s*\((?P<in_list>[^)]*)\)|'
+        rf'(?:=\s*)?(?:ANY|ALL)\s*\((?P<any_list>[^)]*)\))',
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    for match in list_pattern.finditer(cleaned):
+        values = match.group("in_list") or match.group("any_list") or ""
+        for param in re.findall(r"\$(\d+)", values):
+            _add_param_column(result, param, match.group("lhs"), aliases)
+
+    # INSERT INTO table (a, b) VALUES ($1, $2)
+    insert_pattern = re.compile(
+        rf'\bINSERT\s+INTO\s+(?P<table>{SQL_IDENTIFIER}(?:\s*\.\s*{SQL_IDENTIFIER})?)\s*'
+        rf'\((?P<columns>[^)]*)\)\s*VALUES\s*\((?P<values>[^)]*)\)',
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    for match in insert_pattern.finditer(cleaned):
+        table = _normalize_column_ref(match.group("table"))
+        columns = [_clean_sql_identifier(c.strip()) for c in match.group("columns").split(",")]
+        values = [v.strip() for v in match.group("values").split(",")]
+
+        for column, value in zip(columns, values):
+            param_match = re.search(r"\$(\d+)", value)
+            if param_match and column:
+                result[param_match.group(1)] = f"{table}.{column}"
 
     return result
 
@@ -387,7 +537,11 @@ def get_column_data_types(connection, table_column_pairs):
             (table_name, column_name) IN %s;
     """
     try:
-        formatted_pairs = [(table, column) for table, column in table_column_pairs]
+        formatted_pairs = [
+            (table.split(".")[-1], column)
+            for table, column in table_column_pairs
+            if table and column
+        ]
         if not formatted_pairs:
             print("No table-column pairs provided.")
             return {}
@@ -423,10 +577,12 @@ def _resolve_param_column_to_table_and_column(
     if not raw_column_ref:
         return None, None
 
-    parts = raw_column_ref.split(".")
+    aliases = extract_query_table_aliases(query)
+    column_ref = _resolve_column_ref(raw_column_ref, aliases)
+    parts = column_ref.split(".")
 
     if len(parts) >= 3:
-        return parts[-2], parts[-1]
+        return ".".join(parts[-3:-1]), parts[-1]
 
     if len(parts) == 2:
         return parts[0], parts[1]
@@ -443,11 +599,18 @@ def map_query_parameters(query, connection):
     """
     normalized_query = normalize_query_for_parameter_analysis(query)
 
+    fallback_columns = fallback_extract_parameter_columns(normalized_query)
+
     try:
         param_columns = analyze_param.extract_parameter_columns(normalized_query)
     except Exception as e:
         print(f"Warning: parameter extraction failed: {e}")
-        param_columns = fallback_extract_parameter_columns(normalized_query)
+        param_columns = {}
+
+    param_columns = {
+        **(param_columns or {}),
+        **fallback_columns,
+    }
 
     if not param_columns:
         print("No SQL parameters found by SQL parser.")
@@ -478,7 +641,11 @@ def map_query_parameters(query, connection):
                 (
                     key
                     for key in column_types.keys()
-                    if key[1] == column_name and key[0].endswith(f".{table_name}")
+                    if key[1] == column_name and (
+                        key[0] == table_name
+                        or key[0].endswith(f".{table_name}")
+                        or key[0].split(".")[-1] == table_name.split(".")[-1]
+                    )
                 ),
                 None,
             )

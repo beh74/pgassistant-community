@@ -141,6 +141,30 @@ def api_global_advisor():
         return jsonify({"error": str(e)}), 500
 
 
+@blueprint.route("/api/v1/dashboard/dev_advisor", methods=["GET"])
+def api_dashboard_dev_advisor():
+    try:
+        if not session.get("db_name"):
+            return jsonify({"status": "error", "error": "Database is not connected."}), 401
+
+        result = api_helper.get_dev_advisor_dashboard(session)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@blueprint.route("/api/v1/dashboard/postgresql_version", methods=["GET"])
+def api_dashboard_postgresql_version():
+    try:
+        if not session.get("db_name"):
+            return jsonify({"status": "error", "error": "Database is not connected."}), 401
+
+        result = api_helper.get_postgresql_version_advisor(session)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 @blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
 def api_reset_stats():
     try:

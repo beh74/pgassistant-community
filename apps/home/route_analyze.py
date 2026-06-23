@@ -3,7 +3,6 @@
 
 import json
 import math
-import re
 import traceback
 
 from apps.home import blueprint
@@ -32,6 +31,12 @@ def analyze_query(querid):
             plan_text = None
             advisor_result = None
             column_statistics = None
+            plan_mode = None
+            try:
+                pg_major_version = int(str(session.get("version") or 0).split(".")[0])
+            except (TypeError, ValueError):
+                pg_major_version = 0
+            generic_plan_available = pg_major_version >= 16
 
             # Clear any previous analyze-derived table list when opening a new query page (optional but recommended)
             prev_qid = session.get("analyze_querid")
@@ -48,30 +53,37 @@ def analyze_query(querid):
             tables = sqlhelper.get_tables(sql_query)
 
             # extract parameters list
-            pattern = r'\$[0-9]+'
-            parameters = re.findall(pattern, sql_query)
-            parameters = sorted(set(parameters), key=lambda p: int(p[1:]))
+            parameters = [
+                f"${param}"
+                for param in sqlhelper.extract_ordered_parameters(sql_query)
+            ]
 
             if request.method == 'POST':
-                params = {}
-                for key, val in request.form.items():
-                    # Verify parameters ($1, $2, ...)
-                    if key.startswith('$'):
-                        param_index = int(key[1:])  # Convert '$1' to 1
-                        if val is None or val.strip() == '':
-                            val = 'NULL'
-                        params[param_index] = val  # Add to dictionary
+                action = request.form.get('action')
 
-                sql_query = sqlhelper.replace_query_parameters(sql_query, params)
-                
-                sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
-                
-                # generic plan
-                #sql_query = database.get_pgstat_query_by_id(session, querid)
-                #sql_query_analyze = f" EXPLAIN (GENERIC_PLAN, VERBOSE,  SETTINGS, FORMAT JSON)  {sql_query}"
-                #print("SQL for GENERIC PLAN:", sql_query_analyze)
+                if action == 'generic_plan':
+                    if not generic_plan_available:
+                        raise ValueError("Generic plan requires PostgreSQL 16 or newer.")
 
-                if request.form.get('action') == 'analyze':
+                    plan_mode = "generic"
+                    sql_query = sqlhelper.normalize_query_for_parameter_analysis(sql_query)
+                    sql_query_analyze = f"EXPLAIN (GENERIC_PLAN TRUE, VERBOSE TRUE, SETTINGS TRUE, FORMAT JSON) {sql_query}"
+
+                else:
+                    plan_mode = "analyze"
+                    params = {}
+                    for key, val in request.form.items():
+                        # Verify parameters ($1, $2, ...)
+                        if key.startswith('$'):
+                            param_index = int(key[1:])  # Convert '$1' to 1
+                            if val is None or val.strip() == '':
+                                val = 'NULL'
+                            params[param_index] = val  # Add to dictionary
+
+                    sql_query = sqlhelper.replace_query_parameters(sql_query, params)
+                    sql_query_analyze = f"EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE, SETTINGS, FORMAT JSON) {sql_query}"
+
+                if action in ('analyze', 'generic_plan'):
                     parameters = {}
                     rows = database.generic_select_with_sql(session, sql_query_analyze)
 
@@ -139,7 +151,7 @@ def analyze_query(querid):
 
                     # generate mermaid code
                     mermaid_code, err = graph.build_mermaid_erd_from_explain_stats(statistics, session)
-                elif request.form.get('action') == 'chatgpt':
+                elif action == 'chatgpt':
                     posted_prompt = (request.form.get("chatgpt") or "").strip()
                     
 
@@ -155,7 +167,7 @@ def analyze_query(querid):
                         print(tb)
                         return render_template('home/page-500.html', err=e1, traceback_text=tb), 500
 
-                elif request.form.get('action') == 'ddl':
+                elif action == 'ddl':
                     # ✅ Use the same table list as the LLM (derived from ANALYZE if available)
                     tables_from_analyze = session.get("analyze_tables")
                     tables_from_sql = sqlhelper.get_tables(sql_query)
@@ -214,7 +226,9 @@ def analyze_query(querid):
                 fmt_int=fmt_int,
                 mermaid_code=mermaid_code,
                 advisor_result=advisor_result,
-                queryplan=plan_text
+                queryplan=plan_text,
+                generic_plan_available=generic_plan_available,
+                plan_mode=plan_mode
             )
         else:
             dbinfo = {}

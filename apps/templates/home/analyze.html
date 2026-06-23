@@ -999,13 +999,18 @@
         {% endif %}
 
         {% if not rows %}
-        <div class="mt-4">
+        <div class="mt-4 d-flex flex-wrap gap-2">
           <button id="analyze" type="submit" class="btn btn-primary" name="submit_analyze" value="analyze" onclick="myButtonAnalyze(this)">
             <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"></path>
             </svg>
             Analyze
           </button>
+          {% if generic_plan_available %}
+          <button id="generic_plan" type="submit" class="btn btn-outline-primary" name="submit_generic_plan" value="generic_plan" onclick="myButtonGenericPlan(this)">
+            Generic plan
+          </button>
+          {% endif %}
         </div>
         {% endif %}
       </form>
@@ -1070,7 +1075,55 @@
                 </div>
               </div>
 
+              {% if plan_mode == 'generic' %}
+              <div class="alert alert-info mb-4">
+                Generic plan mode uses PostgreSQL estimated planning without executing the query. Runtime timings, buffers, WAL, and actual row counts are not available.
+              </div>
+              {% endif %}
+
               <div class="row g-3">
+                {% if plan_mode == 'generic' %}
+                <div class="col-12 col-xl-5">
+                  <div class="card insight-card h-100">
+                    <div class="card-body p-4">
+                      <div class="d-flex align-items-start justify-content-between gap-3">
+                        <div>
+                          <div class="analyze-kpi-label">Plan mode</div>
+                          <div class="mt-2">
+                            <span class="pg-badge">
+                              <span class="fs-5 fw-semibold">Estimated generic plan</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="insight-callout mt-4">
+                        <div class="fw-semibold mb-1">Insight</div>
+                        <div class="mb-0">This plan shows PostgreSQL's estimated strategy for parameterized execution. It is useful for understanding plan shape, but it cannot classify runtime bottlenecks.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6 col-xl-2">
+                  <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                      <div class="kpi-title">Execution metrics</div>
+                      <div class="kpi-value">N/A</div>
+                      <div class="muted-small mt-2">The query was not executed.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6 col-xl-2">
+                  <div class="card kpi-card h-100">
+                    <div class="card-body p-4">
+                      <div class="kpi-title">Planning metrics</div>
+                      <div class="kpi-value">N/A</div>
+                      <div class="muted-small mt-2">Generic plans expose estimates, not timing distribution.</div>
+                    </div>
+                  </div>
+                </div>
+                {% else %}
                 <div class="col-12 col-xl-5">
                   <div class="card insight-card h-100">
                     <div class="card-body p-4">
@@ -1128,6 +1181,7 @@
                     </div>
                   </div>
                 </div>
+                {% endif %}
 
                 <div class="col-12 col-md-6 col-xl-3">
                   <div class="card kpi-card h-100">
@@ -1140,7 +1194,7 @@
                 </div>
               </div>
 
-              {% if result.summary.buffers_total is defined %}
+              {% if plan_mode != 'generic' and result.summary.buffers_total is defined %}
                 {% set bt = result.summary.buffers_total %}
                 {% set rr = result.summary.buffers_read_ratio|default(0) %}
                 {% set rr_pct = 100 * rr %}
@@ -1249,7 +1303,7 @@
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
               <h2 class="h4 mb-1">Index Advisor</h2>
-              <p class="analyze-muted mb-0">Suggestions derived from the plan, including filters, joins, ORDER BY patterns, confidence, and technical context.</p>
+              <p class="analyze-muted mb-0">Suggestions derived from the plan, including filters, joins, ORDER BY, GROUP BY patterns, confidence, and technical context.</p>
             </div>
             {% if advisor_result and advisor_result.recommendations %}
               <span class="badge text-bg-secondary">{{ advisor_result.recommendations | length }} recommendations</span>
@@ -1305,6 +1359,12 @@
                                 {{ order_col.column }} {{ order_col.direction|default('ASC') }}{% if not loop.last %}, {% endif %}
                               {% endfor %}
                             </span>
+                          </span>
+                        {% endif %}
+                        {% if rec.candidate_group_columns is defined and rec.candidate_group_columns %}
+                          <span class="advisor-meta-pill">
+                            <span class="advisor-meta-label">GROUP BY</span>
+                            <span class="advisor-meta-value">{{ rec.candidate_group_columns | join(', ') }}</span>
                           </span>
                         {% endif %}
                       </div>
@@ -1417,6 +1477,17 @@
                               <span>{{ order_col.column }}</span>
                               <span class="advisor-order-direction">{{ order_col.direction|default('ASC') }}</span>
                             </span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      {% endif %}
+
+                      {% if rec.candidate_group_columns is defined and rec.candidate_group_columns %}
+                      <div class="advisor-section">
+                        <div class="advisor-section-title">GROUP BY columns</div>
+                        <div class="d-flex flex-wrap gap-2">
+                          {% for col in rec.candidate_group_columns %}
+                            <span class="advisor-column-pill">{{ col }}</span>
                           {% endfor %}
                         </div>
                       </div>
@@ -2322,6 +2393,16 @@ function myButtonAnalyze(el) {
   } else {
     form.reportValidity();
   }
+}
+
+function myButtonGenericPlan(el) {
+  const form = document.getElementById("form_analyse");
+
+  document.getElementById("generic_plan").disabled = true;
+  document.getElementById("generic_plan").innerHTML =
+    '<span class="spinner-border spinner-border-sm me-1"></span>Planning ...';
+  document.getElementById("action").value = 'generic_plan';
+  form.submit();
 }
 
 function myButtonAnalyzeOpenAI(el) {

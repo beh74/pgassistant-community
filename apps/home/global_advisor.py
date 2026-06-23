@@ -422,6 +422,51 @@ def run_postgresql_version_recommendation(
 
     return [recommendation]
 
+
+def get_postgresql_version_advisor(
+    db_config: Dict[str, Any],
+) -> Dict[str, Any]:
+    conn, status_message = connectdb(db_config)
+
+    if conn is None:
+        return {
+            "status": "error",
+            "message": status_message,
+        }
+
+    try:
+        sql = """
+            SELECT current_setting('server_version') AS installed_version;
+        """
+        rows = json.loads(db_fetch_json(conn, sql))
+        installed_version = str(rows[0].get("installed_version") or "").strip()
+
+        version_status = get_postgresql_upgrade_recommendation(installed_version)
+        recommendations = run_postgresql_version_recommendation(conn)
+
+        return {
+            "status": "ok",
+            "installed_version": version_status.installed_version,
+            "major_version": version_status.major_version,
+            "latest_minor_version": version_status.latest_minor_version,
+            "latest_release_date": version_status.latest_release_date,
+            "supported": version_status.supported,
+            "end_of_life_date": version_status.end_of_life_date,
+            "upgrade_recommended": version_status.upgrade_recommended,
+            "recommendation_level": version_status.recommendation_level,
+            "recommendation": version_status.recommendation,
+            "global_advisor_recommendation": (
+                recommendations[0].to_dict()
+                if recommendations
+                else None
+            ),
+        }
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 def run_sql_recommendation(
     conn,
     definition: Dict[str, Any],
@@ -560,9 +605,147 @@ def _group_recommendations_by(
     return dict(grouped)
 
 
+def get_dashboard_scope_counts(db_config: Dict[str, Any]) -> Dict[str, int]:
+    conn, _ = connectdb(db_config)
+
+    default_scope = {
+        "table_count": 0,
+        "index_count": 0,
+        "foreign_key_count": 0,
+        "column_count": 0,
+    }
+
+    if conn is None:
+        return default_scope
+
+    try:
+        sql = """
+            WITH user_tables AS (
+                SELECT c.oid
+                FROM pg_class AS c
+                JOIN pg_namespace AS n ON n.oid = c.relnamespace
+                WHERE c.relkind IN ('r', 'p')
+                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                  AND n.nspname NOT LIKE 'pg_toast%'
+            )
+            SELECT
+                (SELECT COUNT(*) FROM user_tables) AS table_count,
+                (
+                    SELECT COUNT(*)
+                    FROM pg_index AS i
+                    JOIN user_tables AS t ON t.oid = i.indrelid
+                ) AS index_count,
+                (
+                    SELECT COUNT(*)
+                    FROM pg_constraint AS c
+                    JOIN user_tables AS t ON t.oid = c.conrelid
+                    WHERE c.contype = 'f'
+                ) AS foreign_key_count,
+                (
+                    SELECT COUNT(*)
+                    FROM pg_attribute AS a
+                    JOIN user_tables AS t ON t.oid = a.attrelid
+                    WHERE a.attnum > 0
+                      AND NOT a.attisdropped
+                ) AS column_count;
+        """
+        rows = json.loads(db_fetch_json(conn, sql))
+        if not rows:
+            return default_scope
+
+        return {
+            "table_count": int(rows[0].get("table_count") or 0),
+            "index_count": int(rows[0].get("index_count") or 0),
+            "foreign_key_count": int(rows[0].get("foreign_key_count") or 0),
+            "column_count": int(rows[0].get("column_count") or 0),
+        }
+    except Exception:
+        return default_scope
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_dashboard_scope_for_recommendation(
+    rec: GlobalRecommendation,
+    scope_counts: Dict[str, int],
+) -> int:
+    fk_based_recommendations = {
+        "foreign_key_columns_different_data_types",
+        "missing_useful_foreign_key_indexes",
+    }
+
+    if rec.recommendation_id in fk_based_recommendations:
+        return scope_counts.get("foreign_key_count", 0)
+
+    if rec.object_type.value == "INDEX":
+        return scope_counts.get("index_count", 0)
+
+    if rec.object_type.value == "COLUMN":
+        return scope_counts.get("column_count", 0)
+
+    return scope_counts.get("table_count", 0)
+
+
+def compute_dashboard_score(
+    grouped_recommendations: Dict[str, List[GlobalRecommendation]],
+    scope_counts: Dict[str, int],
+) -> Dict[str, Any]:
+    severity_weights = {
+        "HIGH": 100.0,
+        "MEDIUM": 40.0,
+        "LOW": 15.0,
+    }
+    max_penalty_by_type = 25.0
+
+    total_penalty = 0.0
+    penalties_by_type = {}
+
+    for recommendation_type, type_recs in grouped_recommendations.items():
+        priority_counts = _counter_by_attr(type_recs, "priority")
+        weighted_issues = sum(
+            priority_counts.get(priority, 0) * weight
+            for priority, weight in severity_weights.items()
+        )
+        scope_count = get_dashboard_scope_for_recommendation(
+            type_recs[0],
+            scope_counts,
+        )
+
+        if scope_count > 0:
+            penalty = weighted_issues / scope_count
+            if weighted_issues > 0:
+                penalty = max(1.0, penalty)
+        else:
+            penalty = (
+                priority_counts.get("HIGH", 0) * 4
+                + priority_counts.get("MEDIUM", 0) * 2
+                + priority_counts.get("LOW", 0)
+            )
+
+        penalty = min(max_penalty_by_type, penalty)
+        total_penalty += penalty
+
+        penalties_by_type[recommendation_type] = {
+            "scope_count": scope_count,
+            "score_penalty": round(penalty, 1),
+        }
+
+    total_penalty = min(100.0, total_penalty)
+
+    return {
+        "database_score": max(0, min(100, round(100 - total_penalty))),
+        "score_penalty": round(total_penalty, 1),
+        "penalties_by_type": penalties_by_type,
+    }
+
+
 def run_global_advisor(
     db_config: Dict[str, Any],
     yaml_path: str,
+    team_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Runs the Global Advisor against a PostgreSQL database.
@@ -573,6 +756,13 @@ def run_global_advisor(
     """
     started_at = time.monotonic()
     catalog = load_recommendation_catalog(yaml_path)
+    wanted_team = team_filter.upper() if team_filter else None
+
+    if wanted_team:
+        catalog = [
+            definition for definition in catalog
+            if str(definition.get("team", "OPS")).upper() == wanted_team
+        ]
 
     conn, status_message = connectdb(db_config)
 
@@ -589,18 +779,19 @@ def run_global_advisor(
     errors: List[Dict[str, str]] = []
 
     # The PostgreSQL release check is implemented in Python rather than YAML.
-    enabled_checks = 1
+    enabled_checks = 0 if wanted_team else 1
 
     try:
-        try:
-            all_recommendations.extend(
-                run_postgresql_version_recommendation(conn)
-            )
-        except Exception as exc:
-            errors.append({
-                "recommendation_id": "PostgreSQL release upgrade",
-                "error": str(exc),
-            })
+        if not wanted_team:
+            try:
+                all_recommendations.extend(
+                    run_postgresql_version_recommendation(conn)
+                )
+            except Exception as exc:
+                errors.append({
+                    "recommendation_id": "PostgreSQL release upgrade",
+                    "error": str(exc),
+                })
 
         for definition in catalog:
             recommendation_id = definition.get("id", "unknown")
@@ -646,3 +837,91 @@ def run_global_advisor(
             conn.close()
         except Exception:
             pass
+
+
+def build_team_dashboard_summary(
+    recommendations: List[GlobalRecommendation],
+    team: str,
+    scope_counts: Optional[Dict[str, int]] = None,
+    errors: Optional[List[Dict[str, str]]] = None,
+    duration_ms: Optional[int] = None,
+) -> Dict[str, Any]:
+    sorted_recs = sorted(recommendations, key=lambda rec: rec.rank, reverse=True)
+    average_rank = (
+        round(sum(rec.rank for rec in sorted_recs) / len(sorted_recs), 1)
+        if sorted_recs
+        else 0.0
+    )
+    scope_counts = scope_counts or {}
+    grouped_by_type = _group_recommendations_by(sorted_recs, "recommendation_id")
+    score = compute_dashboard_score(grouped_by_type, scope_counts)
+    by_type = []
+
+    for recommendation_type, type_recs in grouped_by_type.items():
+        priority_counts = _counter_by_attr(type_recs, "priority")
+        score_details = score["penalties_by_type"].get(recommendation_type, {})
+        by_type.append({
+            "recommendation_id": recommendation_type,
+            "label": type_recs[0].label or type_recs[0].title or recommendation_type,
+            "advisor_group": type_recs[0].advisor_group.value,
+            "total": len(type_recs),
+            "average_rank": round(sum(rec.rank for rec in type_recs) / len(type_recs), 1),
+            "scope_count": score_details.get("scope_count", 0),
+            "score_penalty": score_details.get("score_penalty", 0),
+            "priority_counts": priority_counts,
+            "highest_priority": (
+                "HIGH" if priority_counts.get("HIGH")
+                else "MEDIUM" if priority_counts.get("MEDIUM")
+                else "LOW"
+            ),
+        })
+
+    by_type.sort(
+        key=lambda item: (
+            item["priority_counts"].get("HIGH", 0),
+            item["priority_counts"].get("MEDIUM", 0),
+            item["average_rank"],
+            item["total"],
+        ),
+        reverse=True,
+    )
+
+    return {
+        "team": team,
+        "total": len(sorted_recs),
+        "average_rank": average_rank,
+        "database_score": score["database_score"],
+        "score_penalty": score["score_penalty"],
+        "score_scope": scope_counts,
+        "priority_counts": _counter_by_attr(sorted_recs, "priority"),
+        "by_type": by_type,
+        "errors": errors or [],
+        "duration_ms": duration_ms,
+    }
+
+
+def run_dev_advisor_dashboard(
+    db_config: Dict[str, Any],
+    yaml_path: str = "advisor_enriched.yml",
+) -> Dict[str, Any]:
+    result = run_global_advisor(
+        db_config,
+        yaml_path=yaml_path,
+        team_filter=AdvisorTeam.DEV.value,
+    )
+
+    recommendations = result.get("recommendations", [])
+    scope_counts = get_dashboard_scope_counts(db_config)
+    summary = build_team_dashboard_summary(
+        recommendations,
+        AdvisorTeam.DEV.value,
+        scope_counts=scope_counts,
+        errors=result.get("errors", []),
+        duration_ms=(result.get("summary") or {}).get("execution", {}).get("duration_ms"),
+    )
+
+    return {
+        "status": result.get("status", "ok"),
+        "message": result.get("message", ""),
+        "summary": summary,
+    }

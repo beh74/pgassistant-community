@@ -30,7 +30,7 @@ def handle_database_post(segment: str):
     session['version']=database.get_pg_major_version(str(dbinfo['version']))
     session.modified = True
 
-    return render_template("home/dashboard.html", segment="dashboard.html", dbinfo=dbinfo)
+    return redirect("/dashboard.html")
 
 def handle_database_get(segment: str):
     return render_template(f"home/{segment}", segment=segment, dbinfo={})

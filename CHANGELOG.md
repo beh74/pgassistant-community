@@ -1,5 +1,29 @@
 # Change Log
 
+## [3.2] - 2026-06-23
+
+A Lot of work in this new release !
+
+## Improvements
+
+- Index advisor: added support for simple `GROUP BY` patterns, including `Aggregate -> Scan` and `Aggregate -> Sort -> Scan` plans.
+- Index advisor: prevents `GROUP BY` sort nodes from being reported as `ORDER BY` recommendations.
+- Analyze Query: added a PostgreSQL 16+ **Generic plan** button to run `EXPLAIN (GENERIC_PLAN TRUE, VERBOSE TRUE, SETTINGS TRUE, FORMAT JSON)` without providing query parameter values.
+- Analyze Query: added a notice when a generic plan is displayed, since runtime timings, buffers, WAL, and actual row counts are not available.
+- Analyze Query: improved detection of query parameters and their related columns for common PostgreSQL patterns, including parameters on either side of comparisons, casts, `BETWEEN`, `IN`, `ANY`, `UPDATE`, and `INSERT`.
+- Analyze Query: improved table alias resolution when mapping query parameters to columns.
+- Dashboard: replaced the four legacy schema-design checks with asynchronous DEV Global Advisor recommendations grouped by recommendation type.
+- Dashboard: added a DEV advisor database score returned by the API and based on **relative penalties** by recommendation type.
+- Dashboard: added contextual help explaining how the DEV advisor score is calculated.
+- Dashboard: database version now opens a Global Advisor powered PostgreSQL version check instead of only linking to generic release notes.
+
+## Bug fixes
+
+- Fixed generic plan failures for `pg_stat_statements` normalized typed literals such as `DATE $1`, `TIMESTAMP $1`, and `INTERVAL $1` by rewriting them as explicit casts like `$1::date`, `$1::timestamp`, and `$1::interval`.
+- Fixed parameter extraction inconsistencies by using the same ordered parameter extractor in the analyze route and parameter mapping logic.
+- Fixed parameter type lookup for schema-qualified table names when resolving parameter suggestions.
+- Reduced dashboard load cost by removing the legacy schema issue queries from the initial database overview request.
+
 ## [3.1] - 2026-06-21
 
 ## Improvements
@@ -672,12 +696,6 @@ For security reasons, we highly recommend deploying pgAssistant behind a reverse
 
 ## [1.0.0] - 2024-08-04
 - **Initial Release**: Repository initialized!
-
-
-
-
-
-
 
 
 
