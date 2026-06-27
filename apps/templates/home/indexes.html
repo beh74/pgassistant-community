@@ -1,0 +1,722 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Indexes{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<style>
+  .indexes-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .indexes-subtitle {
+    color: var(--bs-secondary-color);
+    margin-bottom: 0;
+  }
+
+  .indexes-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: 1rem;
+  }
+
+  .indexes-summary-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: .75rem;
+    padding: .75rem 1rem;
+    min-width: 170px;
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .04);
+  }
+
+  .indexes-summary-label {
+    display: block;
+    font-size: .78rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: .15rem;
+  }
+
+  .indexes-summary-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--bs-body-color);
+  }
+
+  .indexes-filters-card .card-body {
+    padding: 1.25rem;
+  }
+
+  .indexes-toolbar {
+    display: grid;
+    grid-template-columns: 2fr repeat(4, minmax(145px, 1fr)) auto;
+    gap: 1rem 1.25rem;
+    align-items: end;
+  }
+
+  .indexes-field {
+    min-width: 0;
+  }
+
+  .indexes-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: .45rem;
+  }
+
+  .indexes-field .form-control,
+  .indexes-field .form-select {
+    min-height: 44px;
+    border-radius: .75rem;
+  }
+
+  .indexes-actions .btn {
+    min-height: 44px;
+    border-radius: .75rem;
+    font-weight: 600;
+    padding: 0 1rem;
+  }
+
+  .indexes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+
+  .index-card-item {
+    min-width: 0;
+  }
+
+  .index-card {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(139, 92, 246, .10), transparent 14rem),
+      radial-gradient(circle at top left, rgba(34, 211, 238, .10), transparent 12rem),
+      linear-gradient(135deg, #ffffff 0%, var(--pga-surface-soft, #f8fafc) 100%);
+    border: 1px solid var(--pga-border, var(--bs-border-color));
+    border-radius: var(--pga-radius-lg, 1rem);
+    box-shadow: var(--pga-shadow-sm, 0 .125rem .25rem rgba(0, 0, 0, .04));
+    transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+  }
+
+  .index-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--pga-cyan, #22d3ee), var(--pga-violet, #8b5cf6));
+    opacity: .85;
+  }
+
+  .index-card::after {
+    content: "";
+    position: absolute;
+    right: -3.5rem;
+    top: -3.5rem;
+    width: 9rem;
+    height: 9rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, .07);
+    pointer-events: none;
+  }
+
+  .index-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--pga-border-strong, rgba(47, 111, 159, .26));
+    box-shadow: var(--pga-shadow-md, 0 .5rem 1rem rgba(0, 0, 0, .08));
+  }
+
+  .index-card .card-header {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, .64);
+    border-bottom: 1px solid var(--pga-border-soft, var(--bs-border-color));
+    padding: .8rem 1rem;
+    border-top-left-radius: var(--pga-radius-lg, 1rem);
+    border-top-right-radius: var(--pga-radius-lg, 1rem);
+  }
+
+  .index-card .card-body {
+    position: relative;
+    z-index: 1;
+    padding: 1rem;
+  }
+
+  .index-schema-badge,
+  .index-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .35rem .6rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .index-schema-badge {
+    background: rgba(108, 117, 125, .12);
+    color: #495057;
+  }
+
+  .index-status-ok { background: #dcfce7; color: #166534; }
+  .index-status-review { background: #fef3c7; color: #92400e; }
+  .index-status-danger { background: #fee2e2; color: #991b1b; }
+  .index-status-muted { background: #e2e8f0; color: #475569; }
+
+  .indexes-name {
+    word-break: break-word;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .indexes-name code {
+    font-size: .82rem;
+  }
+
+  .index-table-name {
+    color: #53647f;
+    font-size: .82rem;
+    margin-top: .2rem;
+    word-break: break-word;
+  }
+
+  .index-metric-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-bottom: .9rem;
+  }
+
+  .index-metric-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .45rem;
+    padding: .45rem .9rem;
+    border-radius: 999px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    font-size: .82rem;
+    line-height: 1;
+  }
+
+  .index-metric-chip .label {
+    color: #6c757d;
+    font-weight: 500;
+  }
+
+  .index-metric-chip .value {
+    color: #212529;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .index-definition {
+    overflow: visible;
+    margin: 0;
+    padding: .85rem;
+    color: #f8fafc;
+    background: #111827;
+    border-radius: .75rem;
+    font-size: .8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .indexes-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .72);
+  }
+
+  .indexes-state .state-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: .35rem;
+  }
+
+  .indexes-state .state-text {
+    color: var(--bs-secondary-color);
+    margin-bottom: 0;
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+  }
+
+  .pagination-info {
+    color: var(--bs-secondary-color);
+    font-size: .95rem;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+  }
+
+  .page-number {
+    min-width: 42px;
+  }
+
+  @media (max-width: 1199.98px) {
+    .indexes-toolbar {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .indexes-toolbar,
+    .indexes-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .indexes-actions .btn {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="container-fluid py-4 ps-3 pe-3">
+  <div class="indexes-header-row">
+    <div>
+      <h1 class="h4 mb-1">Indexes advisor</h1>
+      <p class="indexes-subtitle">
+        Explore all user indexes, usage statistics, cache behavior, and recommendations.
+      </p>
+    </div>
+  </div>
+
+  <div class="indexes-summary d-none" id="indexes-summary">
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">Indexes</span>
+      <span class="indexes-summary-value" id="indexes-total-count">0</span>
+    </div>
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">Schemas</span>
+      <span class="indexes-summary-value" id="indexes-schema-count">0</span>
+    </div>
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">Matching indexes</span>
+      <span class="indexes-summary-value" id="indexes-visible-count">0</span>
+    </div>
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">Used</span>
+      <span class="indexes-summary-value text-success" id="indexes-used-count">0</span>
+    </div>
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">Unused</span>
+      <span class="indexes-summary-value text-warning" id="indexes-unused-count">0</span>
+    </div>
+    <div class="indexes-summary-card">
+      <span class="indexes-summary-label">To review</span>
+      <span class="indexes-summary-value text-danger" id="indexes-review-count">0</span>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4 indexes-filters-card d-none" id="indexes-filters-card">
+    <div class="card-body">
+      <div class="indexes-toolbar">
+        <div class="indexes-field">
+          <label for="index-search">Search</label>
+          <input id="index-search" type="search" class="form-control" placeholder="Search schema, table or index..." autocomplete="off">
+        </div>
+
+        <div class="indexes-field">
+          <label for="index-schema-filter">Schema</label>
+          <select id="index-schema-filter" class="form-select">
+            <option value="">All</option>
+          </select>
+        </div>
+
+        <div class="indexes-field">
+          <label for="index-status-filter">Status</label>
+          <select id="index-status-filter" class="form-select">
+            <option value="">All</option>
+            <option value="ok">OK</option>
+            <option value="review">Review</option>
+            <option value="danger">Danger</option>
+            <option value="unused">Unused</option>
+          </select>
+        </div>
+
+        <div class="indexes-field">
+          <label for="index-sort">Sort by</label>
+          <select id="index-sort" class="form-select">
+            <option value="severity">Severity</option>
+            <option value="size">Index size</option>
+            <option value="reads">Physical reads</option>
+            <option value="scans">Index scans</option>
+            <option value="schema">Schema</option>
+            <option value="table">Table</option>
+          </select>
+        </div>
+
+        <div class="indexes-field">
+          <label for="index-per-page">Cards per page</label>
+          <select id="index-per-page" class="form-select">
+            <option value="12">12</option>
+            <option value="24" selected>24</option>
+            <option value="36">36</option>
+            <option value="48">48</option>
+            <option value="72">72</option>
+          </select>
+        </div>
+
+        <div class="indexes-actions">
+          <button type="button" id="index-reset-btn" class="btn btn-outline-secondary">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="indexes-loading" class="indexes-state">
+    <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+    <div class="state-title">Loading indexes</div>
+    <p class="state-text">pgAssistant is collecting index statistics for the connected database.</p>
+  </div>
+
+  <div id="indexes-error" class="indexes-state d-none">
+    <div class="state-title">Unable to load indexes</div>
+    <p class="state-text" id="indexes-error-message">The API returned an error.</p>
+  </div>
+
+  <div id="indexes-empty-state" class="indexes-state d-none">
+    <div class="state-title">No index found</div>
+    <p class="state-text">No index matches the current search and filters.</p>
+  </div>
+
+  <div id="indexes-grid" class="indexes-grid d-none"></div>
+
+  <div id="indexes-pagination" class="pagination-wrapper d-none">
+    <div id="indexes-pagination-info" class="pagination-info"></div>
+    <div id="indexes-pagination-controls" class="pagination-controls"></div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const loadingState = document.getElementById("indexes-loading");
+  const errorState = document.getElementById("indexes-error");
+  const errorMessage = document.getElementById("indexes-error-message");
+  const emptyState = document.getElementById("indexes-empty-state");
+  const summary = document.getElementById("indexes-summary");
+  const filtersCard = document.getElementById("indexes-filters-card");
+  const grid = document.getElementById("indexes-grid");
+  const pagination = document.getElementById("indexes-pagination");
+  const paginationInfo = document.getElementById("indexes-pagination-info");
+  const paginationControls = document.getElementById("indexes-pagination-controls");
+
+  const searchInput = document.getElementById("index-search");
+  const schemaFilter = document.getElementById("index-schema-filter");
+  const statusFilter = document.getElementById("index-status-filter");
+  const sortSelect = document.getElementById("index-sort");
+  const perPageSelect = document.getElementById("index-per-page");
+  const resetButton = document.getElementById("index-reset-btn");
+
+  const totalCount = document.getElementById("indexes-total-count");
+  const schemaCount = document.getElementById("indexes-schema-count");
+  const visibleCount = document.getElementById("indexes-visible-count");
+  const usedCount = document.getElementById("indexes-used-count");
+  const unusedCount = document.getElementById("indexes-unused-count");
+  const reviewCount = document.getElementById("indexes-review-count");
+
+  let indexes = [];
+  let cards = [];
+  let currentPage = 1;
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function formatNumber(value, suffix) {
+    if (value === null || value === undefined || value === "") return "-";
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value) + (suffix || "");
+    return number.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (suffix || "");
+  }
+
+  function normalizeColumns(indexStats) {
+    const columns = indexStats.indexed_columns || "";
+    return Array.isArray(columns) ? columns.join(", ") : String(columns || "");
+  }
+
+  function getStatus(indexStats) {
+    const severity = String(indexStats.severity || "").replace(/_/g, " ").toUpperCase();
+    const scans = Number(indexStats.idx_scan || 0);
+
+    if (/INVALID|NOT READY|NOT LIVE/.test(severity)) {
+      return { key: "danger", label: severity, css: "index-status-danger", weight: 4, review: true };
+    }
+
+    if (scans === 0 || /UNUSED|NO INDEX ACTIVITY/.test(severity)) {
+      return { key: "unused", label: severity || "UNUSED", css: "index-status-review", weight: 3, review: true };
+    }
+
+    if (/REVIEW|MONITOR|LOW CACHE|TUNE/.test(severity)) {
+      return { key: "review", label: severity, css: "index-status-review", weight: 2, review: true };
+    }
+
+    if (/OK|GOOD|CACHED/.test(severity)) {
+      return { key: "ok", label: severity, css: "index-status-ok", weight: 1, review: false };
+    }
+
+    return { key: "review", label: severity || "REVIEW", css: "index-status-muted", weight: 2, review: true };
+  }
+
+  function renderSchemaOptions() {
+    const schemas = Array.from(new Set(indexes.map(idx => idx.schemaname).filter(Boolean))).sort();
+    schemaFilter.innerHTML = '<option value="">All</option>' + schemas.map(schema => {
+      return '<option value="' + escapeHtml(schema) + '">' + escapeHtml(schema) + '</option>';
+    }).join("");
+  }
+
+  function renderSummary() {
+    const schemas = new Set(indexes.map(idx => idx.schemaname).filter(Boolean));
+    const used = indexes.filter(idx => Number(idx.idx_scan || 0) > 0).length;
+    const review = indexes.filter(idx => getStatus(idx).review).length;
+
+    totalCount.textContent = String(indexes.length);
+    schemaCount.textContent = String(schemas.size);
+    usedCount.textContent = String(used);
+    unusedCount.textContent = String(indexes.length - used);
+    reviewCount.textContent = String(review);
+  }
+
+  function renderCards() {
+    grid.innerHTML = indexes.map(function (idx, index) {
+      const status = getStatus(idx);
+      const schema = idx.schemaname || "-";
+      const table = idx.table_name || "-";
+      const name = idx.index_name || idx.qualified_index_name || "-";
+      const qualifiedIndex = idx.qualified_index_name || [schema, name].filter(Boolean).join(".");
+      const searchText = [schema, table, name, qualifiedIndex, normalizeColumns(idx), idx.index_type].join(" ").toLowerCase();
+      const definition = idx.index_definition || "";
+      const cacheHit = idx.cache_hit_pct === null || idx.cache_hit_pct === undefined ? "-" : formatNumber(idx.cache_hit_pct, "%");
+      const size = idx.index_size_pretty || formatNumber(idx.index_size_bytes, " bytes");
+      const reads = idx.idx_blks_read ?? 0;
+      const scans = idx.idx_scan ?? 0;
+
+      return '<div class="index-card-item" data-search="' + escapeHtml(searchText) + '" data-schema="' + escapeHtml(String(schema).toLowerCase()) + '" data-table="' + escapeHtml(String(table).toLowerCase()) + '" data-status="' + escapeHtml(status.key) + '" data-status-weight="' + status.weight + '" data-size="' + escapeHtml(idx.index_size_bytes || 0) + '" data-reads="' + escapeHtml(reads || 0) + '" data-scans="' + escapeHtml(scans || 0) + '">' +
+        '<div class="card shadow-sm h-100 index-card">' +
+          '<div class="card-header d-flex justify-content-between align-items-center gap-2">' +
+            '<div class="d-flex align-items-center gap-2 flex-wrap">' +
+              '<span class="index-schema-badge"><i class="bi bi-diagram-3 me-1"></i>' + escapeHtml(schema) + '</span>' +
+              '<span class="index-status-badge ' + status.css + '">' + escapeHtml(status.label) + '</span>' +
+            '</div>' +
+            '<span class="text-muted small index-card-position">#' + (index + 1) + '</span>' +
+          '</div>' +
+          '<div class="card-body d-flex flex-column">' +
+            '<div class="indexes-name mb-2"><code class="text-muted">' + escapeHtml(schema) + '</code>.<strong>' + escapeHtml(name) + '</strong></div>' +
+            '<div class="index-table-name mb-3"><i class="bi bi-table me-1"></i>' + escapeHtml(schema) + '.' + escapeHtml(table) + '</div>' +
+            '<div class="index-metric-chips">' +
+              '<div class="index-metric-chip"><span class="label">Type</span><span class="value">' + escapeHtml(idx.index_type || "-") + '</span></div>' +
+              '<div class="index-metric-chip"><span class="label">Size</span><span class="value">' + escapeHtml(size) + '</span></div>' +
+              '<div class="index-metric-chip"><span class="label">Scans</span><span class="value">' + escapeHtml(formatNumber(scans)) + '</span></div>' +
+              '<div class="index-metric-chip"><span class="label">Reads</span><span class="value">' + escapeHtml(formatNumber(reads)) + '</span></div>' +
+              '<div class="index-metric-chip"><span class="label">Cache</span><span class="value">' + escapeHtml(cacheHit) + '</span></div>' +
+            '</div>' +
+            '<div class="index-table-name mb-3">Columns: <strong>' + escapeHtml(normalizeColumns(idx) || "-") + '</strong></div>' +
+            '<div class="index-table-name mb-2">Recommendation</div>' +
+            '<p class="text-muted small mb-3">' + escapeHtml(idx.recommendation_action || "No recommendation available.") + '</p>' +
+            '<pre class="index-definition mt-auto"><code>' + escapeHtml(definition || "No index definition available.") + '</code></pre>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    cards = Array.from(grid.querySelectorAll(".index-card-item"));
+  }
+
+  function getNumber(card, attributeName) {
+    const value = Number(card.getAttribute(attributeName));
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function compareText(a, b, datasetKey) {
+    return (a.dataset[datasetKey] || "").localeCompare(
+      b.dataset[datasetKey] || "",
+      undefined,
+      { sensitivity: "base" }
+    );
+  }
+
+  function getFilteredAndSortedCards() {
+    const search = (searchInput.value || "").trim().toLowerCase();
+    const schema = (schemaFilter.value || "").toLowerCase();
+    const status = statusFilter.value || "";
+    const sort = sortSelect.value || "severity";
+
+    const filtered = cards.filter(function (card) {
+      const matchesSearch = !search || (card.dataset.search || "").includes(search);
+      const matchesSchema = !schema || card.dataset.schema === schema;
+      const matchesStatus = !status || card.dataset.status === status;
+      return matchesSearch && matchesSchema && matchesStatus;
+    });
+
+    filtered.sort(function (a, b) {
+      if (sort === "size") return getNumber(b, "data-size") - getNumber(a, "data-size");
+      if (sort === "reads") return getNumber(b, "data-reads") - getNumber(a, "data-reads");
+      if (sort === "scans") return getNumber(b, "data-scans") - getNumber(a, "data-scans");
+      if (sort === "schema") return compareText(a, b, "schema") || compareText(a, b, "table");
+      if (sort === "table") return compareText(a, b, "table") || compareText(a, b, "schema");
+      return getNumber(b, "data-status-weight") - getNumber(a, "data-status-weight") ||
+        getNumber(b, "data-size") - getNumber(a, "data-size");
+    });
+
+    return filtered;
+  }
+
+  function createPageButton(label, page, active, disabled) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm " + (active ? "btn-primary" : "btn-outline-primary");
+    button.textContent = label;
+    button.disabled = Boolean(disabled);
+
+    if (!disabled) {
+      button.addEventListener("click", function () {
+        currentPage = page;
+        render();
+        window.scrollTo({ top: grid.offsetTop - 100, behavior: "smooth" });
+      });
+    }
+
+    return button;
+  }
+
+  function renderPagination(totalPages) {
+    paginationControls.innerHTML = "";
+
+    if (totalPages <= 1) {
+      pagination.classList.add("d-none");
+      return;
+    }
+
+    pagination.classList.remove("d-none");
+    paginationControls.appendChild(createPageButton("Previous", currentPage - 1, false, currentPage <= 1));
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+
+    for (let page = start; page <= end; page += 1) {
+      const button = createPageButton(String(page), page, page === currentPage, false);
+      button.classList.add("page-number");
+      paginationControls.appendChild(button);
+    }
+
+    paginationControls.appendChild(createPageButton("Next", currentPage + 1, false, currentPage >= totalPages));
+  }
+
+  function render() {
+    const filtered = getFilteredAndSortedCards();
+    const perPage = Number(perPageSelect.value || 24);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    cards.forEach(card => { card.style.display = "none"; });
+    filtered.forEach(card => { grid.appendChild(card); });
+
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = Math.min(startIndex + perPage, filtered.length);
+    const visibleCards = filtered.slice(startIndex, endIndex);
+
+    visibleCards.forEach(function (card, index) {
+      card.style.display = "";
+      const position = card.querySelector(".index-card-position");
+      if (position) position.textContent = "#" + (startIndex + index + 1);
+    });
+
+    visibleCount.textContent = String(filtered.length);
+
+    if (!filtered.length) {
+      grid.classList.add("d-none");
+      emptyState.classList.remove("d-none");
+      pagination.classList.add("d-none");
+      return;
+    }
+
+    grid.classList.remove("d-none");
+    emptyState.classList.add("d-none");
+    paginationInfo.textContent = "Showing " + (startIndex + 1) + "-" + endIndex + " of " + filtered.length + " indexes";
+    renderPagination(totalPages);
+  }
+
+  function resetFilters() {
+    searchInput.value = "";
+    schemaFilter.value = "";
+    statusFilter.value = "";
+    sortSelect.value = "severity";
+    perPageSelect.value = "24";
+    currentPage = 1;
+    render();
+  }
+
+  async function loadIndexes() {
+    try {
+      const response = await fetch("/api/v1/database_indexes_stats", {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      indexes = Array.isArray(data.indexes) ? data.indexes : [];
+      loadingState.classList.add("d-none");
+      summary.classList.remove("d-none");
+      filtersCard.classList.remove("d-none");
+
+      renderSchemaOptions();
+      renderSummary();
+      renderCards();
+      render();
+    } catch (error) {
+      loadingState.classList.add("d-none");
+      errorState.classList.remove("d-none");
+      errorMessage.textContent = error.message || "Unable to load indexes.";
+    }
+  }
+
+  [searchInput, schemaFilter, statusFilter, sortSelect, perPageSelect].forEach(function (control) {
+    control.addEventListener("input", function () {
+      currentPage = 1;
+      render();
+    });
+    control.addEventListener("change", function () {
+      currentPage = 1;
+      render();
+    });
+  });
+
+  resetButton.addEventListener("click", resetFilters);
+  loadIndexes();
+});
+</script>
+{% endblock javascripts %}

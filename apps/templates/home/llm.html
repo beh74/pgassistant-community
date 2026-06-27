@@ -72,6 +72,53 @@
     gap: 1rem;
   }
 
+  .llm-tabs {
+    display: inline-flex;
+    width: fit-content;
+    gap: .35rem;
+    padding: .35rem;
+    background: rgba(255, 255, 255, .82);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .llm-tabs .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border: 0;
+    color: var(--ga-muted, #64748b);
+    font-weight: 850;
+    padding: .65rem 1rem;
+    border-radius: 999px;
+    transition: all .16s ease;
+  }
+
+  .llm-tabs .nav-link:hover,
+  .llm-tabs .nav-link:focus {
+    color: var(--ga-primary-dark, #1d4ed8);
+    background: rgba(37, 99, 235, .06);
+  }
+
+  .llm-tabs .nav-link.active {
+    background: var(--ga-primary-soft, #dbeafe);
+    color: var(--ga-primary-dark, #1d4ed8);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15);
+  }
+
+  .llm-tab-content {
+    padding-top: 1rem;
+  }
+
+  .llm-tab-pane {
+    gap: 1rem;
+  }
+
+  .llm-tab-pane.active {
+    display: grid;
+  }
+
   .llm-section {
     border: 1px solid var(--ga-border, #dbe4ef);
     border-radius: 1rem;
@@ -154,6 +201,20 @@
     color: var(--ga-muted, #64748b);
     line-height: 1.45;
     margin-top: .45rem;
+  }
+
+  .llm-field .llm-template-textarea {
+    min-height: 34rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: .82rem;
+    line-height: 1.45;
+    resize: vertical;
+  }
+
+  .llm-template-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: .55rem;
   }
 
   .llm-help-icon {
@@ -247,6 +308,18 @@
       width: 100%;
       justify-content: center;
     }
+
+    .llm-tabs {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      border-radius: 1rem;
+    }
+
+    .llm-tabs .nav-link {
+      justify-content: center;
+      border-radius: .75rem;
+    }
   }
 </style>
 {% endblock stylesheets %}
@@ -269,105 +342,193 @@
       <div class="llm-card-body">
 
         <form method="POST" class="llm-form">
+          {% if llm_settings_error %}
+          <div class="alert alert-danger mb-0" role="alert">
+            {{ llm_settings_error }}
+          </div>
+          {% endif %}
 
-          <!-- CONNECTION -->
-          <section class="llm-section">
-            <div class="llm-section-header">
-              <div class="llm-section-icon"><i class="bi bi-plug"></i></div>
-              <div>
-                <div class="llm-section-title">Connection</div>
-                <div class="llm-section-subtitle">Endpoint and authentication used to contact the LLM provider.</div>
-              </div>
-            </div>
+          <ul class="nav nav-tabs llm-tabs" id="llmSettingsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general-pane" type="button" role="tab" aria-controls="general-pane" aria-selected="true">
+                <i class="bi bi-sliders"></i>
+                General
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="rfc-prompt-tab" data-bs-toggle="tab" data-bs-target="#rfc-prompt-pane" type="button" role="tab" aria-controls="rfc-prompt-pane" aria-selected="false">
+                <i class="bi bi-file-text"></i>
+                RFC prompt
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="naming-prompt-tab" data-bs-toggle="tab" data-bs-target="#naming-prompt-pane" type="button" role="tab" aria-controls="naming-prompt-pane" aria-selected="false">
+                <i class="bi bi-type"></i>
+                Naming prompt
+              </button>
+            </li>
+          </ul>
 
-            <div class="llm-grid">
-              <div class="llm-field llm-grid-full">
-                <label class="form-label" for="llm_uri">
-                  <span>LLM URI</span>
-                  <span class="llm-help-icon" data-bs-toggle="tooltip" title="URI of the LLM endpoint (OpenAI compatible or Ollama)">?</span>
-                </label>
-                <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
-                <div class="form-text">
-                  Example: http://host.docker.internal:11434/v1/ when running Ollama locally alongside the pgAssistant Docker image. Make sure to set OLLAMA_HOST=0.0.0.0:11434.
-                </div>
-              </div>
-
-              <div class="llm-field">
-                <label class="form-label" for="llm_api_key">API Key</label>
-                <div class="input-group">
-                  <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
-                  <button type="button" class="btn btn-outline-secondary llm-input-action" id="toggleApiKey" aria-label="Toggle API key visibility">
-                    <i class="bi bi-eye"></i>
-                  </button>
-                </div>
-              </div>
-
-              <div class="llm-field llm-action-field">
-                <label class="form-label">Connection test</label>
-                <button type="button" class="btn ga-outline-action llm-action-btn" id="testConnectionBtn">
-                  <i class="bi bi-wifi"></i>
-                  Test connection
-                  <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
-                </button>
-                <div id="test-status" class="small mt-2 llm-status"></div>
-              </div>
-            </div>
-          </section>
-
-          <!-- MODEL -->
-          <section class="llm-section">
-            <div class="llm-section-header">
-              <div class="llm-section-icon"><i class="bi bi-cpu"></i></div>
-              <div>
-                <div class="llm-section-title">Model</div>
-                <div class="llm-section-subtitle">Select the model returned by the configured endpoint.</div>
-              </div>
-            </div>
-
-            <div class="llm-grid">
-              <div class="llm-field llm-grid-full">
-                <label class="form-label" for="llm_model">Model</label>
-
-                <div class="input-group">
-                  <select class="form-select" id="llm_model" name="llm_model">
-                    {% if llm_model %}
-                      <option selected value="{{ llm_model }}">{{ llm_model }}</option>
-                    {% else %}
-                      <option selected disabled>-- Select a model --</option>
-                    {% endif %}
-                  </select>
-
-                  <button type="button" class="btn btn-outline-secondary llm-input-action" id="fetchModelsBtn" aria-label="Fetch available models">
-                    <span id="fetch-icon"><i class="bi bi-search"></i></span>
-                    <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none"></span>
-                  </button>
+          <div class="tab-content llm-tab-content" id="llmSettingsTabsContent">
+            <div class="tab-pane fade show active llm-tab-pane" id="general-pane" role="tabpanel" aria-labelledby="general-tab" tabindex="0">
+              <!-- CONNECTION -->
+              <section class="llm-section">
+                <div class="llm-section-header">
+                  <div class="llm-section-icon"><i class="bi bi-plug"></i></div>
+                  <div>
+                    <div class="llm-section-title">Connection</div>
+                    <div class="llm-section-subtitle">Endpoint and authentication used to contact the LLM provider.</div>
+                  </div>
                 </div>
 
-                <div id="model-status" class="small mt-2 llm-status"></div>
-              </div>
-            </div>
-          </section>
+                <div class="llm-grid">
+                  <div class="llm-field llm-grid-full">
+                    <label class="form-label" for="llm_uri">
+                      <span>LLM URI</span>
+                      <span class="llm-help-icon" data-bs-toggle="tooltip" title="URI of the LLM endpoint (OpenAI compatible or Ollama)">?</span>
+                    </label>
+                    <input class="form-control" value="{{ llm_uri }}" id="llm_uri" name="llm_uri" type="text">
+                    <div class="form-text">
+                      Example: http://host.docker.internal:11434/v1/ when running Ollama locally alongside the pgAssistant Docker image. Make sure to set OLLAMA_HOST=0.0.0.0:11434.
+                    </div>
+                  </div>
 
-          <!-- SQL GUIDELINES -->
-          <section class="llm-section">
-            <div class="llm-section-header">
-              <div class="llm-section-icon"><i class="bi bi-braces"></i></div>
-              <div>
-                <div class="llm-section-title">SQL behavior</div>
-                <div class="llm-section-subtitle">Guidelines used when pgAssistant asks the LLM to review SQL or table definitions.</div>
-              </div>
-            </div>
+                  <div class="llm-field">
+                    <label class="form-label" for="llm_api_key">API Key</label>
+                    <div class="input-group">
+                      <input class="form-control" value="{{ llm_api_key }}" id="llm_api_key" name="llm_api_key" type="password">
+                      <button type="button" class="btn btn-outline-secondary llm-input-action" id="toggleApiKey" aria-label="Toggle API key visibility">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </div>
+                  </div>
 
-            <div class="llm-grid">
-              <div class="llm-field llm-grid-full">
-                <label class="form-label" for="llm_sql_guidelines">SQL conventions URL</label>
-                <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
-                <div class="form-text">
-                  This guidelines will be used to instruct the LLM on Table advisor menu - Check conventions
+                  <div class="llm-field llm-action-field">
+                    <label class="form-label">Connection test</label>
+                    <button type="button" class="btn ga-outline-action llm-action-btn" id="testConnectionBtn">
+                      <i class="bi bi-wifi"></i>
+                      Test connection
+                      <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                    </button>
+                    <div id="test-status" class="small mt-2 llm-status"></div>
+                  </div>
                 </div>
-              </div>
+              </section>
+
+              <!-- MODEL -->
+              <section class="llm-section">
+                <div class="llm-section-header">
+                  <div class="llm-section-icon"><i class="bi bi-cpu"></i></div>
+                  <div>
+                    <div class="llm-section-title">Model</div>
+                    <div class="llm-section-subtitle">Select the model returned by the configured endpoint.</div>
+                  </div>
+                </div>
+
+                <div class="llm-grid">
+                  <div class="llm-field llm-grid-full">
+                    <label class="form-label" for="llm_model">Model</label>
+
+                    <div class="input-group">
+                      <select class="form-select" id="llm_model" name="llm_model">
+                        {% if llm_model %}
+                          <option selected value="{{ llm_model }}">{{ llm_model }}</option>
+                        {% else %}
+                          <option selected disabled>-- Select a model --</option>
+                        {% endif %}
+                      </select>
+
+                      <button type="button" class="btn btn-outline-secondary llm-input-action" id="fetchModelsBtn" aria-label="Fetch available models">
+                        <span id="fetch-icon"><i class="bi bi-search"></i></span>
+                        <span id="fetch-spinner" class="spinner-border spinner-border-sm d-none"></span>
+                      </button>
+                    </div>
+
+                    <div id="model-status" class="small mt-2 llm-status"></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- SQL GUIDELINES -->
+              <section class="llm-section">
+                <div class="llm-section-header">
+                  <div class="llm-section-icon"><i class="bi bi-braces"></i></div>
+                  <div>
+                    <div class="llm-section-title">SQL behavior</div>
+                    <div class="llm-section-subtitle">Guidelines used when pgAssistant asks the LLM to review SQL or table definitions.</div>
+                  </div>
+                </div>
+
+                <div class="llm-grid">
+                  <div class="llm-field llm-grid-full">
+                    <label class="form-label" for="llm_sql_guidelines">SQL conventions URL</label>
+                    <input class="form-control" value="{{ llm_sql_guidelines }}" id="llm_sql_guidelines" name="llm_sql_guidelines" type="text">
+                    <div class="form-text">
+                      These guidelines are available as <code>{{ '{{GUIDELINES}}' }}</code> in the naming conventions prompt.
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
-          </section>
+
+            <div class="tab-pane fade llm-tab-pane" id="rfc-prompt-pane" role="tabpanel" aria-labelledby="rfc-prompt-tab" tabindex="0">
+              <section class="llm-section">
+                <div class="llm-section-header">
+                  <div class="llm-section-icon"><i class="bi bi-file-text"></i></div>
+                  <div>
+                    <div class="llm-section-title">RFC prompt</div>
+                    <div class="llm-section-subtitle">Template used to analyze table structures against RFCs and standards.</div>
+                  </div>
+                </div>
+
+                <div class="llm-field">
+                  <label class="form-label" for="llm_table_rfc_prompt_template">
+                    <span>Prompt template</span>
+                    <span class="llm-help-icon" data-bs-toggle="tooltip" title="Place {{ '{{DDL}}' }} where pgAssistant should inject the generated table DDL.">?</span>
+                  </label>
+                  <textarea class="form-control llm-template-textarea" id="llm_table_rfc_prompt_template" name="llm_table_rfc_prompt_template" rows="20" spellcheck="false">{{ llm_table_rfc_prompt_template }}</textarea>
+                  <div class="form-text">
+                    Must contain <code>{{ '{{DDL}}' }}</code>. Leave empty or reset to use the original pgAssistant template.
+                  </div>
+                  <div class="llm-template-actions">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="resetRfcPromptTemplate">
+                      <i class="bi bi-arrow-counterclockwise"></i>
+                      Reset pgAssistant template
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="tab-pane fade llm-tab-pane" id="naming-prompt-pane" role="tabpanel" aria-labelledby="naming-prompt-tab" tabindex="0">
+              <section class="llm-section">
+                <div class="llm-section-header">
+                  <div class="llm-section-icon"><i class="bi bi-type"></i></div>
+                  <div>
+                    <div class="llm-section-title">Naming prompt</div>
+                    <div class="llm-section-subtitle">Template used to check SQL naming conventions on table definitions.</div>
+                  </div>
+                </div>
+
+                <div class="llm-field">
+                  <label class="form-label" for="llm_table_naming_prompt_template">
+                    <span>Prompt template</span>
+                    <span class="llm-help-icon" data-bs-toggle="tooltip" title="Place {{ '{{DDL}}' }} where pgAssistant should inject the generated table DDL.">?</span>
+                  </label>
+                  <textarea class="form-control llm-template-textarea" id="llm_table_naming_prompt_template" name="llm_table_naming_prompt_template" rows="20" spellcheck="false">{{ llm_table_naming_prompt_template }}</textarea>
+                  <div class="form-text">
+                    Must contain <code>{{ '{{DDL}}' }}</code>. Use <code>{{ '{{GUIDELINES}}' }}</code> if the prompt should include the SQL conventions URL.
+                  </div>
+                  <div class="llm-template-actions">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="resetNamingPromptTemplate">
+                      <i class="bi bi-arrow-counterclockwise"></i>
+                      Reset pgAssistant template
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
 
           <div class="llm-footer-actions">
             <button class="btn ga-primary-action llm-save-btn" type="submit">
@@ -415,6 +576,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const uriField = document.getElementById("llm_uri");
   const apiKeyField = document.getElementById("llm_api_key");
+  const rfcPromptTemplate = document.getElementById("llm_table_rfc_prompt_template");
+  const namingPromptTemplate = document.getElementById("llm_table_naming_prompt_template");
+  const resetRfcPromptTemplate = document.getElementById("resetRfcPromptTemplate");
+  const resetNamingPromptTemplate = document.getElementById("resetNamingPromptTemplate");
+  const defaultRfcPromptTemplate = {{ default_table_rfc_prompt_template|tojson }};
+  const defaultNamingPromptTemplate = {{ default_table_naming_prompt_template|tojson }};
+
+  if (resetRfcPromptTemplate && rfcPromptTemplate) {
+    resetRfcPromptTemplate.addEventListener("click", () => {
+      rfcPromptTemplate.value = defaultRfcPromptTemplate;
+    });
+  }
+
+  if (resetNamingPromptTemplate && namingPromptTemplate) {
+    resetNamingPromptTemplate.addEventListener("click", () => {
+      namingPromptTemplate.value = defaultNamingPromptTemplate;
+    });
+  }
 
   async function callGetModels() {
     const res = await fetch("/api/v1/llm_get_models", {

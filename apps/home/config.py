@@ -3,7 +3,14 @@ import json
 import requests
 
 CONFIG_PATH = "config.json"
-ENV_KEYS = ["LOCAL_LLM_URI", "OPENAI_API_KEY", "OPENAI_API_MODEL", "LLM_SQL_GUIDELINES"]
+ENV_KEYS = [
+    "LOCAL_LLM_URI",
+    "OPENAI_API_KEY",
+    "OPENAI_API_MODEL",
+    "LLM_SQL_GUIDELINES",
+    "LLM_TABLE_RFC_PROMPT_TEMPLATE",
+    "LLM_TABLE_NAMING_PROMPT_TEMPLATE",
+]
 
 def init_or_load_env(config_path=CONFIG_PATH, keys=ENV_KEYS):
     """
@@ -30,6 +37,8 @@ def update_llm_config(
     llm_model=None,
     config_path=CONFIG_PATH,
     llm_sql_guidelines=None,
+    llm_table_rfc_prompt_template=None,
+    llm_table_naming_prompt_template=None,
 ):
     """
     Updates the LLM configuration in config.json with the given values.
@@ -41,6 +50,8 @@ def update_llm_config(
         llm_model (str): New value for OPENAI_API_MODEL
         config_path (str): Path to the JSON config file (default: config.json)
         llm_sql_guidelines (str): a valid URL for SQL guidelines (http or https)
+        llm_table_rfc_prompt_template (str): Prompt template for RFC table analysis
+        llm_table_naming_prompt_template (str): Prompt template for SQL naming analysis
     """
     config = {}
 
@@ -82,6 +93,10 @@ def update_llm_config(
         config["OPENAI_API_KEY"] = llm_api_key
     if llm_model is not None:
         config["OPENAI_API_MODEL"] = llm_model
+    if llm_table_rfc_prompt_template is not None:
+        config["LLM_TABLE_RFC_PROMPT_TEMPLATE"] = llm_table_rfc_prompt_template
+    if llm_table_naming_prompt_template is not None:
+        config["LLM_TABLE_NAMING_PROMPT_TEMPLATE"] = llm_table_naming_prompt_template
 
     # Write back to file
     with open(config_path, "w", encoding="utf-8") as f:
@@ -105,4 +120,4 @@ def get_config_value(key, default=""):
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
 
-    return config.get(key, default)            
+    return config.get(key, default)

@@ -7,9 +7,11 @@ from flask import render_template, request, session, redirect
 
 from . import config
 from . import database
+from . import llm
 from . import pgstat_helper
 from . import pgtune
 from . import ranking
+from . import schema_helper
 from . import sqlcolumns
 from . import sqlhelper
 from . import stats
@@ -133,6 +135,46 @@ def handle_table_rfc_get(template: str, segment: str):
             return render_template("home/tables_cards.html", tables=query_rows, segment="tables_cards.html" )
     else:
         return redirect("/database.html")
+
+def handle_indexes_get(template: str, segment: str):
+    if session.get("db_name"):
+        return render_template("home/indexes.html", segment=segment)
+    else:
+        return redirect("/database.html")
+
+def handle_database_analyze_llm_get(template: str, segment: str):
+    if session.get("db_name"):
+        return render_template("home/database_analyze_llm.html", segment=segment)
+    else:
+        return redirect("/database.html")
+
+def handle_database_analyze_llm_post(template: str, segment: str):
+    if not session.get("db_name"):
+        return redirect("/database.html")
+
+    llm_prompt = request.form.get("llm_prompt", "").strip()
+
+    if not llm_prompt:
+        conn, status = database.connectdb(session)
+        if conn is None or status != "OK":
+            return render_template("home/page-500.html", err=status, traceback_text=status), 500
+        try:
+            result = schema_helper.get_database_schema_llm_context(conn)
+            llm_prompt = result.get("llm_prompt", "")
+        finally:
+            conn.close()
+
+    try:
+        chatgpt_response = llm.query_chatgpt(llm_prompt)
+    except Exception as e1:
+        return render_template("home/page-500.html", err=e1, traceback_text=str(e1)), 500
+
+    return render_template(
+        "home/chatgpt.html",
+        chatgpt_response=chatgpt_response,
+        chatgpt_query=llm.render_markdown(llm_prompt),
+        title="Database schema analysis",
+    )
 
 def handle_cache_table_get(template: str, segment: str):
     if session.get("db_name"):

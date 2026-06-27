@@ -145,6 +145,23 @@ def choose_ctx_and_output_budget(model_llm: str | None, prompt_tokens: int) -> t
 
     return ctx_limit, out_budget, "ok"
 
+def choose_ctx_for_unlimited_output(model_llm: str | None, prompt_tokens: int) -> tuple[int, str]:
+    """
+    Return (ctx_limit, mode) without applying any pgAssistant output cap.
+
+    Ollama still cannot exceed the model/context capabilities, but pgAssistant
+    should not shorten the answer with a conservative num_predict budget.
+    """
+    family = detect_model_family(model_llm)
+    ctx_limit = MODEL_CTX_LIMITS.get(family, MODEL_CTX_LIMITS["unknown"])
+    margin = 512 if ctx_limit <= 8192 else 1024
+
+    if prompt_tokens >= ctx_limit - margin:
+        return ctx_limit, "overflow"
+    if prompt_tokens >= int(ctx_limit * 0.85):
+        return ctx_limit, "tight"
+    return ctx_limit, "ok"
+
 def clamp_num_ctx(ctx_limit: int, prompt_tokens: int, out_budget: int) -> int:
     """
     num_ctx covers prompt + output + margin, but does not enforce an excessively large minimum

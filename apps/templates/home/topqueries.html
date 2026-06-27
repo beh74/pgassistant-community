@@ -3,7 +3,8 @@
 {% block title %} Top queries {% endblock %}
 
 {% block stylesheets %}
-<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css?v=query-activity-cards">
 {% endblock stylesheets %}
 
 {% block content %}
@@ -102,91 +103,90 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="topQueriesCards" class="topqueries-grid">
-      {% for row in rows %}
-      {% set search_blob = (
-          (row['query'] | string) ~ ' ' ~
-          (row['operation_type'] | string if row['operation_type'] is defined else '') ~ ' ' ~
-          (row['tables'] | join(' ') if row['tables'] is defined and row['tables'] else '')
-        ) | lower
-      %}
+  <div id="topQueriesCards" class="topqueries-grid">
+    {% for row in rows %}
+    {% set search_blob = (
+        (row['query'] | string) ~ ' ' ~
+        (row['operation_type'] | string if row['operation_type'] is defined else '') ~ ' ' ~
+        (row['tables'] | join(' ') if row['tables'] is defined and row['tables'] else '')
+      ) | lower
+    %}
 
-      <div
-        class="query-card-item"
-        data-search="{{ search_blob | e }}"
-        data-row='{{ row | tojson | safe }}'
-        data-total_exec_time="{{ row['total_exec_time'] }}"
-        data-calls="{{ row['calls'] }}"
-        data-mean_exec_time="{{ row['mean_exec_time'] }}"
-        data-hit_cache_ratio="{{ row['hit_cache_ratio'] if row['hit_cache_ratio'] is not none else '' }}"
-      >
-        <div class="card topquery-card">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-              <div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  {% set op = row['operation_type'] if row['operation_type'] is defined else 'unknown' %}
-                  {% if op == 'select' %}
-                    <span class="badge bg-info text-dark text-uppercase">{{ op }}</span>
-                  {% elif op == 'insert' %}
-                    <span class="badge bg-success text-uppercase">{{ op }}</span>
-                  {% elif op == 'update' %}
-                    <span class="badge bg-warning text-dark text-uppercase">{{ op }}</span>
-                  {% elif op == 'delete' %}
-                    <span class="badge bg-danger text-uppercase">{{ op }}</span>
-                  {% else %}
-                    <span class="badge bg-secondary text-uppercase">unknown</span>
-                  {% endif %}
+    <div
+      class="query-card-item"
+      data-search="{{ search_blob | e }}"
+      data-row='{{ row | tojson | safe }}'
+      data-total_exec_time="{{ row['total_exec_time'] }}"
+      data-calls="{{ row['calls'] }}"
+      data-mean_exec_time="{{ row['mean_exec_time'] }}"
+      data-hit_cache_ratio="{{ row['hit_cache_ratio'] if row['hit_cache_ratio'] is not none else '' }}"
+    >
+        <div class="card h-100 topquery-card">
+          <div class="card-header activity-card-header">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              {% set op = row['operation_type'] if row['operation_type'] is defined else 'unknown' %}
+              {% if op == 'select' %}
+                <span class="badge activity-operation-badge bg-info text-dark text-uppercase">{{ op }}</span>
+              {% elif op == 'insert' %}
+                <span class="badge activity-operation-badge bg-success text-uppercase">{{ op }}</span>
+              {% elif op == 'update' %}
+                <span class="badge activity-operation-badge bg-warning text-dark text-uppercase">{{ op }}</span>
+              {% elif op == 'delete' %}
+                <span class="badge activity-operation-badge bg-danger text-uppercase">{{ op }}</span>
+              {% else %}
+                <span class="badge activity-operation-badge bg-secondary text-uppercase">unknown</span>
+              {% endif %}
 
-                  {% if row['mean_exec_time'] | float < 0.5 %}
-                    <span class="badge bg-success perf-badge">Perf</span>
-                  {% elif row['mean_exec_time'] | float < 1 %}
-                    <span class="badge bg-secondary perf-badge">Perf</span>
-                  {% elif row['mean_exec_time'] | float < 5 %}
-                    <span class="badge bg-warning text-dark perf-badge">Perf</span>
-                  {% else %}
-                    <span class="badge bg-danger perf-badge">Slow</span>
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="d-flex align-items-center gap-2">
-                <span class="small text-muted">Cache Hit Ratio</span>
-                {% set cache_ratio = row['hit_cache_ratio'] | float if row['hit_cache_ratio'] is not none else -1 %}
-                {% if row['hit_cache_ratio'] is none %}
-                  <span class="badge bg-secondary cache-badge">N/A</span>
-                {% elif cache_ratio >= 99 %}
-                  <span class="badge bg-success cache-badge">{{ row['hit_cache_ratio'] }}%</span>
-                {% elif cache_ratio >= 95 %}
-                  <span class="badge bg-info text-dark cache-badge">{{ row['hit_cache_ratio'] }}%</span>
-                {% elif cache_ratio >= 90 %}
-                  <span class="badge bg-warning text-dark cache-badge">{{ row['hit_cache_ratio'] }}%</span>
-                {% else %}
-                  <span class="badge bg-danger cache-badge">{{ row['hit_cache_ratio'] }}%</span>
-                {% endif %}
-              </div>
+              {% if row['mean_exec_time'] | float < 0.5 %}
+                <span class="badge bg-success perf-badge">Fast</span>
+              {% elif row['mean_exec_time'] | float < 1 %}
+                <span class="badge bg-secondary perf-badge">Normal</span>
+              {% elif row['mean_exec_time'] | float < 5 %}
+                <span class="badge bg-warning text-dark perf-badge">Review</span>
+              {% else %}
+                <span class="badge bg-danger perf-badge">Slow</span>
+              {% endif %}
             </div>
 
-            <div class="topquery-sql mb-2">{{ row['query'] }}</div>
+            <div class="activity-cache-summary">
+              <span class="small text-muted">Cache</span>
+              {% set cache_ratio = row['hit_cache_ratio'] | float if row['hit_cache_ratio'] is not none else -1 %}
+              {% if row['hit_cache_ratio'] is none %}
+                <span class="badge bg-secondary cache-badge">N/A</span>
+              {% elif cache_ratio >= 99 %}
+                <span class="badge bg-success cache-badge">{{ row['hit_cache_ratio'] }}%</span>
+              {% elif cache_ratio >= 95 %}
+                <span class="badge bg-info text-dark cache-badge">{{ row['hit_cache_ratio'] }}%</span>
+              {% elif cache_ratio >= 90 %}
+                <span class="badge bg-warning text-dark cache-badge">{{ row['hit_cache_ratio'] }}%</span>
+              {% else %}
+                <span class="badge bg-danger cache-badge">{{ row['hit_cache_ratio'] }}%</span>
+              {% endif %}
+            </div>
+          </div>
 
-            <div class="mb-3">
-              <div class="small text-muted mb-1">Tables</div>
+          <div class="card-body d-flex flex-column">
+            <pre class="topquery-sql activity-query-sql"><code>{{ row['query'] }}</code></pre>
+
+            <div class="activity-tables mb-3">
+              <div class="activity-section-label">Tables</div>
               <div class="d-flex flex-wrap gap-1">
-                {% if row['tables'] is defined and row['tables'] %}
-                  {% for table_name in row['tables'] %}
-                    <button
-                      type="button"
-                      class="table-badge table-filter-btn"
-                      data-table-name="{{ table_name }}"
-                      title="Filter by table {{ table_name }}"
-                    >
-                      {{ table_name }}
-                    </button>
-                  {% endfor %}
-                {% else %}
-                  <span class="text-muted small">No table detected</span>
-                {% endif %}
+              {% if row['tables'] is defined and row['tables'] %}
+                {% for table_name in row['tables'] %}
+                  <button
+                    type="button"
+                    class="table-badge table-filter-btn"
+                    data-table-name="{{ table_name }}"
+                    title="Filter by table {{ table_name }}"
+                  >
+                    {{ table_name }}
+                  </button>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted small">No table detected</span>
+              {% endif %}
               </div>
             </div>
 
@@ -246,41 +246,54 @@
               </div>
             </div>
 
-            <div class="d-flex justify-content-end gap-2">
-              {% if 'EXPLAIN ANALYZE' not in row['query'] and row['operation_type'] in ['select', 'update', 'delete', 'insert'] %}
-              <button onclick="location.href='/analyze/{{ row['queryid'] }}'" type="button" class="btn btn-primary btn-sm">
-                Analyze
-              </button>
-              {% endif %}
+            <div class="activity-card-footer mt-auto">
+              <div class="activity-card-actions">
+                <div class="activity-query-id text-muted small">Query ID {{ row['queryid'] }}</div>
+                <div class="d-flex justify-content-end gap-2">
+                {% set can_analyze = row['operation_type'] in ['select', 'update', 'delete', 'insert']
+                  and not (row['query'] | trim | upper).startswith('EXPLAIN') %}
+                {% if can_analyze %}
+                <a href="/analyze/{{ row['queryid'] }}" class="btn btn-sm btn-primary">
+                  Analyze
+                </a>
+                {% else %}
+                <span title="This statement type cannot be analyzed">
+                  <button type="button" class="btn btn-sm btn-primary" disabled>
+                    Analyze
+                  </button>
+                </span>
+                {% endif %}
 
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm open-details-btn"
-                data-bs-toggle="modal"
-                data-bs-target="#queryDetailsModal">
-                Details
-              </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm open-details-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#queryDetailsModal">
+                  <i class="bi bi-list-ul me-1"></i>
+                  Details
+                </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      {% endfor %}
     </div>
+    {% endfor %}
+  </div>
 
-    <div id="noResultsMessage" class="no-results d-none">
-      No queries match your search.
+  <div id="noResultsMessage" class="no-results d-none">
+    No queries match your search.
+  </div>
+
+  <div class="pagination-wrapper">
+    <div id="paginationInfo" class="pagination-info"></div>
+
+    <div class="pagination-controls">
+      <button id="prevPageBtn" class="btn btn-outline-primary btn-sm">Previous</button>
+      <div id="pageNumbers" class="d-flex gap-2 flex-wrap"></div>
+      <button id="nextPageBtn" class="btn btn-outline-primary btn-sm">Next</button>
     </div>
-
-    <div class="pagination-wrapper">
-      <div id="paginationInfo" class="pagination-info"></div>
-
-      <div class="pagination-controls">
-        <button id="prevPageBtn" class="btn btn-outline-primary btn-sm">Previous</button>
-        <div id="pageNumbers" class="d-flex gap-2 flex-wrap"></div>
-        <button id="nextPageBtn" class="btn btn-outline-primary btn-sm">Next</button>
-      </div>
-    </div>
-
+  </div>
 </div>
 
 <div class="modal fade" id="queryDetailsModal" tabindex="-1" aria-labelledby="queryDetailsModalLabel" aria-hidden="true">
@@ -298,6 +311,11 @@
 
         <div class="table-responsive">
           <table class="table table-sm details-table align-middle">
+            <colgroup>
+              <col class="details-column-name">
+              <col class="details-column-value">
+              <col class="details-column-description">
+            </colgroup>
             <thead>
               <tr>
                 <th>Column</th>
@@ -552,8 +570,8 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <th><code>${column}</code></th>
-          <td>${displayValue}</td>
-          <td class="text-muted">${description}</td>
+          <td class="details-value"><div>${displayValue}</div></td>
+          <td class="details-description text-muted">${description}</td>
         `;
         tbody.appendChild(tr);
       });

@@ -13,15 +13,19 @@ from jinja2 import TemplateNotFound
 
 from . import config
 from . import database
+from . import llm
 from . import pgstat_helper
 from .routes_helpers import (
     get_segment,
     handle_cache_table_get,
+    handle_database_analyze_llm_get,
+    handle_database_analyze_llm_post,
     handle_dashboard_get,
     handle_database_get,
     handle_database_post,
     handle_enable_pg_statistics,
     handle_lint_post,
+    handle_indexes_get,
     handle_myqueries_get,
     handle_pgtune_post,
     handle_primarykey_get,
@@ -126,6 +130,12 @@ def route_template(template: str):
             return handle_primarykey_get(template, segment)
         elif segment == "tables_cards.html"  and request.method == 'GET':
             return handle_table_rfc_get(template, segment)
+        elif segment == "indexes.html" and request.method == 'GET':
+            return handle_indexes_get(template, segment)
+        elif segment == "database_analyze_llm.html" and request.method == 'GET':
+            return handle_database_analyze_llm_get(template, segment)
+        elif segment == "database_analyze_llm.html" and request.method == 'POST':
+            return handle_database_analyze_llm_post(template, segment)
         elif segment == "cache_table.html" and request.method == 'GET':
             return handle_cache_table_get(template, segment)
         elif segment == "llm.html" and request.method == 'GET':
@@ -135,17 +145,74 @@ def route_template(template: str):
                 llm_uri=config.get_config_value("LOCAL_LLM_URI"),
                 llm_api_key=config.get_config_value("OPENAI_API_KEY"),
                 llm_model=config.get_config_value("OPENAI_API_MODEL"),
-                llm_sql_guidelines=config.get_config_value("LLM_SQL_GUIDELINES")
-)
+                llm_sql_guidelines=config.get_config_value("LLM_SQL_GUIDELINES"),
+                llm_table_rfc_prompt_template=llm.get_configured_table_prompt_template(
+                    "LLM_TABLE_RFC_PROMPT_TEMPLATE",
+                    llm.get_default_table_rfc_prompt_template(),
+                ),
+                llm_table_naming_prompt_template=llm.get_configured_table_prompt_template(
+                    "LLM_TABLE_NAMING_PROMPT_TEMPLATE",
+                    llm.get_default_table_naming_prompt_template(),
+                ),
+                default_table_rfc_prompt_template=llm.get_default_table_rfc_prompt_template(),
+                default_table_naming_prompt_template=llm.get_default_table_naming_prompt_template(),
+            )
         elif segment == "llm.html" and request.method == 'POST':
             llm_uri = request.form.get("llm_uri")
             llm_api_key = request.form.get("llm_api_key")
             llm_model = request.form.get("llm_model")
             llm_sql_guidelines = request.form.get("llm_sql_guidelines", "")
+            llm_table_rfc_prompt_template = request.form.get(
+                "llm_table_rfc_prompt_template", ""
+            )
+            llm_table_naming_prompt_template = request.form.get(
+                "llm_table_naming_prompt_template", ""
+            )
 
-            config.update_llm_config(llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model, llm_sql_guidelines=llm_sql_guidelines)
+            if not llm_table_rfc_prompt_template.strip():
+                llm_table_rfc_prompt_template = llm.get_default_table_rfc_prompt_template()
+            if not llm_table_naming_prompt_template.strip():
+                llm_table_naming_prompt_template = llm.get_default_table_naming_prompt_template()
 
-            return render_template(f"home/{template}", segment=segment, llm_uri=llm_uri, llm_api_key=llm_api_key, llm_model=llm_model,llm_sql_guidelines=llm_sql_guidelines)
+            try:
+                llm.validate_table_prompt_template(llm_table_rfc_prompt_template)
+                llm.validate_table_prompt_template(llm_table_naming_prompt_template)
+            except ValueError as prompt_error:
+                return render_template(
+                    f"home/{template}",
+                    segment=segment,
+                    llm_uri=llm_uri,
+                    llm_api_key=llm_api_key,
+                    llm_model=llm_model,
+                    llm_sql_guidelines=llm_sql_guidelines,
+                    llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
+                    llm_table_naming_prompt_template=llm_table_naming_prompt_template,
+                    default_table_rfc_prompt_template=llm.get_default_table_rfc_prompt_template(),
+                    default_table_naming_prompt_template=llm.get_default_table_naming_prompt_template(),
+                    llm_settings_error=str(prompt_error),
+                )
+
+            config.update_llm_config(
+                llm_uri=llm_uri,
+                llm_api_key=llm_api_key,
+                llm_model=llm_model,
+                llm_sql_guidelines=llm_sql_guidelines,
+                llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
+                llm_table_naming_prompt_template=llm_table_naming_prompt_template,
+            )
+
+            return render_template(
+                f"home/{template}",
+                segment=segment,
+                llm_uri=llm_uri,
+                llm_api_key=llm_api_key,
+                llm_model=llm_model,
+                llm_sql_guidelines=llm_sql_guidelines,
+                llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
+                llm_table_naming_prompt_template=llm_table_naming_prompt_template,
+                default_table_rfc_prompt_template=llm.get_default_table_rfc_prompt_template(),
+                default_table_naming_prompt_template=llm.get_default_table_naming_prompt_template(),
+            )
         return render_template(f"home/{template}", segment=segment, dbinfo={})
     except TemplateNotFound:
         return render_template('home/page-404.html'), 404

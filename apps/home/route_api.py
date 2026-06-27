@@ -15,6 +15,7 @@ from . import database
 from . import reporting
 from . import sqlhelper
 from . import indexe_helper
+from . import schema_helper
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -340,6 +341,97 @@ def api_table_indexe_stats(schemaname, tablename):
 
         status_code = 200 if result.get("success") else 404
         return jsonify(result), status_code
+
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+@blueprint.route("/api/v1/database_indexe_stats", methods=["GET"])
+@blueprint.route("/api/v1/database_indexes_stats", methods=["GET"])
+def api_database_indexe_stats():
+    """
+    Return detailed statistics for all user indexes in the connected database.
+
+    PostgreSQL internal schemas and information_schema are excluded.
+
+    Example:
+      /api/v1/database_indexe_stats
+      /api/v1/database_indexes_stats
+    """
+    conn = None
+
+    try:
+        if not session.get("db_host") and not session.get("db_uri"):
+            return jsonify({
+                "success": False,
+                "error": "No database connection found in session."
+            }), 400
+
+        conn, status = database.connectdb(session)
+
+        if conn is None or status != "OK":
+            return jsonify({
+                "success": False,
+                "error": status or "Unable to connect to database."
+            }), 500
+
+        result = indexe_helper.get_database_indexes_stats(conn)
+        return jsonify(result), 200
+
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+@blueprint.route("/api/v1/database_schema_llm_context", methods=["GET"])
+def api_database_schema_llm_context():
+    """
+    Return a compact database schema relationship digest for LLM analysis.
+
+    The digest includes PK/FK/UNIQUE information, FK index coverage, and
+    table-level pg_stat / pg_statio statistics for user tables.
+
+    Example:
+      /api/v1/database_schema_llm_context
+    """
+    conn = None
+
+    try:
+        if not session.get("db_host") and not session.get("db_uri"):
+            return jsonify({
+                "success": False,
+                "error": "No database connection found in session."
+            }), 400
+
+        conn, status = database.connectdb(session)
+
+        if conn is None or status != "OK":
+            return jsonify({
+                "success": False,
+                "error": status or "Unable to connect to database."
+            }), 500
+
+        result = schema_helper.get_database_schema_llm_context(conn)
+        return jsonify(result), 200
 
     except Exception as exc:
         return jsonify({

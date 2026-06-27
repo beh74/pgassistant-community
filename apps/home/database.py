@@ -633,3 +633,117 @@ def fetch_table_stats(db_config, tables):
             })
 
     return rows
+
+
+def fetch_foreign_key_index_coverage(db_config, tables):
+    """
+    Returns child-side foreign-key index coverage for the provided tables.
+
+    A FK is considered covered when a valid, ready, non-partial, non-expression
+    index starts with the FK column list in the same order.
+    """
+    if not tables:
+        return []
+
+    try:
+        conn, message = connectdb(db_config)
+    except Exception:
+        return []
+
+    qualified = [t for t in tables if "." in t]
+    unqualified = [t for t in tables if "." not in t]
+
+    filters = []
+    params = []
+
+    if qualified:
+        filters.append("(nsrc.nspname || '.' || src.relname) = ANY(%s)")
+        params.append(qualified)
+
+    if unqualified:
+        filters.append("src.relname = ANY(%s)")
+        params.append(unqualified)
+
+    if not filters:
+        conn.close()
+        return []
+
+    where_filter = " OR ".join(filters)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT
+                    con.conname AS constraint_name,
+                    nsrc.nspname AS from_schema,
+                    src.relname AS from_table,
+                    ARRAY_AGG(src_att.attname ORDER BY k.ord) AS from_columns,
+                    ntgt.nspname AS to_schema,
+                    tgt.relname AS to_table,
+                    ARRAY_AGG(tgt_att.attname ORDER BY k.ord) AS to_columns,
+                    EXISTS (
+                        SELECT 1
+                        FROM pg_index idx
+                        WHERE idx.indrelid = con.conrelid
+                          AND idx.indisvalid
+                          AND idx.indisready
+                          AND idx.indpred IS NULL
+                          AND idx.indexprs IS NULL
+                          AND (
+                              string_to_array(idx.indkey::text, ' ')::smallint[]
+                          )[1:array_length(con.conkey, 1)] = con.conkey
+                    ) AS fk_index_covered
+                FROM pg_constraint con
+                JOIN pg_class src ON src.oid = con.conrelid
+                JOIN pg_namespace nsrc ON nsrc.oid = src.relnamespace
+                JOIN pg_class tgt ON tgt.oid = con.confrelid
+                JOIN pg_namespace ntgt ON ntgt.oid = tgt.relnamespace
+                JOIN LATERAL (
+                    SELECT u.ord, u.src_attnum, v.tgt_attnum
+                    FROM unnest(con.conkey) WITH ORDINALITY u(src_attnum, ord)
+                    JOIN unnest(con.confkey) WITH ORDINALITY v(tgt_attnum, ord)
+                      USING (ord)
+                ) k ON true
+                JOIN pg_attribute src_att
+                  ON src_att.attrelid = src.oid
+                 AND src_att.attnum = k.src_attnum
+                JOIN pg_attribute tgt_att
+                  ON tgt_att.attrelid = tgt.oid
+                 AND tgt_att.attnum = k.tgt_attnum
+                WHERE con.contype = 'f'
+                  AND src.relkind IN ('r', 'p')
+                  AND tgt.relkind IN ('r', 'p')
+                  AND nsrc.nspname <> 'information_schema'
+                  AND nsrc.nspname !~ '^pg_'
+                  AND ntgt.nspname <> 'information_schema'
+                  AND ntgt.nspname !~ '^pg_'
+                  AND ({where_filter})
+                GROUP BY
+                    con.conname,
+                    con.conrelid,
+                    con.conkey,
+                    nsrc.nspname,
+                    src.relname,
+                    ntgt.nspname,
+                    tgt.relname
+                ORDER BY nsrc.nspname, src.relname, con.conname
+                """,
+                tuple(params),
+            )
+
+            rows = []
+            for row in cur.fetchall():
+                rows.append(
+                    {
+                        "constraint_name": row["constraint_name"],
+                        "from_table": f"{row['from_schema']}.{row['from_table']}",
+                        "from_columns": list(row["from_columns"] or []),
+                        "to_table": f"{row['to_schema']}.{row['to_table']}",
+                        "to_columns": list(row["to_columns"] or []),
+                        "fk_index_covered": bool(row["fk_index_covered"]),
+                    }
+                )
+            return rows
+    finally:
+        conn.close()

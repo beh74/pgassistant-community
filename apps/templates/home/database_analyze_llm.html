@@ -1,0 +1,544 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}DB Design{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+<style>
+  .schema-llm-page {
+    padding: 1.5rem;
+  }
+
+  .schema-llm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .schema-llm-subtitle {
+    color: var(--ga-muted, #64748b);
+    margin: .35rem 0 0;
+  }
+
+  .schema-llm-state,
+  .schema-llm-card,
+  .schema-llm-summary-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+  }
+
+  .schema-llm-state {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+
+  .schema-llm-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: .85rem;
+    margin-bottom: 1rem;
+  }
+
+  .schema-llm-summary-card {
+    padding: .9rem 1rem;
+  }
+
+  .schema-llm-summary-label {
+    color: var(--ga-muted-strong, #475569);
+    font-size: .74rem;
+    font-weight: 850;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .schema-llm-summary-value {
+    color: var(--ga-text, #0f172a);
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin-top: .15rem;
+  }
+
+  .schema-llm-card {
+    overflow: hidden;
+  }
+
+  .schema-llm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--ga-border, #dbe4ef);
+    background: rgba(255, 255, 255, .72);
+  }
+
+  .schema-llm-card-title {
+    color: var(--ga-text, #0f172a);
+    font-weight: 900;
+    margin-bottom: .15rem;
+  }
+
+  .schema-llm-card-text {
+    color: var(--ga-muted, #64748b);
+    font-size: .9rem;
+  }
+
+  .schema-llm-card-body {
+    padding: 1rem;
+  }
+
+  .schema-llm-actions {
+    display: flex;
+    gap: .65rem;
+    flex-wrap: wrap;
+  }
+
+  .schema-mermaid-shell {
+    min-height: 24rem;
+    overflow: auto;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .85rem;
+    background: #fff;
+    padding: 1rem;
+  }
+
+  .schema-mermaid-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+  }
+
+  .schema-mermaid-zoom-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+  }
+
+  .schema-mermaid-zoom-level {
+    min-width: 3.6rem;
+    color: var(--ga-muted-strong, #475569);
+    font-size: .82rem;
+    font-weight: 850;
+    text-align: center;
+  }
+
+  .schema-mermaid-canvas {
+    position: relative;
+    min-width: 100%;
+    min-height: 20rem;
+  }
+
+  #schemaMermaidGraph {
+    display: inline-block;
+    transform-origin: top left;
+  }
+
+  #schemaMermaidGraph svg {
+    display: block;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+  }
+
+  .schema-size-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .6rem;
+    flex-wrap: wrap;
+    color: var(--ga-muted, #64748b);
+    font-size: .78rem;
+    font-weight: 750;
+  }
+
+  .schema-size-legend-swatches {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 999px;
+  }
+
+  .schema-size-legend-swatch {
+    width: 1.45rem;
+    height: .7rem;
+  }
+
+  .schema-size-legend-swatch:nth-child(1) { background: #f8fafc; }
+  .schema-size-legend-swatch:nth-child(2) { background: #eff6ff; }
+  .schema-size-legend-swatch:nth-child(3) { background: #dbeafe; }
+  .schema-size-legend-swatch:nth-child(4) { background: #bfdbfe; }
+  .schema-size-legend-swatch:nth-child(5) { background: #93c5fd; }
+  .schema-size-legend-swatch:nth-child(6) { background: #60a5fa; }
+
+  .schema-context-preview,
+  .schema-prompt-textarea {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: .82rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .schema-context-preview {
+    max-height: 22rem;
+    overflow: auto;
+    margin: 0;
+    padding: 1rem;
+    color: #f8fafc;
+    background: #111827;
+    border-radius: .85rem;
+  }
+
+  .schema-prompt-textarea {
+    min-height: 28rem;
+    resize: vertical;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="schema-llm-page">
+  <div class="schema-llm-header">
+    <div>
+      <h1 class="h4 mb-1">DB Design</h1>
+      <p class="schema-llm-subtitle">
+        Analyze table relationships with a compact PK/FK digest enriched with PostgreSQL statistics.
+      </p>
+    </div>
+    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+
+  <div id="schemaLoading" class="schema-llm-state">
+    <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+    <div class="fw-bold">Loading schema relationship digest</div>
+    <p class="text-muted mb-0">pgAssistant is collecting PK, FK, UNIQUE constraints and pg_stat information.</p>
+  </div>
+
+  <div id="schemaError" class="schema-llm-state d-none">
+    <div class="fw-bold">Unable to load schema digest</div>
+    <p class="text-muted mb-0" id="schemaErrorMessage">The API returned an error.</p>
+  </div>
+
+  <div id="schemaContent" class="d-none">
+    <div class="schema-llm-summary">
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">Tables</div>
+        <div class="schema-llm-summary-value" id="schemaTableCount">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">Primary keys</div>
+        <div class="schema-llm-summary-value" id="schemaPkCount">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">Foreign keys</div>
+        <div class="schema-llm-summary-value" id="schemaFkCount">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">FK index gaps</div>
+        <div class="schema-llm-summary-value text-warning" id="schemaFkIndexGaps">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">Avg live rows</div>
+        <div class="schema-llm-summary-value" id="schemaAverageRows">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">PK/FK stats</div>
+        <div class="schema-llm-summary-value" id="schemaColumnStats">0</div>
+      </div>
+      <div class="schema-llm-summary-card">
+        <div class="schema-llm-summary-label">Stats reset</div>
+        <div class="schema-llm-summary-value fs-6" id="schemaStatsReset">-</div>
+      </div>
+    </div>
+
+    <div class="schema-llm-card mb-4">
+      <div class="schema-llm-card-header">
+        <div>
+          <div class="schema-llm-card-title">Simplified relationship diagram</div>
+          <div class="schema-llm-card-text">Mermaid diagram focused on primary and foreign-key relationships.</div>
+        </div>
+        <div class="schema-llm-actions">
+          <button type="button" class="btn btn-outline-secondary" id="copyMermaidBtn">
+            <i class="bi bi-clipboard me-1"></i>Copy Mermaid
+          </button>
+          <button type="button" class="btn btn-outline-primary" id="showPromptBtn" data-bs-toggle="modal" data-bs-target="#schemaPromptModal">
+            Give me an LLM prompt
+          </button>
+          <form method="POST" id="schemaAnalyzeForm" class="d-inline">
+            <input type="hidden" id="llmPromptInput" name="llm_prompt">
+            <button type="submit" class="btn btn-primary" id="analyzeLlmBtn">
+              <i class="bi bi-stars me-1"></i>Analyze with LLM
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="schema-llm-card-body">
+        <pre id="mermaidSource" class="d-none"></pre>
+        <div class="schema-mermaid-toolbar">
+          <div class="schema-size-legend">
+            <span>Rows vs average</span>
+            <span class="schema-size-legend-swatches" aria-hidden="true">
+              <span class="schema-size-legend-swatch"></span>
+              <span class="schema-size-legend-swatch"></span>
+              <span class="schema-size-legend-swatch"></span>
+              <span class="schema-size-legend-swatch"></span>
+              <span class="schema-size-legend-swatch"></span>
+              <span class="schema-size-legend-swatch"></span>
+            </span>
+            <span>lower to higher</span>
+          </div>
+          <div class="schema-mermaid-zoom-controls" aria-label="Diagram zoom controls">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="zoomOutBtn" title="Zoom out">
+              <i class="bi bi-zoom-out"></i>
+            </button>
+            <span class="schema-mermaid-zoom-level" id="schemaZoomLevel">100%</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="zoomInBtn" title="Zoom in">
+              <i class="bi bi-zoom-in"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="zoomResetBtn" title="Reset zoom">
+              <i class="bi bi-aspect-ratio"></i>
+            </button>
+          </div>
+        </div>
+        <div class="schema-mermaid-shell">
+          <div class="schema-mermaid-canvas" id="schemaMermaidCanvas">
+            <div id="schemaMermaidGraph"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="schema-llm-card">
+      <div class="schema-llm-card-header">
+        <div>
+          <div class="schema-llm-card-title">LLM digest preview</div>
+          <div class="schema-llm-card-text">Compact context generated from catalog metadata and pg_stat views.</div>
+        </div>
+      </div>
+      <div class="schema-llm-card-body">
+        <pre class="schema-context-preview" id="schemaContextPreview"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="schemaPromptModal" tabindex="-1" aria-labelledby="schemaPromptModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="schemaPromptModalTitle">Database schema LLM prompt</h5>
+            <div class="text-muted small">You can copy or edit this prompt before using it in another LLM.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <textarea class="form-control schema-prompt-textarea" id="schemaPromptTextarea" spellcheck="false"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="copyPromptBtn">
+            <i class="bi bi-clipboard me-1"></i>Copy
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const loading = document.getElementById("schemaLoading");
+  const error = document.getElementById("schemaError");
+  const errorMessage = document.getElementById("schemaErrorMessage");
+  const content = document.getElementById("schemaContent");
+  const mermaidSource = document.getElementById("mermaidSource");
+  const canvas = document.getElementById("schemaMermaidCanvas");
+  const graph = document.getElementById("schemaMermaidGraph");
+  const promptInput = document.getElementById("llmPromptInput");
+  const promptTextarea = document.getElementById("schemaPromptTextarea");
+  const contextPreview = document.getElementById("schemaContextPreview");
+  const copyPromptBtn = document.getElementById("copyPromptBtn");
+  const copyMermaidBtn = document.getElementById("copyMermaidBtn");
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  const zoomResetBtn = document.getElementById("zoomResetBtn");
+  const zoomLevel = document.getElementById("schemaZoomLevel");
+  let mermaidZoom = 1;
+  let mermaidNaturalSize = { width: 0, height: 0 };
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? "-";
+  }
+
+  function formatNumber(value) {
+    return new Intl.NumberFormat().format(Math.round(Number(value) || 0));
+  }
+
+  function clampZoom(value) {
+    return Math.min(8, Math.max(.25, value));
+  }
+
+  function updateMermaidZoom(nextZoom) {
+    mermaidZoom = clampZoom(nextZoom);
+
+    if (graph) {
+      graph.style.transform = `scale(${mermaidZoom})`;
+    }
+
+    if (canvas && mermaidNaturalSize.width && mermaidNaturalSize.height) {
+      canvas.style.width = `${Math.ceil(mermaidNaturalSize.width * mermaidZoom)}px`;
+      canvas.style.height = `${Math.ceil(mermaidNaturalSize.height * mermaidZoom)}px`;
+    }
+
+    if (zoomLevel) {
+      zoomLevel.textContent = `${Math.round(mermaidZoom * 100)}%`;
+    }
+  }
+
+  function captureMermaidNaturalSize() {
+    if (!graph) return;
+    graph.style.transform = "scale(1)";
+
+    const svg = graph.querySelector("svg");
+    if (!svg) return;
+
+    svg.style.width = "auto";
+    svg.style.height = "auto";
+    svg.style.maxWidth = "none";
+
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute("width", Math.ceil(viewBox.width));
+      svg.setAttribute("height", Math.ceil(viewBox.height));
+    }
+
+    const box = svg.getBoundingClientRect();
+    mermaidNaturalSize = {
+      width: Math.max(box.width, 1),
+      height: Math.max(box.height, 1)
+    };
+  }
+
+  async function copyText(value, button, originalLabel) {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    } catch (err) {
+      button.textContent = "Copy failed";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    }
+  }
+
+  async function loadSchemaDigest() {
+    try {
+      const response = await fetch("/api/v1/database_schema_llm_context", {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      const digest = data.digest || {};
+      const summary = digest.summary || {};
+
+      setText("schemaTableCount", summary.table_count || 0);
+      setText("schemaPkCount", summary.primary_key_count || 0);
+      setText("schemaFkCount", summary.foreign_key_count || 0);
+      setText("schemaFkIndexGaps", summary.foreign_keys_without_covering_index || 0);
+      setText("schemaAverageRows", formatNumber(summary.average_live_rows || 0));
+      setText("schemaColumnStats", formatNumber(summary.column_stat_count || 0));
+      setText("schemaStatsReset", digest.stats_reset || "-");
+
+      const prompt = data.llm_prompt || "";
+      const mermaidCode = data.mermaid_code || "erDiagram";
+
+      promptInput.value = prompt;
+      promptTextarea.value = prompt;
+      contextPreview.textContent = data.llm_context || "";
+      mermaidSource.textContent = mermaidCode;
+
+      loading.classList.add("d-none");
+      content.classList.remove("d-none");
+
+      await window.renderSchemaMermaid();
+    } catch (err) {
+      loading.classList.add("d-none");
+      error.classList.remove("d-none");
+      errorMessage.textContent = err.message || "Unable to load schema digest.";
+    }
+  }
+
+  promptTextarea.addEventListener("input", function () {
+    promptInput.value = promptTextarea.value;
+  });
+
+  copyPromptBtn.addEventListener("click", function () {
+    copyText(promptTextarea.value, copyPromptBtn, "Copy");
+  });
+
+  copyMermaidBtn.addEventListener("click", function () {
+    copyText(mermaidSource.textContent || "", copyMermaidBtn, "Copy Mermaid");
+  });
+
+  zoomOutBtn.addEventListener("click", function () {
+    updateMermaidZoom(mermaidZoom - .25);
+  });
+
+  zoomInBtn.addEventListener("click", function () {
+    updateMermaidZoom(mermaidZoom + .25);
+  });
+
+  zoomResetBtn.addEventListener("click", function () {
+    updateMermaidZoom(1);
+  });
+
+  window.renderSchemaMermaid = async function () {
+    if (!window.mermaidApiReady || !graph || !mermaidSource) return;
+    graph.innerHTML = "";
+    mermaidNaturalSize = { width: 0, height: 0 };
+    if (canvas) {
+      canvas.style.width = "";
+      canvas.style.height = "";
+    }
+    const pre = document.createElement("pre");
+    pre.className = "mermaid";
+    pre.textContent = mermaidSource.textContent || "erDiagram";
+    graph.appendChild(pre);
+    await window.mermaidApi.run({ querySelector: "#schemaMermaidGraph .mermaid" });
+    captureMermaidNaturalSize();
+    updateMermaidZoom(mermaidZoom);
+  };
+
+  loadSchemaDigest();
+});
+</script>
+
+<script type="module">
+  import mermaid from '{{ config.ASSETS_ROOT }}/js/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+  window.mermaidApi = mermaid;
+  window.mermaidApiReady = true;
+  if (window.renderSchemaMermaid) {
+    window.renderSchemaMermaid();
+  }
+</script>
+{% endblock javascripts %}

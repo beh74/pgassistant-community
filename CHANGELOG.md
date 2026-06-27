@@ -1,5 +1,23 @@
 # Change Log
 
+## [3.3] - 2026-06-28
+
+## Improvements
+
+- LLM Settings: added editable prompt templates for table RFC/standards analysis and SQL naming convention checks.
+- Index API: added database-wide user index statistics endpoints:
+  - `/api/v1/database_indexes_stats`
+  - `/api/v1/database_indexe_stats`
+- Indexes advisor: added `/indexes.html` to load database-wide index statistics asynchronously and display them as cards with search, filters, sorting, and pagination.
+- DB Design: added `/database_analyze_llm.html` under **Schema & design** to analyze database relationships through a compact LLM-oriented schema digest.
+- LLM: removed pgAssistant's conservative Ollama output cap so responses are no longer shortened by a small `num_predict` budget.
+
+## Bug fixes
+
+- Indexes advisor: fixed truncated index definitions by letting definition blocks grow with their content.
+- LLM: added a warning when Ollama still stops generation because the model/provider context limit is reached.
+
+
 ## [3.2] - 2026-06-23
 
 A Lot of work in this new release !
@@ -696,6 +714,3 @@ For security reasons, we highly recommend deploying pgAssistant behind a reverse
 
 ## [1.0.0] - 2024-08-04
 - **Initial Release**: Repository initialized!
-
-
-

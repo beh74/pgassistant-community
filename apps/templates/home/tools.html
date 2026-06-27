@@ -518,11 +518,7 @@
       {% endfor %}
 
       {% set index_items = [
-        ('All indexes', '/generic/index_definition', 'definition ddl', 'bi bi-journal-code', 'Inventory of indexes & definitions.', ['definition','ddl','btree']),
-        ('Sequential scans', '/generic/index_seqscan', 'seq scan', 'bi bi-lightning-charge', 'Identify seq-scan hotspots.', ['seqscan','hotspots','opportunity']),
-        ('Unused indexes', '/generic/index_unused', 'unused idx', 'bi bi-trash', 'Candidate indexes to drop.', ['unused','idx_scan','cleanup']),
-        ('Indexes usage', '/generic/index_usage', 'usage', 'bi bi-pie-chart', 'Usage & efficiency indicators.', ['usage','hit ratio','scans']),
-        ('Indexes IO', '/generic/index_io', 'io', 'bi bi-hdd', 'I/O profile for indexes.', ['io','reads','writes'])
+        ('All indexes', 'indexes.html', 'definition ddl', 'bi bi-journal-code', 'Inventory of indexes & definitions.', ['definition','ddl','btree'])
       ] %}
       {% for label, href, kw, icon, subtitle, tags in index_items %}
         {{ tool_card('Indexes · ' ~ label, href, 'indexes', icon, subtitle, tags=tags, keywords='indexes ' ~ label|lower ~ ' ' ~ kw) }}

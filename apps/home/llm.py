@@ -12,7 +12,8 @@ from .sqlhelper import get_tables
 from .config import get_config_value
 from .database import get_pg_tune_parameter
 from .database import fetch_table_stats
-from .llm_helper import detect_model_family, estimate_tokens, choose_ctx_and_output_budget, clamp_num_ctx
+from .database import fetch_foreign_key_index_coverage
+from .llm_helper import detect_model_family, estimate_tokens, choose_ctx_for_unlimited_output
 
 
 def extract_root_uri(uri):
@@ -95,8 +96,8 @@ def query_chatgpt(question):
         prompt = f"{system_msg}\n\n{question}"
         prompt_tokens = estimate_tokens(prompt)
 
-        ctx_limit, out_budget, mode = choose_ctx_and_output_budget(model_llm, prompt_tokens)
-        num_ctx = clamp_num_ctx(ctx_limit, prompt_tokens, out_budget)
+        ctx_limit, mode = choose_ctx_for_unlimited_output(model_llm, prompt_tokens)
+        num_ctx = ctx_limit
 
         family = detect_model_family(model_llm)
 
@@ -106,7 +107,7 @@ def query_chatgpt(question):
         print(
             f"Using native Ollama API "
             f"(model={model_llm}, family={family}, est_prompt_tokens={prompt_tokens}, "
-            f"num_ctx={num_ctx}/{ctx_limit}, num_predict={out_budget}), mode={mode}, think={think_level}"
+            f"num_ctx={num_ctx}/{ctx_limit}, num_predict=unlimited), mode={mode}, think={think_level}"
         )
 
         root = extract_root_uri(local_llm)
@@ -120,7 +121,7 @@ def query_chatgpt(question):
                 {"role": "user", "content": question},
             ],
             "options": {
-                "num_predict": out_budget,
+                "num_predict": -1,
                 "num_ctx": num_ctx,
             },
         }
@@ -135,6 +136,7 @@ def query_chatgpt(question):
 
         # Ollama /api/chat returns: {"message":{"role":"assistant","content":"..."}, "done":..., "done_reason":...}
         output = ((data.get("message") or {}).get("content")) or ""
+        done_reason = data.get("done_reason")
 
         # 2) retry if empty/whitespace
         if not output.strip():
@@ -150,11 +152,7 @@ def query_chatgpt(question):
 
             payload2 = payload.copy()
             payload2["options"] = payload["options"].copy()
-            
-            if family in ("qwen3.6", "qwen3.5"):
-                payload2["options"]["num_predict"] = max(1024, out_budget)
-            else:
-                payload2["options"]["num_predict"] = min(256, out_budget)
+            payload2["options"].pop("num_predict", None)
 
             # keep think=low on retry if enabled
             if think_level is not None:
@@ -162,6 +160,7 @@ def query_chatgpt(question):
 
             data2 = _ollama_post(root, "/api/chat", payload2, timeout=600)
             output = (((data2.get("message") or {}).get("content")) or "")
+            done_reason = data2.get("done_reason")
 
             if not output.strip():
                 diag2 = {
@@ -172,6 +171,12 @@ def query_chatgpt(question):
                     "has_thinking": ("thinking" in data2) or ("thinking" in (data2.get("message") or {})),
                 }
                 raise Exception(f"Ollama returned empty output twice. diag1={diag}, diag2={diag2}")
+
+        if done_reason == "length":
+            output += (
+                "\n\n> **Warning:** Ollama stopped because the model/context limit was reached. "
+                "pgAssistant did not apply an output cap, but the provider still ended the generation."
+            )
 
     else:
         # ... path OpenAI unchanged ...
@@ -273,6 +278,24 @@ def format_column_statistics(column_statistics):
 
     return "\n".join(lines)
 
+def format_fk_index_coverage(fk_index_coverage):
+    if not fk_index_coverage:
+        return ""
+
+    lines = []
+    for fk in fk_index_coverage:
+        status = "covered" if fk.get("fk_index_covered") else "missing covering index"
+        from_columns = ", ".join(fk.get("from_columns") or [])
+        to_columns = ", ".join(fk.get("to_columns") or [])
+        lines.append(
+            "  - "
+            f"{fk.get('from_table')}({from_columns}) -> "
+            f"{fk.get('to_table')}({to_columns}) "
+            f"[constraint={fk.get('constraint_name')}, fk_index={status}]"
+        )
+
+    return "\n".join(lines)
+
 def get_llm_query_for_query_analyze(
     host: str,
     port: int,
@@ -342,6 +365,15 @@ def get_llm_query_for_query_analyze(
         except Exception:
             pass
 
+    fk_index_coverage = fetch_foreign_key_index_coverage(db_config, tables) if db_config else None
+    if fk_index_coverage:
+        formatted_fk_index_coverage = format_fk_index_coverage(fk_index_coverage)
+        if formatted_fk_index_coverage:
+            meta_lines.append(
+                "- Foreign-key index coverage for involved child tables:\n"
+                + formatted_fk_index_coverage
+            )
+
     #plan_section = "\n".join(row['QUERY PLAN'] for row in rows)
     plan_section = "\n".join(
         json.dumps(row['QUERY PLAN'], indent=2)
@@ -373,6 +405,8 @@ def get_llm_query_for_query_analyze(
         """
 **Rules (very important):**
 - Do **not** recommend indexes that already exist in the DDL. Primary keys are already indexed.
+- Do **not** recommend an index on foreign-key columns when the FK index coverage section says `fk_index=covered`.
+- If a FK is marked `missing covering index`, recommend an index only when the execution plan or table size/selectivity makes it useful for this query.
 - If you recommend an index, include: table, columns (with order), predicate (if partial), opclass (if non-default), and whether `CONCURRENTLY` is advisable.
 - Never assume extensions (e.g., `pg_trgm`, `btree_gin`) are available unless visible in the DDL; if needed, say it's a *conditional* recommendation.
 - If no meaningful improvement is likely, say **No change required** and explain why.
@@ -452,8 +486,10 @@ Additionally, provide the necessary **ALTER TABLE** SQL command(s) to implement 
 """
     return prompt
 
-def analyze_table_format (ddl: str) -> str:
-    llm_prompt = f"""
+TABLE_PROMPT_DDL_PLACEHOLDER = "{{DDL}}"
+TABLE_PROMPT_GUIDELINES_PLACEHOLDER = "{{GUIDELINES}}"
+
+DEFAULT_TABLE_RFC_PROMPT_TEMPLATE = """
 # SQL Table Structure Validation Based on RFC & International Standards (PostgreSQL Compatible)
 
 ## **Task**  
@@ -494,15 +530,13 @@ You are an expert in **database design**, **SQL optimization**, and **data stand
 
 ## **Here is the DDL to analyze**  
 ```sql
-{ddl}
+{{DDL}}
 ```
 """
-    return llm_prompt
 
 
-def analyze_with_sql_quide(ddl: str, guidelines: str) -> str:
-    llm_prompt = f"""
-Please review the following DDL using this SQL Naming Conventions Guide: {guidelines}
+DEFAULT_TABLE_NAMING_PROMPT_TEMPLATE = """
+Please review the following DDL using this SQL Naming Conventions Guide: {{GUIDELINES}}
 
 Produce a single Markdown table with EXACTLY five columns:
 
@@ -527,11 +561,59 @@ Produce a single Markdown table with EXACTLY five columns:
 Now analyze the following DDL:
 
 ```sql
-{ddl}
+{{DDL}}
 ```
 """
 
-    return llm_prompt
+
+def get_default_table_rfc_prompt_template() -> str:
+    return DEFAULT_TABLE_RFC_PROMPT_TEMPLATE.strip()
+
+
+def get_default_table_naming_prompt_template() -> str:
+    return DEFAULT_TABLE_NAMING_PROMPT_TEMPLATE.strip()
+
+
+def validate_table_prompt_template(template: str) -> None:
+    if TABLE_PROMPT_DDL_PLACEHOLDER not in (template or ""):
+        raise ValueError(
+            f"The prompt template must contain the {TABLE_PROMPT_DDL_PLACEHOLDER} variable."
+        )
+
+
+def render_table_prompt_template(ddl: str, template: str, guidelines: str = "") -> str:
+    validate_table_prompt_template(template)
+    return (
+        template.replace(TABLE_PROMPT_DDL_PLACEHOLDER, ddl)
+        .replace(TABLE_PROMPT_GUIDELINES_PLACEHOLDER, guidelines or "")
+    )
+
+
+def get_configured_table_prompt_template(config_key: str, default_template: str) -> str:
+    template = get_config_value(config_key, default_template)
+    if not template or not template.strip():
+        return default_template
+    return template
+
+
+def analyze_table_format(ddl: str) -> str:
+    template = get_configured_table_prompt_template(
+        "LLM_TABLE_RFC_PROMPT_TEMPLATE",
+        get_default_table_rfc_prompt_template(),
+    )
+    return render_table_prompt_template(ddl=ddl, template=template)
+
+
+def analyze_with_sql_quide(ddl: str, guidelines: str) -> str:
+    template = get_configured_table_prompt_template(
+        "LLM_TABLE_NAMING_PROMPT_TEMPLATE",
+        get_default_table_naming_prompt_template(),
+    )
+    return render_table_prompt_template(
+        ddl=ddl,
+        template=template,
+        guidelines=guidelines,
+    )
 
 
 def get_llm_query_for_query_optimize (sql_query):

@@ -1382,7 +1382,14 @@ body {
 }
 
 .topqueries-toolbar {
-  grid-template-columns: 2fr minmax(190px, 1fr) minmax(150px, .6fr);
+  grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr);
+}
+
+.topqueries-toolbar-right {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(150px, .7fr);
+  gap: 1rem;
+  align-items: end;
 }
 
 @media (max-width: 1400px) {
@@ -1392,11 +1399,19 @@ body {
 @media (max-width: 992px) {
   .rankqueries-toolbar,
   .topqueries-toolbar { grid-template-columns: 1fr 1fr; }
+
+  .topqueries-toolbar-right {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 768px) {
   .rankqueries-toolbar,
   .topqueries-toolbar { grid-template-columns: 1fr; }
+
+  .topqueries-toolbar-right {
+    grid-template-columns: 1fr;
+  }
 }
 
 .rankqueries-field,
@@ -1433,7 +1448,7 @@ body {
 }
 
 .topqueries-grid {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
 }
 
 @media (max-width: 575.98px) {
@@ -1458,7 +1473,8 @@ body {
   border-color: rgba(47, 111, 159, .28);
 }
 
-.rank-query-card .card-header {
+.rank-query-card .card-header,
+.topquery-card .card-header {
   background: linear-gradient(135deg, #ffffff, #f8fbff);
   border-bottom: 1px solid var(--pga-border-soft);
   padding: .85rem 1rem;
@@ -1466,6 +1482,84 @@ body {
 
 .rank-query-card .card-body,
 .topquery-card .card-body { padding: 1rem; }
+
+.activity-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+}
+
+.activity-cache-summary {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-shrink: 0;
+}
+
+.activity-operation-badge {
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 800;
+  padding: .35rem .6rem;
+}
+
+.activity-query-sql.topquery-sql {
+  display: block;
+  background: #0b1220 !important;
+  color: #e5e7eb !important;
+  border-color: rgba(148, 163, 184, .18) !important;
+  min-height: 0;
+  max-height: 11rem;
+  margin: 0 0 1rem;
+  padding: .95rem 1rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+}
+
+.activity-query-sql.topquery-sql code {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+
+.activity-section-label {
+  color: var(--pga-muted);
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  margin-bottom: .4rem;
+}
+
+.activity-query-id {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.activity-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .45rem;
+  margin-left: auto;
+  min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+  .activity-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 
 .topquery-sql {
   font-size: .83rem;
@@ -1596,10 +1690,32 @@ body {
 .cache-badge { min-width: 84px; text-align: center; }
 .perf-badge { min-width: 74px; text-align: center; }
 
-.rank-query-footer {
+.rank-query-footer,
+.activity-card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: .75rem;
+}
+
+@media (max-width: 575.98px) {
+  .activity-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-card-actions {
+    align-items: stretch;
+    margin-left: 0;
+  }
+
+  .activity-query-id {
+    text-align: left;
+  }
+
+  .activity-card-actions > :last-child {
+    flex-wrap: wrap;
+  }
 }
 
 .rank-empty-state,
@@ -1621,9 +1737,41 @@ body {
 
 .rank-empty-state .empty-text { color: var(--pga-muted); }
 
-.details-table th {
-  width: 220px;
-  white-space: nowrap;
+.details-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.details-table .details-column-name { width: 20%; }
+.details-table .details-column-value { width: 36%; }
+.details-table .details-column-description { width: 44%; }
+
+.details-table th,
+.details-table td {
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.details-table th code {
+  white-space: normal;
+}
+
+.details-value > div {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.details-description {
+  line-height: 1.45;
+  white-space: normal;
+}
+
+@media (max-width: 767.98px) {
+  .details-table {
+    min-width: 760px;
+  }
 }
 
 .pagination-wrapper {

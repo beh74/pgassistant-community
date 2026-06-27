@@ -30,12 +30,13 @@
 {% set is_dashboard = current_path == '/dashboard.html' or 'dashboard' in segment %}
 {% set is_global_advisor = current_path == '/global/advisor' or 'global_advisor' in segment %}
 {% set is_tables_cards = current_path == '/tables_cards.html' or 'tables_cards' in segment %}
+{% set is_db_design = current_path == '/database_analyze_llm.html' or segment == 'database_analyze_llm.html' %}
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
 {% set is_rankqueries = current_path == '/rankqueries.html' or 'rankqueries' in segment %}
 {% set is_stats = current_path == '/stats.html' or segment.startswith('stats') %}
-{% set is_database_connection = current_path == '/database.html' or 'database' in segment %}
+{% set is_database_connection = current_path == '/database.html' or segment == 'database.html' %}
 {% set is_pgtune = current_path == '/pgtune.html' or 'pgtune' in segment %}
-{% set is_llm = current_path == '/llm.html' or 'llm' in segment %}
+{% set is_llm = current_path == '/llm.html' or segment == 'llm.html' %}
 
 {% set is_tools_database = current_path == '/tools' and tools_cat == 'database' %}
 {% set is_tools_tables = current_path == '/tools' and tools_cat == 'tables' %}
@@ -176,6 +177,20 @@
         </a>
       </li>
 
+      <li class="nav-item nav-schema {% if is_db_design %}active{% endif %}">
+        <a href="/database_analyze_llm.html" class="nav-link" {% if is_db_design %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1"/>
+              <path d="M2 7v-.839c.457.432 1.004.751 1.49.972C4.722 7.693 6.318 8 8 8s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7"/>
+              <path d="M2 10v-.839c.457.432 1.004.751 1.49.972C4.722 10.693 6.318 11 8 11s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10"/>
+              <path d="M2 13v-.839c.457.432 1.004.751 1.49.972C4.722 13.693 6.318 14 8 14s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13"/>
+            </svg>
+          </div>
+          <div class="sidebar-text">DB Design</div>
+        </a>
+      </li>
+
 
       {# Issues menu #}
         <li class="nav-item nav-schema {% if is_tools_issues %}active{% endif %}">
@@ -240,7 +255,7 @@
 
         {# Indexes menu #}
         <li class="nav-item nav-schema {% if is_tools_indexes %}active{% endif %}">
-          <a href="/tools?cat=indexes" class="nav-link" {% if is_tools_indexes %}aria-current="page"{% endif %}>
+          <a href="/indexes.html" class="nav-link" {% if is_tools_indexes %}aria-current="page"{% endif %}>
             <div class="sidebar-icon me-2 icon-20">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-journal-code" viewBox="0 0 16 16">
                 <path fill-rule="evenodd" d="M8.646 5.646a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1 0 .708l-2 2a.5.5 0 0 1-.708-.708L10.293 8 8.646 6.354a.5.5 0 0 1 0-.708m-1.292 0a.5.5 0 0 0-.708 0l-2 2a.5.5 0 0 0 0 .708l2 2a.5.5 0 0 0 .708-.708L5.707 8l1.647-1.646a.5.5 0 0 0 0-.708"/>

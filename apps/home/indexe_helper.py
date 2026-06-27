@@ -327,3 +327,23 @@ def get_table_indexes_stats(conn, schemaname: str, table_name: str) -> Dict[str,
         "count": len(rows),
         "indexes": rows,
     }
+
+
+def get_database_indexes_stats(conn) -> Dict[str, Any]:
+    """Return statistics for every user index in the connected database."""
+    rows = _fetch_all_dicts(
+        conn,
+        INDEX_STATS_SQL,
+        {
+            "index_name": None,
+            "schemaname": None,
+            "table_name": None,
+        },
+    )
+
+    return {
+        "success": True,
+        "query_type": "database",
+        "count": len(rows),
+        "indexes": rows,
+    }
