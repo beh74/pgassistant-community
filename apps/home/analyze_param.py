@@ -1,3 +1,5 @@
+"""Map PostgreSQL query parameters to the columns they constrain."""
+
 import re
 import sqlglot
 from sqlglot.expressions import (
@@ -10,6 +12,8 @@ PARAM_PATTERN = re.compile(r"^\$?\d+$")
 
 def extract_binary_conditions(expression):
     """
+    Walk a SQLGlot expression tree and collect comparison predicates.
+
     Recursive function to extract all comparison conditions (=, >, <, IN, LIKE, etc.),
     including those wrapped in parentheses, NOT, and logical combinations.
     """
@@ -112,6 +116,8 @@ def extract_param_keys_from_expr(expr):
 
 def extract_parameter_columns(sql_query):
     """
+    Main helper used by query analysis to understand what each bind parameter targets.
+
     Parse an SQL query and return a mapping of parameters ($1, $2, etc.)
     to the used columns (table.column) based on WHERE clauses and SELECT lists.
 

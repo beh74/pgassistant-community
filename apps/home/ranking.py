@@ -2,6 +2,7 @@ import math
 
 
 def _to_float(value, default=0.0):
+    """Convert a raw database value to float while tolerating empty fields."""
     try:
         if value is None or value == "":
             return default
@@ -11,6 +12,7 @@ def _to_float(value, default=0.0):
 
 
 def _to_int(value, default=0):
+    """Convert a raw database value to int while tolerating empty fields."""
     try:
         if value is None or value == "":
             return default
@@ -20,6 +22,7 @@ def _to_int(value, default=0):
 
 
 def format_duration_ms(value):
+    """Format a duration expressed in milliseconds for the ranking UI."""
     t = _to_float(value, 0.0)
 
     if t <= 0:
@@ -45,6 +48,7 @@ def format_duration_ms(value):
 
 
 def _log_norm(value, max_value):
+    """Normalize a positive value on a logarithmic scale between 0 and 1."""
     value = max(_to_float(value, 0.0), 0.0)
     max_value = max(_to_float(max_value, 0.0), 0.0)
 
@@ -55,6 +59,7 @@ def _log_norm(value, max_value):
 
 
 def normalize_query_row(row):
+    """Normalize pg_stat_statements values before computing ranking scores."""
     normalized = dict(row)
 
     normalized["query"] = row.get("query", "") or ""
@@ -91,6 +96,7 @@ def normalize_query_row(row):
 
 
 def _should_exclude_query(query: str) -> bool:
+    """Ignore statements that are not useful for workload prioritization."""
     normalized = (query or "").strip().lower()
 
     if not normalized:
@@ -127,6 +133,7 @@ def _should_exclude_query(query: str) -> bool:
 
 
 def rank_queries(rows):
+    """Rank pg_stat_statements rows by workload impact and tuning signals."""
     if not rows:
         return []
 
@@ -205,9 +212,7 @@ def rank_queries(rows):
             else 0.0
         )
 
-        # ------------------------------------------------------------
-        # Workload shares
-        # ------------------------------------------------------------
+        # Compare each query to the full captured workload.
         share_total = (
             total_time / sum_total_time
             if sum_total_time else 0.0
@@ -233,9 +238,7 @@ def rank_queries(rows):
         norm_share_io = min(share_io / 0.20, 1.0)
         norm_cache_miss_share = min(cache_miss_share / 0.20, 1.0)
 
-        # ------------------------------------------------------------
-        # Score
-        # ------------------------------------------------------------
+        # Build a score with workload impact first and technical smells second.
         LOW_CALL_SHARE = 0.001
         LOW_LOAD_SHARE = 0.005
         LOW_TOTAL_TIME_MS = 100
@@ -244,7 +247,6 @@ def rank_queries(rows):
         norm_calls = _log_norm(calls, max_calls)
         norm_mean = _log_norm(mean_time, max_mean_time)
 
-        # Workload impact first.
         impact_score = 0.0
         impact_score += norm_share_total * 40
         impact_score += norm_total_time * 25
@@ -252,7 +254,6 @@ def rank_queries(rows):
         impact_score += norm_calls * 10
         impact_score += norm_mean * 5
 
-        # Technical smells second.
         technical_score = 0.0
 
         if cache_hit_ratio < 95 and shared_read >= 1000:
@@ -274,9 +275,7 @@ def rank_queries(rows):
 
         score = impact_score + technical_score
 
-        # ------------------------------------------------------------
-        # Demotion rules
-        # ------------------------------------------------------------
+        # Keep tiny one-off statements from outranking meaningful workload.
         if (
             share_calls < LOW_CALL_SHARE
             and total_time < LOW_TOTAL_TIME_MS
@@ -297,9 +296,7 @@ def rank_queries(rows):
 
         score = min(score, 100.0)
 
-        # ------------------------------------------------------------
-        # Signals
-        # ------------------------------------------------------------
+        # Signals are user-facing labels used for filtering and explanation.
         signals = []
 
         if share_total >= 0.10:
@@ -330,9 +327,7 @@ def rank_queries(rows):
             ):
                 signals.append("unstable")
 
-        # ------------------------------------------------------------
-        # Reason
-        # ------------------------------------------------------------
+        # Build a concise human-readable explanation for the score.
         reason_parts = []
 
         if "high_load" in signals:
@@ -373,9 +368,7 @@ def rank_queries(rows):
             else:
                 reason_parts.append("Low workload impact")
 
-        # ------------------------------------------------------------
-        # Priority level
-        # ------------------------------------------------------------
+        # Map the numeric score to a coarse priority level for the UI.
         if score >= 80:
             level = "Critical"
 

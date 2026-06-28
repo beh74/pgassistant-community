@@ -1,3 +1,5 @@
+"""Shared parsing, metadata and heuristic helpers for the index advisor."""
+
 import json
 import re
 from dataclasses import dataclass, asdict
@@ -12,6 +14,7 @@ from . import database
 
 @dataclass
 class TableMeta:
+    """Database metadata needed to judge table size and existing indexes."""
     schema: str
     table: str
     reltuples: float
@@ -22,6 +25,7 @@ class TableMeta:
 
 @dataclass
 class ScanFinding:
+    """Normalized scan node extracted from a PostgreSQL JSON plan."""
     schema: str
     table: str
     alias: Optional[str]
@@ -46,6 +50,7 @@ class ScanFinding:
 
 @dataclass
 class JoinFinding:
+    """Normalized join condition extracted from a PostgreSQL JSON plan."""
     join_node_type: str
     join_type: str
     cond_type: str
@@ -64,6 +69,7 @@ class JoinFinding:
 
 @dataclass
 class OrderByFinding:
+    """Simple Sort/Incremental Sort pattern suitable for ORDER BY analysis."""
     node_type: str
     sort_key: Optional[List[str]]
     presorted_key: Optional[List[str]]
@@ -93,6 +99,7 @@ class OrderByFinding:
 
 @dataclass
 class GroupByFinding:
+    """Simple aggregate/grouping pattern suitable for GROUP BY analysis."""
     node_type: str
     strategy: Optional[str]
     group_key: Optional[List[str]]
@@ -121,6 +128,7 @@ class GroupByFinding:
 
 @dataclass
 class QueryStats:
+    """pg_stat_statements counters attached to a query when available."""
     queryid: str
     calls: float
     rows: float
@@ -138,6 +146,7 @@ class QueryStats:
 
 @dataclass
 class ColumnStats:
+    """Subset of pg_stats used to estimate selectivity and index usefulness."""
     schema: str
     table: str
     column: str
@@ -150,6 +159,7 @@ class ColumnStats:
 
 @dataclass
 class Recommendation:
+    """Index advisor output returned to API/UI consumers."""
     schema: str
     table: str
     confidence: str
@@ -176,6 +186,7 @@ class Recommendation:
 # --------------------------------------------------------------------
 
 def get_db_config_from_session(session: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept the different session shapes used by routes and API calls."""
     if "db_config" in session:
         return session["db_config"]
     if "database" in session:
@@ -188,12 +199,14 @@ def get_db_config_from_session(session: Dict[str, Any]) -> Dict[str, Any]:
 # --------------------------------------------------------------------
 
 def normalize_plan_json(plan_json: Any) -> Any:
+    """Accept either a JSON string or an already decoded plan object."""
     if isinstance(plan_json, str):
         return json.loads(plan_json)
     return plan_json
 
 
 def extract_root_plan(plan_json: Any) -> Dict[str, Any]:
+    """Return the PostgreSQL root Plan node from FORMAT JSON output."""
     if isinstance(plan_json, list):
         if not plan_json:
             raise ValueError("Empty plan JSON.")
@@ -212,6 +225,7 @@ def collect_relation_aliases(
     node: Dict[str, Any],
     alias_map: Dict[str, Dict[str, str]],
 ) -> None:
+    """Collect plan aliases so join findings can be mapped back to tables."""
     relation = node.get("Relation Name")
     schema = node.get("Schema")
     alias = node.get("Alias")
@@ -236,6 +250,7 @@ def walk_plan_collect_findings(
     group_by_findings: Optional[List[GroupByFinding]] = None,
     parent_node_type: Optional[str] = None,
 ) -> None:
+    """Walk the plan tree and collect scan, join, ORDER BY and GROUP BY findings."""
     node_type = node.get("Node Type", "")
 
     # ------------------------------------------------------------
@@ -421,6 +436,7 @@ def first_direct_scan_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def first_simple_group_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the simple scan child under a grouping node, allowing one Sort."""
     plans = node.get("Plans", []) or []
     if len(plans) != 1:
         return None
@@ -446,6 +462,7 @@ def first_simple_group_child(node: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 # --------------------------------------------------------------------
 
 def load_table_meta(con, schema: str, table: str) -> Optional[TableMeta]:
+    """Load relation size and existing indexes for one table."""
     rel_sql = """
         SELECT
             n.nspname,
@@ -507,6 +524,8 @@ def load_table_meta(con, schema: str, table: str) -> Optional[TableMeta]:
 
 def parse_index_columns(indexdef: str) -> List[str]:
     """
+    Extract column names from a simple PostgreSQL index definition.
+
     Parse très simple :
     CREATE INDEX ... ON schema.table USING btree (col1, col2)
     """
@@ -531,6 +550,7 @@ def parse_index_columns(indexdef: str) -> List[str]:
 # --------------------------------------------------------------------
 
 def load_query_stats(con, queryid: int | str) -> Optional[QueryStats]:
+    """Load pg_stat_statements counters for the analyzed query ID."""
     sql = """
         SELECT
             queryid::text,
@@ -580,6 +600,7 @@ def load_query_stats(con, queryid: int | str) -> Optional[QueryStats]:
 # --------------------------------------------------------------------
 
 def parse_pg_array_text(value: Optional[str]) -> Optional[List[str]]:
+    """Parse PostgreSQL array text returned by pg_stats into a Python list."""
     if value is None:
         return None
 
@@ -622,6 +643,7 @@ def parse_pg_array_text(value: Optional[str]) -> Optional[List[str]]:
 
 
 def parse_pg_float_array_text(value: Optional[str]) -> Optional[List[float]]:
+    """Parse PostgreSQL array text into floats when all items are numeric."""
     raw = parse_pg_array_text(value)
     if raw is None:
         return None
@@ -636,6 +658,7 @@ def parse_pg_float_array_text(value: Optional[str]) -> Optional[List[float]]:
 
 
 def load_column_stats(con, schema: str, table: str, column: str) -> Optional[ColumnStats]:
+    """Load pg_stats information for one table column."""
     sql = """
         SELECT
             schemaname,
@@ -673,6 +696,7 @@ def load_column_stats(con, schema: str, table: str, column: str) -> Optional[Col
 
 
 def build_column_stats_summary(stats: Optional[ColumnStats]) -> str:
+    """Format column statistics into a compact explanation string."""
     if stats is None:
         return "n_distinct=unknown"
 
@@ -697,6 +721,7 @@ def build_candidate_columns_stats_reason(
     table: str,
     candidate_columns: List[str],
 ) -> str:
+    """Build a stats summary for a list of candidate index columns."""
     parts: List[str] = []
 
     for col in candidate_columns:
@@ -727,6 +752,7 @@ def build_candidate_predicates_stats_reason(
 
 
 def try_extract_constant_text(filter_expr: str) -> Optional[str]:
+    """Extract a simple literal value from a comparison expression."""
     m = re.search(
         r"""(=|>=|<=|>|<)\s*(?:
             '(?P<quoted>[^']*)'(?:::.*)? |
@@ -753,6 +779,7 @@ def estimate_equality_selectivity_from_stats(
     filter_expr: str,
     column_stats: ColumnStats,
 ) -> Optional[float]:
+    """Estimate equality predicate selectivity from MCV or n_distinct stats."""
     op = extract_simple_operator(filter_expr)
     if op != "=":
         return None
@@ -780,6 +807,7 @@ def estimate_equality_selectivity_from_stats(
 
 
 def try_parse_numeric_constant(filter_expr: str) -> Optional[float]:
+    """Extract a numeric literal from a simple comparison expression."""
     m = re.search(
         r"""(=|>=|<=|>|<)\s*(?:'(?P<qnum>-?\d+(?:\.\d+)?)'(?:::.*)?|(?P<num>-?\d+(?:\.\d+)?))""",
         filter_expr,
@@ -799,6 +827,7 @@ def try_parse_numeric_constant(filter_expr: str) -> Optional[float]:
 
 
 def extract_simple_operator(filter_expr: str) -> Optional[str]:
+    """Return the comparison operator from a simple predicate."""
     m = re.search(r"(=|>=|<=|>|<|~~|LIKE|ILIKE)", filter_expr, flags=re.IGNORECASE)
     if not m:
         return None
@@ -809,6 +838,7 @@ def estimate_selectivity_from_stats(
     filter_expr: str,
     column_stats: ColumnStats,
 ) -> Optional[float]:
+    """Estimate predicate selectivity using pg_stats when the expression is simple."""
     op = extract_simple_operator(filter_expr)
     if not op:
         return None
@@ -926,6 +956,7 @@ def has_large_row_estimation_gap(
 
 
 def find_index_definition(indexes: List[Dict[str, Any]], index_name: Optional[str]) -> Optional[str]:
+    """Return the CREATE INDEX definition for a named existing index."""
     if not index_name:
         return None
 
@@ -954,6 +985,7 @@ def compute_row_estimation_ratio(plan_rows: float, actual_rows: float) -> Option
 
 
 def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
+    """Explain how far planner row estimates are from actual rows."""
     ratio = compute_row_estimation_ratio(plan_rows, actual_rows)
     if ratio is None:
         return "Row estimate comparison unavailable."
@@ -977,6 +1009,7 @@ def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
 
 
 def is_small_table(meta: TableMeta) -> bool:
+    """Return True when an index recommendation is unlikely to be worthwhile."""
     if meta.relpages <= 8:
         return True
     if meta.reltuples > 0 and meta.reltuples <= 1000:
@@ -1009,6 +1042,7 @@ def is_full_relation_scan_without_predicate(finding: ScanFinding, meta: TableMet
 
 
 def build_no_filter_seq_scan_reason(finding: ScanFinding, meta: TableMeta) -> str:
+    """Explain why a sequential scan without a visible predicate is not actionable."""
     relation = f'{finding.schema}.{finding.table}'
 
     if is_small_table(meta):
@@ -1032,6 +1066,7 @@ def build_no_filter_seq_scan_reason(finding: ScanFinding, meta: TableMeta) -> st
     )
 
 def estimate_selected_fraction(finding: ScanFinding) -> Optional[float]:
+    """Estimate how selective a filter was from actual rows and removed rows."""
     scanned_rows = finding.actual_rows + finding.rows_removed_by_filter
     if scanned_rows <= 0:
         return None
@@ -1069,6 +1104,7 @@ def is_planned_scan_potentially_expensive(finding: ScanFinding, meta: TableMeta)
 
 
 def strip_outer_parentheses(expr: str) -> str:
+    """Remove balanced outer parentheses from an expression string."""
     expr = expr.strip()
 
     while expr.startswith("(") and expr.endswith(")"):
@@ -1094,6 +1130,7 @@ def strip_outer_parentheses(expr: str) -> str:
 
 
 def split_top_level_and(expr: str) -> List[str]:
+    """Split an expression on top-level AND operators only."""
     parts: List[str] = []
     current: List[str] = []
     depth = 0
@@ -1138,6 +1175,7 @@ def split_top_level_and(expr: str) -> List[str]:
 
 
 def strip_trivial_lhs_casts(expr: str) -> str:
+    """Remove simple casts around the left side of a predicate."""
     expr = expr.strip()
 
     while True:
@@ -1158,6 +1196,7 @@ def strip_trivial_lhs_casts(expr: str) -> str:
 
 
 def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:
+    """Extract simple single-table filter columns from an AND expression."""
     expr = strip_outer_parentheses(filter_expr.strip())
     clauses = split_top_level_and(expr)
 
@@ -1363,6 +1402,7 @@ def reorder_index_candidate_columns(
 def extract_simple_join_columns(
     cond_expr: str,
 ) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Extract alias/column pairs from a simple equality join condition."""
     expr = strip_outer_parentheses(cond_expr.strip())
 
     m = re.match(
@@ -1407,6 +1447,7 @@ def merge_simple_predicates(
 
 
 def find_index_columns(indexes: List[Dict[str, Any]], index_name: Optional[str]) -> List[str]:
+    """Return parsed columns for an existing index name."""
     if not index_name:
         return []
 
@@ -1447,6 +1488,7 @@ def estimate_post_index_filter_fraction(finding: ScanFinding) -> Optional[float]
 
 
 def build_post_index_filter_reason(finding: ScanFinding) -> Optional[str]:
+    """Explain how much residual filtering happened after an indexed access."""
     fraction = estimate_post_index_filter_fraction(finding)
     if fraction is None:
         return None
@@ -1459,12 +1501,14 @@ def build_post_index_filter_reason(finding: ScanFinding) -> Optional[str]:
     )
 
 def looks_like_prefix_search(filter_expr: str) -> bool:
+    """Detect LIKE 'prefix%' predicates that may need operator-class review."""
     return bool(
         re.search(r"(LIKE|~~)\s+'[^%_']+%'", filter_expr, flags=re.IGNORECASE)
     )
 
 
 def looks_suspicious_predicate(filter_expr: str) -> bool:
+    """Flag predicates that look semantically unusual and need human review."""
     expr = filter_expr.lower()
     if "discount" in expr and "> '1'" in expr:
         return True
@@ -1538,6 +1582,7 @@ def extract_simple_group_keys(
     alias: Optional[str],
     table: str,
 ) -> List[str]:
+    """Extract GROUP BY columns using the same parser as ORDER BY keys."""
     order_keys = extract_simple_sort_keys(keys, alias=alias, table=table)
     return [item["column"] for item in order_keys]
 
@@ -1546,6 +1591,7 @@ def merge_columns_with_order(
     filter_columns: List[str],
     order_columns: List[Dict[str, str]],
 ) -> List[str]:
+    """Merge equality/filter columns with ordered columns for composite indexes."""
     merged: List[str] = []
 
     for col in filter_columns or []:
@@ -1566,6 +1612,7 @@ def build_create_index_sql_with_order(
     filter_columns: List[str],
     order_columns: List[Dict[str, str]],
 ) -> str:
+    """Build CREATE INDEX SQL preserving ORDER BY directions where needed."""
     index_parts: List[str] = []
     name_parts: List[str] = []
 
@@ -1592,10 +1639,12 @@ def build_create_index_sql_with_order(
 
 
 def sort_spilled_to_disk(finding: OrderByFinding) -> bool:
+    """Return True when PostgreSQL reported a disk-backed sort."""
     return (finding.sort_space_type or "").lower() == "disk"
 
 
 def build_sort_context_reason(finding: OrderByFinding) -> str:
+    """Build a compact ORDER BY context string for recommendation reasons."""
     details: List[str] = []
 
     if finding.has_limit:
@@ -1618,10 +1667,12 @@ def build_sort_context_reason(finding: OrderByFinding) -> str:
 
 
 def group_by_spilled_to_disk(finding: GroupByFinding) -> bool:
+    """Return True when the GROUP BY supporting sort spilled to disk."""
     return (finding.sort_space_type or "").lower() == "disk"
 
 
 def build_group_by_context_reason(finding: GroupByFinding) -> str:
+    """Build a compact GROUP BY context string for recommendation reasons."""
     details: List[str] = []
 
     if finding.strategy:
@@ -1644,6 +1695,7 @@ def build_group_by_context_reason(finding: GroupByFinding) -> str:
 
 
 def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List[str]) -> Optional[str]:
+    """Return an existing index whose leading columns cover the candidate."""
     wanted = [c.strip('"') for c in candidate_columns]
 
     for idx in indexes:
@@ -1654,12 +1706,14 @@ def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List
 
 
 def build_create_index_sql(schema: str, table: str, columns: List[str]) -> str:
+    """Build a simple concurrent B-tree index creation statement."""
     idx_name = f"pga_idx_{table}_{'_'.join(columns)}"
     cols_sql = ", ".join(f'"{c}"' for c in columns)
     return f'CREATE INDEX CONCURRENTLY "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
 
 
 def is_high_workload(query_stats: Optional[QueryStats]) -> bool:
+    """Return True when pg_stat_statements says the query is significant."""
     if not query_stats:
         return False
     return (

@@ -1,5 +1,8 @@
+"""SQLGlot helpers used to extract table/column usage from a query."""
+
 import sqlglot
 from sqlglot.expressions import Column, Table, Where, From, Select, Join, Group, Order, Having
+
 
 def extract_table_aliases(expression):
     """
@@ -114,6 +117,8 @@ def analyze_table_conditions(sql_query):
 
 def check_index_coverage(indexes_dict, used_columns_dict):
     """
+    Cross-check query columns against existing index definitions.
+
     Returns a dictionary indicating, for each table and each column used,
     whether the column is covered by at least one existing index.
 
@@ -158,4 +163,3 @@ def check_index_coverage(indexes_dict, used_columns_dict):
             coverage_info[table][col] = is_covered
 
     return coverage_info
-

@@ -14,6 +14,7 @@ INTERNAL_SCHEMAS = {"pg_catalog", "information_schema"}
 
 
 def _get_postgres_major_version(db_config: Dict[str, Any]) -> int:
+    """Resolve the PostgreSQL major version from session config or the database."""
     configured_version = db_config.get("version")
     if configured_version:
         try:
@@ -34,6 +35,7 @@ def _get_postgres_major_version(db_config: Dict[str, Any]) -> int:
 
 
 def _sort_recommendations(recommendations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Sort advisor recommendations by confidence for stable API/UI output."""
     priority = {
         "safe": 0,
         "review": 1,
@@ -47,18 +49,21 @@ def _sort_recommendations(recommendations: List[Dict[str, Any]]) -> List[Dict[st
 
 
 def _query_text_for_row(db_config: Dict[str, Any], row: Dict[str, Any]) -> str:
+    """Return SQL text from ranking data, falling back to pg_stat_statements."""
     if row.get("query"):
         return row["query"]
     return database.get_pgstat_query_by_id(db_config, str(row.get("queryid")))
 
 
 def _queryid_as_text(value: Any) -> str | None:
+    """Keep PostgreSQL 64-bit query IDs as strings to avoid JavaScript rounding."""
     if value is None or value == "":
         return None
     return str(value)
 
 
 def _generic_plan_for_query(db_config: Dict[str, Any], query: str) -> Any:
+    """Ask PostgreSQL 16+ for a generic JSON plan for a normalized query."""
     normalized_query = sqlhelper.normalize_query_for_parameter_analysis(query)
     explain_sql = (
         "EXPLAIN (GENERIC_PLAN TRUE, VERBOSE TRUE, SETTINGS TRUE, FORMAT JSON) "
@@ -71,6 +76,7 @@ def _generic_plan_for_query(db_config: Dict[str, Any], query: str) -> Any:
 
 
 def _walk_plan_nodes(node: Any):
+    """Yield every plan node from PostgreSQL's nested JSON plan structure."""
     if isinstance(node, list):
         for item in node:
             yield from _walk_plan_nodes(item)
@@ -90,6 +96,7 @@ def _walk_plan_nodes(node: Any):
 
 
 def _plan_uses_internal_schema(plan_json: Any) -> bool:
+    """Detect plans that target PostgreSQL internal schemas and should be skipped."""
     for node in _walk_plan_nodes(plan_json):
         schema = str(node.get("Schema") or "").strip()
         if schema in INTERNAL_SCHEMAS or schema.startswith("pg_toast"):

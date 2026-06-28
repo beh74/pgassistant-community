@@ -34,6 +34,7 @@
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
 {% set is_rankqueries = current_path == '/rankqueries.html' or 'rankqueries' in segment %}
 {% set is_query_index_advisor = current_path == '/query_index_advisor.html' or segment == 'query_index_advisor.html' %}
+{% set is_query_parameter_advisor = current_path == '/query_parameter_advisor.html' or segment == 'query_parameter_advisor.html' %}
 {% set is_stats = current_path == '/stats.html' or segment.startswith('stats') %}
 {% set is_database_connection = current_path == '/database.html' or segment == 'database.html' %}
 {% set is_pgtune = current_path == '/pgtune.html' or 'pgtune' in segment %}
@@ -158,6 +159,18 @@
             </svg>
           </div>
           <div class="sidebar-text">Index Advisor</div>
+        </a>
+      </li>
+
+      <li class="nav-item nav-query {% if is_query_parameter_advisor %}active{% endif %}">
+        <a href="/query_parameter_advisor.html" class="nav-link" {% if is_query_parameter_advisor %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.902 3.433 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.892 3.433-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.892-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/>
+            </svg>
+          </div>
+          <div class="sidebar-text">Parameter Advisor</div>
         </a>
       </li>
 

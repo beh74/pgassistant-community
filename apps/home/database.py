@@ -566,38 +566,77 @@ def fetch_table_stats(db_config, tables):
     rel_filters = []
     rel_params = []
 
-    stat_filters = []
-    stat_params = []
-
     if qualified:
         rel_filters.append("(n.nspname || '.' || c.relname) = ANY(%s)")
         rel_params.append(qualified)
-
-        stat_filters.append("(schemaname || '.' || relname) = ANY(%s)")
-        stat_params.append(qualified)
 
     if unqualified:
         rel_filters.append("c.relname = ANY(%s)")
         rel_params.append(unqualified)
 
-        stat_filters.append("relname = ANY(%s)")
-        stat_params.append(unqualified)
-
     rel_where = " OR ".join(rel_filters)
-    stat_where = " OR ".join(stat_filters)
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
         cur.execute(
             f"""
-            SELECT n.nspname AS schemaname,
-                   c.relname AS tablename,
-                   c.reltuples::bigint AS estimated_rows,
-                   pg_total_relation_size(c.oid) AS total_bytes
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('r','p')
-              AND ({rel_where})
+            WITH RECURSIVE input_matches AS (
+                SELECT c.oid
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind IN ('r','p')
+                  AND ({rel_where})
+            ),
+            ancestor_chain(relid, ancestor_oid) AS (
+                SELECT oid AS relid, oid AS ancestor_oid
+                FROM input_matches
+
+                UNION ALL
+
+                SELECT ac.relid, inh.inhparent AS ancestor_oid
+                FROM ancestor_chain ac
+                JOIN pg_inherits inh ON inh.inhrelid = ac.ancestor_oid
+            ),
+            roots AS (
+                SELECT DISTINCT ac.ancestor_oid AS oid
+                FROM ancestor_chain ac
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM pg_inherits parent_link
+                    WHERE parent_link.inhrelid = ac.ancestor_oid
+                )
+            ),
+            relation_members(root_oid, member_oid) AS (
+                SELECT oid AS root_oid, oid AS member_oid
+                FROM roots
+
+                UNION ALL
+
+                SELECT rm.root_oid, child.oid AS member_oid
+                FROM relation_members rm
+                JOIN pg_inherits inh ON inh.inhparent = rm.member_oid
+                JOIN pg_class child ON child.oid = inh.inhrelid
+                WHERE child.relkind IN ('r','p')
+            )
+            SELECT
+                n.nspname AS schemaname,
+                root.relname AS tablename,
+                GREATEST(COUNT(DISTINCT rm.member_oid) - 1, 0) AS partition_count,
+                COALESCE(SUM(member.reltuples), 0)::bigint AS estimated_rows,
+                COALESCE(SUM(pg_total_relation_size(member.oid)), 0) AS total_bytes,
+                COALESCE(SUM(st.n_live_tup), 0) AS n_live_tup,
+                COALESCE(SUM(st.n_dead_tup), 0) AS n_dead_tup,
+                MAX(st.last_vacuum) AS last_vacuum,
+                MAX(st.last_autovacuum) AS last_autovacuum,
+                MAX(st.last_analyze) AS last_analyze,
+                MAX(st.last_autoanalyze) AS last_autoanalyze
+            FROM roots r
+            JOIN pg_class root ON root.oid = r.oid
+            JOIN pg_namespace n ON n.oid = root.relnamespace
+            JOIN relation_members rm ON rm.root_oid = root.oid
+            JOIN pg_class member ON member.oid = rm.member_oid
+            LEFT JOIN pg_stat_all_tables st ON st.relid = member.oid
+            GROUP BY n.nspname, root.relname
             """,
             tuple(rel_params),
         )
@@ -605,37 +644,16 @@ def fetch_table_stats(db_config, tables):
         for r in cur.fetchall():
             key = f"{r['schemaname']}.{r['tablename']}"
             rows[key] = {
-                "estimated_rows": int(r["estimated_rows"]),
-                "total_bytes": int(r["total_bytes"]),
-            }
-
-        cur.execute(
-            f"""
-            SELECT schemaname,
-                   relname,
-                   n_live_tup,
-                   n_dead_tup,
-                   last_vacuum,
-                   last_autovacuum,
-                   last_analyze,
-                   last_autoanalyze
-            FROM pg_stat_all_tables
-            WHERE ({stat_where})
-            """,
-            tuple(stat_params),
-        )
-
-        for r in cur.fetchall():
-            key = f"{r['schemaname']}.{r['relname']}"
-            rows.setdefault(key, {})
-            rows[key].update({
-                "n_live_tup": r["n_live_tup"],
-                "n_dead_tup": r["n_dead_tup"],
+                "partition_count": int(r["partition_count"] or 0),
+                "estimated_rows": int(r["estimated_rows"] or 0),
+                "total_bytes": int(r["total_bytes"] or 0),
+                "n_live_tup": int(r["n_live_tup"] or 0),
+                "n_dead_tup": int(r["n_dead_tup"] or 0),
                 "last_vacuum": str(r["last_vacuum"]) if r["last_vacuum"] else None,
                 "last_autovacuum": str(r["last_autovacuum"]) if r["last_autovacuum"] else None,
                 "last_analyze": str(r["last_analyze"]) if r["last_analyze"] else None,
                 "last_autoanalyze": str(r["last_autoanalyze"]) if r["last_autoanalyze"] else None,
-            })
+            }
 
     return rows
 

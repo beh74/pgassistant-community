@@ -516,14 +516,25 @@
 {% macro format_rows(n) %}
   {% if n is none %}
     -
-  {% elif n >= 1000000000 %}
-    {{ (n / 1000000000)|round(1) }}B
-  {% elif n >= 1000000 %}
-    {{ (n / 1000000)|round(1) }}M
-  {% elif n >= 1000 %}
-    {{ (n / 1000)|round(1) }}k
   {% else %}
-    {{ n }}
+    {% set numeric_n = n|int %}
+    {% if numeric_n >= 1000000000 %}
+      {{ (numeric_n / 1000000000)|round(1) }}B
+    {% elif numeric_n >= 1000000 %}
+      {{ (numeric_n / 1000000)|round(1) }}M
+    {% elif numeric_n >= 1000 %}
+      {{ (numeric_n / 1000)|round(1) }}k
+    {% else %}
+      {{ numeric_n }}
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro numeric_attr(n) %}
+  {% if n is none %}
+    0
+  {% else %}
+    {{ n|float }}
   {% endif %}
 {% endmacro %}
 
@@ -729,9 +740,9 @@
           data-schema="{{ schema|lower|e }}"
           data-table="{{ table|lower|e }}"
           data-bloat="{{ bloat|e }}"
-          data-rows="{{ row_count if row_count is not none else 0 }}"
-          data-dead-pct="{{ dead_pct if dead_pct is not none else 0 }}"
-          data-index-pct="{{ index_pct if index_pct is not none else 0 }}"
+          data-rows="{{ numeric_attr(row_count) }}"
+          data-dead-pct="{{ numeric_attr(dead_pct) }}"
+          data-index-pct="{{ numeric_attr(index_pct) }}"
         >
           <div class="card shadow-sm h-100 table-card">
 

@@ -1,0 +1,481 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Parameter Advisor{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+<style>
+  .query-parameter-page {
+    padding: 1.5rem;
+  }
+
+  .query-parameter-actions {
+    display: flex;
+    gap: .65rem;
+    flex-wrap: wrap;
+  }
+
+  .query-parameter-state,
+  .query-parameter-card {
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+  }
+
+  .query-parameter-state {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+
+  .query-parameter-section-title {
+    color: var(--pga-text, #0f172a);
+    font-size: 1rem;
+    font-weight: 850;
+    margin: 1.35rem 0 .75rem;
+  }
+
+  .query-parameter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: .9rem;
+  }
+
+  .query-parameter-card {
+    overflow: hidden;
+  }
+
+  .query-parameter-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: 1rem 1.15rem;
+    background: #f8fbff;
+    border-bottom: 1px solid var(--ga-border, #dbe4ef);
+  }
+
+  .query-parameter-name {
+    color: var(--pga-text, #0f172a);
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .query-parameter-confidence {
+    border-radius: 999px;
+    padding: .25rem .55rem;
+    color: #0f172a;
+    background: #e0f2fe;
+    font-size: .72rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .query-parameter-confidence.is-high {
+    color: #7f1d1d;
+    background: #fee2e2;
+  }
+
+  .query-parameter-card-body {
+    padding: 1rem 1.15rem;
+  }
+
+  .query-parameter-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .65rem;
+    margin-bottom: .8rem;
+  }
+
+  .query-parameter-value-box {
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .75rem;
+    padding: .65rem .75rem;
+    background: #fff;
+  }
+
+  .query-parameter-value-label {
+    color: var(--pga-muted, #64748b);
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .query-parameter-value {
+    color: var(--pga-text, #0f172a);
+    font-size: 1rem;
+    font-weight: 850;
+    word-break: break-word;
+  }
+
+  .query-parameter-evidence {
+    margin: .75rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--pga-muted-strong, #475569);
+  }
+
+  .query-parameter-sql {
+    margin: .85rem 0 0;
+    padding: .75rem;
+    color: #e5e7eb;
+    background: #111827;
+    border-radius: .65rem;
+    font-size: .78rem;
+    white-space: pre-wrap;
+  }
+
+  .query-parameter-metrics {
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+  }
+
+  .query-parameter-metric-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: .7rem;
+    margin: 0;
+  }
+
+  .query-parameter-metric {
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .75rem;
+    padding: .7rem .8rem;
+    background: #fbfdff;
+  }
+
+  .query-parameter-metric dt {
+    color: var(--pga-muted, #64748b);
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .query-parameter-metric dd {
+    margin: .15rem 0 0;
+    color: var(--pga-text, #0f172a);
+    font-weight: 850;
+    font-size: 1.05rem;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="query-parameter-page">
+  <div class="pg-page-header">
+    <div>
+      <div class="pg-eyebrow">Query tuning</div>
+      <h1 class="pg-title">Parameter Advisor</h1>
+      <p class="pg-subtitle">
+        Runs generic plans for the pg_stat_statements workload, aggregates plan and runtime signals,
+        then highlights the pgTune parameters worth reviewing.
+      </p>
+    </div>
+
+    <div class="pg-actions query-parameter-actions">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="copyAllParametersBtn" disabled>
+        <i class="bi bi-clipboard me-1"></i>Copy proposals
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    This feature requires PostgreSQL 16 or newer because it relies on
+    <code>EXPLAIN (GENERIC_PLAN TRUE, ...)</code>.
+    {% if postgres_major_version %}
+      Current detected major version: <strong>{{ postgres_major_version }}</strong>.
+    {% endif %}
+  </div>
+
+  <div class="alert alert-warning">
+    <strong>Experimental feature.</strong>
+    Parameter Advisor provides workload-based review hints, not automatic tuning decisions.
+    Please read the algorithm documentation before applying any proposal:
+    <a
+      href="https://github.com/beh74/pgassistant-community/blob/main/parameter_advisor.md"
+      target="_blank"
+      rel="noopener"
+      class="alert-link"
+    >
+      parameter_advisor.md
+    </a>.
+  </div>
+
+  <div id="advisorLoading" class="query-parameter-state">
+    <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+    <div class="fw-bold">Analyzing workload parameters</div>
+    <p class="text-muted mb-0">pgAssistant is reading pg_stat_statements and running generic plans.</p>
+  </div>
+
+  <div id="advisorUnsupported" class="query-parameter-state d-none">
+    <div class="fw-bold">PostgreSQL 16 required</div>
+    <p class="text-muted mb-0" id="advisorUnsupportedMessage">
+      This database version cannot use generic plans.
+    </p>
+  </div>
+
+  <div id="advisorError" class="query-parameter-state d-none">
+    <div class="fw-bold">Unable to run Parameter Advisor</div>
+    <p class="text-muted mb-0" id="advisorErrorMessage">The API returned an error.</p>
+  </div>
+
+  <div id="advisorContent" class="d-none">
+    <div class="pg-summary-grid">
+      <div class="pg-summary-card is-info">
+        <div class="pg-summary-label">Queries seen</div>
+        <div class="pg-summary-value" id="summaryQueriesSeen">0</div>
+      </div>
+      <div class="pg-summary-card is-green">
+        <div class="pg-summary-label">Generic plans</div>
+        <div class="pg-summary-value" id="summaryQueriesPlanned">0</div>
+      </div>
+      <div class="pg-summary-card is-high">
+        <div class="pg-summary-label">Temp usage</div>
+        <div class="pg-summary-value" id="summaryTempUsage">0 MB</div>
+      </div>
+      <div class="pg-summary-card is-violet">
+        <div class="pg-summary-label">Cache hit ratio</div>
+        <div class="pg-summary-value" id="summaryCacheHit">-</div>
+      </div>
+      <div class="pg-summary-card is-critical">
+        <div class="pg-summary-label">Recommendations</div>
+        <div class="pg-summary-value" id="summaryRecommendations">0</div>
+      </div>
+    </div>
+
+    <div class="query-parameter-metrics">
+      <div class="query-parameter-section-title mt-0">Aggregated plan signals</div>
+      <dl class="query-parameter-metric-list">
+        <div class="query-parameter-metric">
+          <dt>Sort nodes</dt>
+          <dd id="metricSortNodes">0</dd>
+        </div>
+        <div class="query-parameter-metric">
+          <dt>Hash nodes</dt>
+          <dd id="metricHashNodes">0</dd>
+        </div>
+        <div class="query-parameter-metric">
+          <dt>Aggregates</dt>
+          <dd id="metricAggregateNodes">0</dd>
+        </div>
+        <div class="query-parameter-metric">
+          <dt>Seq scans</dt>
+          <dd id="metricSeqScanNodes">0</dd>
+        </div>
+        <div class="query-parameter-metric">
+          <dt>Gather nodes</dt>
+          <dd id="metricGatherNodes">0</dd>
+        </div>
+        <div class="query-parameter-metric">
+          <dt>Failures</dt>
+          <dd id="metricFailures">0</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="query-parameter-section-title">Parameter proposals</div>
+    <div id="advisorRecommendations" class="query-parameter-grid"></div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const loading = document.getElementById("advisorLoading");
+  const unsupported = document.getElementById("advisorUnsupported");
+  const unsupportedMessage = document.getElementById("advisorUnsupportedMessage");
+  const error = document.getElementById("advisorError");
+  const errorMessage = document.getElementById("advisorErrorMessage");
+  const content = document.getElementById("advisorContent");
+  const recommendationsBox = document.getElementById("advisorRecommendations");
+  const copyAllParametersBtn = document.getElementById("copyAllParametersBtn");
+  let proposalsCopyText = "";
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? "0";
+  }
+
+  function appendText(parent, tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    el.textContent = text || "";
+    parent.appendChild(el);
+    return el;
+  }
+
+  async function copyText(value, button, originalLabel) {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    } catch (err) {
+      const fallback = document.createElement("textarea");
+      fallback.value = value || "";
+      document.body.appendChild(fallback);
+      fallback.select();
+      document.execCommand("copy");
+      fallback.remove();
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    }
+  }
+
+  function buildProposalsText(items) {
+    const lines = [];
+    (items || []).forEach(function (item) {
+      lines.push(`${item.parameter}`);
+      lines.push(`Current: ${item.current_value ?? "-"}`);
+      lines.push(`Proposal: ${item.proposed_value ?? "review with pgTune inputs"}`);
+      lines.push(`Confidence: ${(item.confidence || "review").toUpperCase()}`);
+      lines.push(`Reason: ${item.reason || ""}`);
+      (item.evidence || []).forEach(function (evidence) {
+        lines.push(`- ${evidence}`);
+      });
+      if (item.alter_system_sql) {
+        lines.push("SQL:");
+        lines.push(item.alter_system_sql);
+      }
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+  }
+
+  function renderRecommendation(item) {
+    const card = document.createElement("article");
+    card.className = "query-parameter-card";
+
+    const header = document.createElement("div");
+    header.className = "query-parameter-card-header";
+    appendText(header, "div", "query-parameter-name", item.parameter || "-");
+    appendText(
+      header,
+      "div",
+      `query-parameter-confidence ${item.confidence === "high" ? "is-high" : ""}`,
+      item.confidence || "review"
+    );
+    card.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "query-parameter-card-body";
+
+    const values = document.createElement("div");
+    values.className = "query-parameter-values";
+
+    const current = document.createElement("div");
+    current.className = "query-parameter-value-box";
+    appendText(current, "div", "query-parameter-value-label", "Current");
+    appendText(current, "div", "query-parameter-value", item.current_value ?? "-");
+    values.appendChild(current);
+
+    const proposal = document.createElement("div");
+    proposal.className = "query-parameter-value-box";
+    appendText(proposal, "div", "query-parameter-value-label", "Proposal");
+    appendText(proposal, "div", "query-parameter-value", item.proposed_value ?? "Review");
+    values.appendChild(proposal);
+
+    body.appendChild(values);
+    appendText(body, "div", "text-muted", item.reason || "");
+
+    if (item.evidence && item.evidence.length) {
+      const list = document.createElement("ul");
+      list.className = "query-parameter-evidence";
+      item.evidence.forEach(function (value) {
+        appendText(list, "li", "", value);
+      });
+      body.appendChild(list);
+    }
+
+    if (item.alter_system_sql) {
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "btn btn-sm btn-outline-secondary mt-2";
+      copyBtn.textContent = "Copy SQL";
+      copyBtn.addEventListener("click", function () {
+        copyText(item.alter_system_sql, copyBtn, "Copy SQL");
+      });
+      body.appendChild(copyBtn);
+      appendText(body, "pre", "query-parameter-sql", item.alter_system_sql);
+    }
+
+    card.appendChild(body);
+    recommendationsBox.appendChild(card);
+  }
+
+  async function loadAdvisor() {
+    try {
+      const response = await fetch("/api/v1/query_parameter_advisor", {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      loading.classList.add("d-none");
+
+      if (data.supported === false) {
+        unsupported.classList.remove("d-none");
+        unsupportedMessage.textContent = data.message || "This feature requires PostgreSQL 16 or newer.";
+        return;
+      }
+
+      const summary = data.summary || {};
+      const planMetrics = summary.plan_metrics || {};
+      const recommendations = data.recommendations || [];
+      proposalsCopyText = buildProposalsText(recommendations);
+
+      copyAllParametersBtn.disabled = !proposalsCopyText;
+
+      setText("summaryQueriesSeen", summary.queries_seen || 0);
+      setText("summaryQueriesPlanned", summary.queries_planned || 0);
+      setText("summaryTempUsage", summary.temp_pretty || "0 B");
+      setText("summaryCacheHit", summary.shared_cache_hit_ratio_pct == null ? "-" : `${summary.shared_cache_hit_ratio_pct}%`);
+      setText("summaryRecommendations", summary.recommendations || 0);
+
+      setText("metricSortNodes", planMetrics.sort_nodes || 0);
+      setText("metricHashNodes", planMetrics.hash_nodes || 0);
+      setText("metricAggregateNodes", planMetrics.aggregate_nodes || 0);
+      setText("metricSeqScanNodes", planMetrics.seq_scan_nodes || 0);
+      setText("metricGatherNodes", planMetrics.gather_nodes || 0);
+      setText("metricFailures", summary.queries_failed || 0);
+
+      recommendationsBox.innerHTML = "";
+      if (!recommendations.length) {
+        appendText(
+          recommendationsBox,
+          "div",
+          "query-parameter-state",
+          "No parameter change proposal was found for the current workload snapshot."
+        );
+      } else {
+        recommendations.forEach(renderRecommendation);
+      }
+
+      content.classList.remove("d-none");
+    } catch (err) {
+      loading.classList.add("d-none");
+      error.classList.remove("d-none");
+      errorMessage.textContent = err.message || "Unable to run Parameter Advisor.";
+    }
+  }
+
+  copyAllParametersBtn.addEventListener("click", function () {
+    copyText(proposalsCopyText, copyAllParametersBtn, "Copy proposals");
+  });
+
+  loadAdvisor();
+});
+</script>
+{% endblock javascripts %}

@@ -14,6 +14,43 @@ USER_SCHEMA_FILTER = """
 
 
 TABLES_SQL = f"""
+WITH RECURSIVE user_relations AS (
+    SELECT
+        c.oid,
+        n.nspname,
+        c.relname,
+        c.relkind,
+        c.relnamespace
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r', 'p')
+      AND {USER_SCHEMA_FILTER}
+),
+table_roots AS (
+    SELECT ur.*
+    FROM user_relations ur
+    WHERE ur.relkind = 'p'
+       OR NOT EXISTS (
+           SELECT 1
+           FROM pg_inherits inh
+           WHERE inh.inhrelid = ur.oid
+       )
+),
+relation_members(root_oid, member_oid) AS (
+    SELECT
+        tr.oid AS root_oid,
+        tr.oid AS member_oid
+    FROM table_roots tr
+
+    UNION ALL
+
+    SELECT
+        rm.root_oid,
+        child.oid AS member_oid
+    FROM relation_members rm
+    JOIN pg_inherits inh ON inh.inhparent = rm.member_oid
+    JOIN user_relations child ON child.oid = inh.inhrelid
+)
 SELECT
     n.nspname AS schemaname,
     c.relname AS table_name,
@@ -22,38 +59,40 @@ SELECT
         WHEN 'p' THEN 'partitioned table'
         ELSE 'table'
     END AS table_kind,
-    pg_total_relation_size(c.oid) AS total_size_bytes,
-    pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size_pretty,
-    pg_relation_size(c.oid) AS table_size_bytes,
-    pg_size_pretty(pg_relation_size(c.oid)) AS table_size_pretty,
-    pg_indexes_size(c.oid) AS indexes_size_bytes,
-    pg_size_pretty(pg_indexes_size(c.oid)) AS indexes_size_pretty,
-    COALESCE(st.n_live_tup, 0) AS n_live_tup,
-    COALESCE(st.n_dead_tup, 0) AS n_dead_tup,
-    COALESCE(st.seq_scan, 0) AS seq_scan,
-    COALESCE(st.seq_tup_read, 0) AS seq_tup_read,
-    COALESCE(st.idx_scan, 0) AS idx_scan,
-    COALESCE(st.idx_tup_fetch, 0) AS idx_tup_fetch,
-    st.last_vacuum,
-    st.last_autovacuum,
-    st.last_analyze,
-    st.last_autoanalyze,
+    GREATEST(COUNT(DISTINCT rm.member_oid) - 1, 0) AS partition_count,
+    COALESCE(SUM(pg_total_relation_size(member.oid)), 0) AS total_size_bytes,
+    pg_size_pretty(COALESCE(SUM(pg_total_relation_size(member.oid)), 0)) AS total_size_pretty,
+    COALESCE(SUM(pg_relation_size(member.oid)), 0) AS table_size_bytes,
+    pg_size_pretty(COALESCE(SUM(pg_relation_size(member.oid)), 0)) AS table_size_pretty,
+    COALESCE(SUM(pg_indexes_size(member.oid)), 0) AS indexes_size_bytes,
+    pg_size_pretty(COALESCE(SUM(pg_indexes_size(member.oid)), 0)) AS indexes_size_pretty,
+    COALESCE(SUM(st.n_live_tup), 0) AS n_live_tup,
+    COALESCE(SUM(st.n_dead_tup), 0) AS n_dead_tup,
+    COALESCE(SUM(st.seq_scan), 0) AS seq_scan,
+    COALESCE(SUM(st.seq_tup_read), 0) AS seq_tup_read,
+    COALESCE(SUM(st.idx_scan), 0) AS idx_scan,
+    COALESCE(SUM(st.idx_tup_fetch), 0) AS idx_tup_fetch,
+    MAX(st.last_vacuum) AS last_vacuum,
+    MAX(st.last_autovacuum) AS last_autovacuum,
+    MAX(st.last_analyze) AS last_analyze,
+    MAX(st.last_autoanalyze) AS last_autoanalyze,
     ROUND(
-        100.0 * sio.heap_blks_hit
-        / NULLIF(sio.heap_blks_hit + sio.heap_blks_read, 0),
+        100.0 * SUM(sio.heap_blks_hit)
+        / NULLIF(SUM(sio.heap_blks_hit + sio.heap_blks_read), 0),
         2
     ) AS table_cache_hit_pct,
     ROUND(
-        100.0 * sio.idx_blks_hit
-        / NULLIF(sio.idx_blks_hit + sio.idx_blks_read, 0),
+        100.0 * SUM(sio.idx_blks_hit)
+        / NULLIF(SUM(sio.idx_blks_hit + sio.idx_blks_read), 0),
         2
     ) AS index_cache_hit_pct
-FROM pg_class c
+FROM table_roots c
 JOIN pg_namespace n ON n.oid = c.relnamespace
-LEFT JOIN pg_stat_user_tables st ON st.relid = c.oid
-LEFT JOIN pg_statio_user_tables sio ON sio.relid = c.oid
-WHERE c.relkind IN ('r', 'p')
-  AND {USER_SCHEMA_FILTER}
+JOIN relation_members rm ON rm.root_oid = c.oid
+JOIN pg_class member ON member.oid = rm.member_oid
+LEFT JOIN pg_stat_all_tables st ON st.relid = member.oid
+LEFT JOIN pg_statio_all_tables sio ON sio.relid = member.oid
+GROUP BY n.nspname, c.relname, c.relkind
 ORDER BY n.nspname, c.relname
 """
 
@@ -77,6 +116,14 @@ JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = k.attnum
 WHERE con.contype IN ('p', 'u')
   AND tbl.relkind IN ('r', 'p')
   AND {USER_SCHEMA_FILTER}
+  AND (
+      tbl.relkind = 'p'
+      OR NOT EXISTS (
+          SELECT 1
+          FROM pg_inherits inh
+          WHERE inh.inhrelid = tbl.oid
+      )
+  )
 GROUP BY n.nspname, tbl.relname, con.conname, con.contype
 ORDER BY n.nspname, tbl.relname, con.contype, con.conname
 """
@@ -133,6 +180,22 @@ JOIN pg_attribute tgt_att ON tgt_att.attrelid = tgt.oid AND tgt_att.attnum = k.t
 WHERE con.contype = 'f'
   AND src.relkind IN ('r', 'p')
   AND tgt.relkind IN ('r', 'p')
+  AND (
+      src.relkind = 'p'
+      OR NOT EXISTS (
+          SELECT 1
+          FROM pg_inherits inh
+          WHERE inh.inhrelid = src.oid
+      )
+  )
+  AND (
+      tgt.relkind = 'p'
+      OR NOT EXISTS (
+          SELECT 1
+          FROM pg_inherits inh
+          WHERE inh.inhrelid = tgt.oid
+      )
+  )
   AND nsrc.nspname <> 'information_schema'
   AND nsrc.nspname !~ '^pg_'
   AND ntgt.nspname <> 'information_schema'
@@ -160,19 +223,30 @@ WHERE datname = current_database()
 
 COLUMN_STATS_SQL = """
 SELECT
-    schemaname,
-    tablename AS table_name,
-    attname AS column_name,
-    null_frac,
-    n_distinct,
-    avg_width,
-    array_length(most_common_freqs, 1) AS most_common_values_count,
-    histogram_bounds IS NOT NULL AS histogram_available,
-    correlation
-FROM pg_stats
-WHERE schemaname <> 'information_schema'
-  AND schemaname !~ '^pg_'
-ORDER BY schemaname, tablename, attname
+    s.schemaname,
+    s.tablename AS table_name,
+    s.attname AS column_name,
+    s.null_frac,
+    s.n_distinct,
+    s.avg_width,
+    array_length(s.most_common_freqs, 1) AS most_common_values_count,
+    s.histogram_bounds IS NOT NULL AS histogram_available,
+    s.correlation
+FROM pg_stats s
+JOIN pg_namespace n ON n.nspname = s.schemaname
+JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = s.tablename
+WHERE s.schemaname <> 'information_schema'
+  AND s.schemaname !~ '^pg_'
+  AND c.relkind IN ('r', 'p')
+  AND (
+      c.relkind = 'p'
+      OR NOT EXISTS (
+          SELECT 1
+          FROM pg_inherits inh
+          WHERE inh.inhrelid = c.oid
+      )
+  )
+ORDER BY s.schemaname, s.tablename, s.attname
 """
 
 
@@ -314,7 +388,7 @@ def _build_llm_context(digest: Dict[str, Any]) -> str:
         stats = table.get("statistics") or {}
         lines.extend(
             [
-                f"- {table['qualified_name']} ({table['table_kind']})",
+                f"- {table['qualified_name']} ({table['table_kind']}, partitions={table.get('partition_count', 0)})",
                 f"  - PK: {_format_columns(pk)}",
                 "  - UNIQUE: "
                 + (
@@ -555,6 +629,7 @@ def get_database_schema_llm_context(conn) -> Dict[str, Any]:
             "table_name": row["table_name"],
             "qualified_name": key,
             "table_kind": row["table_kind"],
+            "partition_count": row.get("partition_count") or 0,
             "primary_key": [],
             "unique_constraints": [],
             "statistics": {

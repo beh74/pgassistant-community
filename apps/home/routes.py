@@ -30,6 +30,7 @@ from .routes_helpers import (
     handle_pgtune_post,
     handle_primarykey_get,
     handle_query_index_advisor_get,
+    handle_query_parameter_advisor_get,
     handle_rank_queries_get,
     handle_reset_pg_stat,
     handle_reset_pg_statistics,
@@ -113,6 +114,8 @@ def route_template(template: str):
             return handle_rank_queries_get(template, segment)
         elif segment == "query_index_advisor.html" and request.method == 'GET':
             return handle_query_index_advisor_get(template, segment)
+        elif segment == "query_parameter_advisor.html" and request.method == 'GET':
+            return handle_query_parameter_advisor_get(template, segment)
         elif segment == "stats.html" and request.method == 'GET':
             return handle_topstatistics_get(template, segment)
         elif segment == "reset_pg_statistics.html":

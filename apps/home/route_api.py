@@ -16,6 +16,7 @@ from . import reporting
 from . import sqlhelper
 from . import indexe_helper
 from . import query_index_advisor
+from . import query_parameter_advisor
 from . import schema_helper
 
 
@@ -148,6 +149,21 @@ def api_query_index_advisor():
             db_config,
             limit=limit,
         )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@blueprint.route("/api/v1/query_parameter_advisor", methods=["GET", "POST"])
+def api_query_parameter_advisor():
+    try:
+        data = request.get_json(silent=True) or {}
+        db_config = data.get("db_config") or session
+
+        if not db_config or not (db_config.get("db_name") or db_config.get("db_uri")):
+            return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+        result = query_parameter_advisor.analyze_query_parameter_workload(db_config)
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

@@ -1,3 +1,5 @@
+"""Index recommendation engine based on PostgreSQL JSON execution plans."""
+
 import json
 import re
 from dataclasses import dataclass, asdict
@@ -199,6 +201,7 @@ def load_candidate_stats_reason(
     table: str,
     candidate_columns: Optional[List[str]],
 ) -> Optional[str]:
+    """Build a compact pg_stats explanation for candidate index columns."""
     if not candidate_columns:
         return None
 
@@ -216,6 +219,7 @@ def evaluate_scan_candidate(
     meta: helpers.TableMeta,
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
+    """Dispatch scan analysis to the Seq Scan or indexed-path evaluator."""
     if finding.node_type == "Seq Scan":
         return evaluate_seq_scan_candidate(con, finding, meta, query_stats)
 
@@ -481,6 +485,7 @@ def evaluate_seq_scan_candidate(
     meta: helpers.TableMeta,
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
+    """Evaluate whether a sequential scan has a safe index opportunity."""
     candidate_columns: List[str] = []
     predicates: List[Dict[str, str]] = []
 
@@ -1098,6 +1103,7 @@ def evaluate_group_by_candidate(
     meta: helpers.TableMeta,
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> helpers.Recommendation:
+    """Evaluate simple GROUP BY patterns that may benefit from ordered access."""
     group_columns = helpers.extract_simple_group_keys(
         finding.group_key,
         alias=finding.alias,
@@ -1251,6 +1257,7 @@ def evaluate_join_candidate(
     alias_map: Dict[str, Dict[str, str]],
     query_stats: Optional[helpers.QueryStats] = None,
 ) -> List[helpers.Recommendation]:
+    """Evaluate whether join columns on non-small tables lack supporting indexes."""
     recommendations: List[helpers.Recommendation] = []
 
     if not all([join.left_alias, join.left_column, join.right_alias, join.right_column]):
@@ -1341,6 +1348,7 @@ def evaluate_join_candidate(
 
 
 def get_columns_statistics(result: Dict[str, Any]) -> List[str]:
+    """Extract human-readable column statistics summaries from recommendations."""
     stats: List[str] = []
 
     for rec in result.get("recommendations", []):
@@ -1363,6 +1371,7 @@ def get_columns_statistics(result: Dict[str, Any]) -> List[str]:
 # --------------------------------------------------------------------
 
 def pretty_print_analysis(result: Dict[str, Any]) -> None:
+    """Print a verbose text dump of advisor findings for debugging."""
     print(result["message"])
 
     if result.get("scan_findings"):

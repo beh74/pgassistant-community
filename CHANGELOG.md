@@ -1,5 +1,16 @@
 # Change Log
 
+## [3.4] - 2026-06-28
+
+## Improvements
+
+- Table advisor: improved support for PostgreSQL partitioned tables by listing partition parents as logical tables instead of showing each child partition as an independent table.
+- Table advisor: aggregates row counts, dead tuples, table size, index size, and bloat indicators across partition trees.
+- Database schema LLM analysis: improved partitioned table handling in the compact schema digest, including partition counts and aggregated table statistics.
+- Query table statistics: resolves partition children back to their root table before building LLM query context.
+- Parameter advisor: added workload analysis for PostgreSQL 16+ generic plans from `pg_stat_statements`, with temp/cache/plan signals and pgTune-style parameter recommendations : experimental feature.
+- Index advisor : Runs PostgreSQL generic plans for the top ranked queries, then checks whether safe index recommendations are available.
+
 ## [3.3] - 2026-06-28
 
 ## Improvements
@@ -11,6 +22,7 @@
 - Indexes advisor: added `/indexes.html` to load database-wide index statistics asynchronously and display them as cards with search, filters, sorting, and pagination.
 - DB Design: added `/database_analyze_llm.html` under **Schema & design** to analyze database relationships through a compact LLM-oriented schema digest.
 - LLM: removed pgAssistant's conservative Ollama output cap so responses are no longer shortened by a small `num_predict` budget.
+- Query tuning: added `/api/v1/query_parameter_advisor` and `/query_parameter_advisor.html` to run PostgreSQL 16+ generic plans across the pg_stat_statements workload, aggregate temp/cache/plan signals, and propose pgTune-style parameter reviews.
 
 ## Bug fixes
 

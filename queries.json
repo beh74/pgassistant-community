@@ -13,7 +13,7 @@
             "id": "table_list",
             "description": "Analyze tables structure with LLM to check RFC(s) compliance or SQL naming guidelines",
             "category": "table",
-            "sql" : "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' and table_schema not in ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;",
+            "sql" : "SELECT n.nspname AS table_schema, c.relname AS table_name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname !~ '^pg_' AND (c.relkind = 'p' OR NOT EXISTS (SELECT 1 FROM pg_inherits inh WHERE inh.inhrelid = c.oid)) ORDER BY table_schema, table_name;",
             "type": "select",
             "reference": ""
         },
@@ -75,7 +75,7 @@
             "id": "table_size",
             "description": "All tables size",                        
             "category": "Table",        
-            "sql": "WITH t AS (SELECT schemaname, relname, n_live_tup, n_dead_tup, (n_live_tup + n_dead_tup) AS total_tup, pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes, pg_indexes_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS index_bytes FROM pg_stat_user_tables) SELECT schemaname, relname AS table_name, n_live_tup AS row_count, n_dead_tup AS dead_tuples, pg_size_pretty(size_bytes) AS total_size, size_bytes, pg_size_pretty(size_bytes - index_bytes) AS table_size, (size_bytes - index_bytes) AS table_bytes, pg_size_pretty(index_bytes) AS index_size, index_bytes, ROUND(100.0 * index_bytes / NULLIF(size_bytes, 0), 2) AS index_pct, ROUND(100.0 * n_dead_tup / NULLIF(total_tup, 0), 2) AS dead_pct, (size_bytes * n_dead_tup / NULLIF(total_tup, 0))::bigint AS estimated_dead_bytes, pg_size_pretty((size_bytes * n_dead_tup / NULLIF(total_tup, 0))::bigint) AS estimated_dead_size, CASE WHEN total_tup = 0 THEN 'NO_STATS' WHEN size_bytes < 128*1024*1024 THEN 'SMALL_TABLE' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 30 THEN 'HIGH' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 10 THEN 'MEDIUM' ELSE 'LOW' END AS bloat_indicator FROM t ORDER BY size_bytes DESC;",
+            "sql": "WITH RECURSIVE roots AS (SELECT c.oid, n.nspname AS schemaname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_' AND (c.relkind = 'p' OR NOT EXISTS (SELECT 1 FROM pg_inherits inh WHERE inh.inhrelid = c.oid))), members(root_oid, member_oid) AS (SELECT oid, oid FROM roots UNION ALL SELECT m.root_oid, child.oid FROM members m JOIN pg_inherits inh ON inh.inhparent = m.member_oid JOIN pg_class child ON child.oid = inh.inhrelid WHERE child.relkind IN ('r','p')), t AS (SELECT r.schemaname, r.relname, GREATEST(COUNT(DISTINCT m.member_oid) - 1, 0)::bigint AS partition_count, COALESCE(SUM(st.n_live_tup), 0)::bigint AS n_live_tup, COALESCE(SUM(st.n_dead_tup), 0)::bigint AS n_dead_tup, COALESCE(SUM(st.n_live_tup + st.n_dead_tup), 0)::bigint AS total_tup, COALESCE(SUM(pg_total_relation_size(member.oid)), 0)::bigint AS size_bytes, COALESCE(SUM(pg_indexes_size(member.oid)), 0)::bigint AS index_bytes FROM roots r JOIN members m ON m.root_oid = r.oid JOIN pg_class member ON member.oid = m.member_oid LEFT JOIN pg_stat_all_tables st ON st.relid = member.oid GROUP BY r.schemaname, r.relname) SELECT schemaname, relname AS table_name, partition_count, n_live_tup AS row_count, n_dead_tup AS dead_tuples, pg_size_pretty(size_bytes) AS total_size, size_bytes, pg_size_pretty(size_bytes - index_bytes) AS table_size, (size_bytes - index_bytes) AS table_bytes, pg_size_pretty(index_bytes) AS index_size, index_bytes, ROUND(100.0 * index_bytes / NULLIF(size_bytes, 0), 2) AS index_pct, ROUND(100.0 * n_dead_tup / NULLIF(total_tup, 0), 2) AS dead_pct, (size_bytes * n_dead_tup / NULLIF(total_tup, 0))::bigint AS estimated_dead_bytes, pg_size_pretty((size_bytes * n_dead_tup / NULLIF(total_tup, 0))::bigint) AS estimated_dead_size, CASE WHEN total_tup = 0 THEN 'NO_STATS' WHEN size_bytes < 128*1024*1024 THEN 'SMALL_TABLE' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 30 THEN 'HIGH' WHEN (100.0 * n_dead_tup / NULLIF(total_tup, 0)) >= 10 THEN 'MEDIUM' ELSE 'LOW' END AS bloat_indicator FROM t ORDER BY size_bytes DESC;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
         },
@@ -83,7 +83,7 @@
             "id": "table_size_top_5",
             "description": "Top 5 tables size",                        
             "category": "Table",        
-            "sql": "SELECT schemaname, relname AS table_name, n_live_tup AS row_count,  pg_size_pretty(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname))) AS size,  pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) AS size_bytes FROM pg_stat_user_tables ORDER BY size_bytes DESC LIMIT 5;",
+            "sql": "WITH RECURSIVE roots AS (SELECT c.oid, n.nspname AS schemaname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_' AND (c.relkind = 'p' OR NOT EXISTS (SELECT 1 FROM pg_inherits inh WHERE inh.inhrelid = c.oid))), members(root_oid, member_oid) AS (SELECT oid, oid FROM roots UNION ALL SELECT m.root_oid, child.oid FROM members m JOIN pg_inherits inh ON inh.inhparent = m.member_oid JOIN pg_class child ON child.oid = inh.inhrelid WHERE child.relkind IN ('r','p')) SELECT r.schemaname, r.relname AS table_name, GREATEST(COUNT(DISTINCT m.member_oid) - 1, 0)::bigint AS partition_count, COALESCE(SUM(st.n_live_tup), 0)::bigint AS row_count, pg_size_pretty(COALESCE(SUM(pg_total_relation_size(member.oid)), 0)::bigint) AS size, COALESCE(SUM(pg_total_relation_size(member.oid)), 0)::bigint AS size_bytes FROM roots r JOIN members m ON m.root_oid = r.oid JOIN pg_class member ON member.oid = m.member_oid LEFT JOIN pg_stat_all_tables st ON st.relid = member.oid GROUP BY r.schemaname, r.relname ORDER BY size_bytes DESC LIMIT 5;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
         },        
@@ -91,7 +91,7 @@
             "id": "launch_analyze",
             "description": "Launch analyze on a table",                        
             "category": "Table",        
-            "sql": "SELECT schemaname, relname AS table_name, 'ANALYZE ' || quote_ident(schemaname) || '.' || quote_ident(relname) || ';' AS pga_suggestion FROM pg_stat_user_tables ORDER BY schemaname, relname;",
+            "sql": "SELECT n.nspname AS schemaname, c.relname AS table_name, 'ANALYZE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ';' AS pga_suggestion FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_' AND (c.relkind = 'p' OR NOT EXISTS (SELECT 1 FROM pg_inherits inh WHERE inh.inhrelid = c.oid)) ORDER BY schemaname, table_name;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
         },    
@@ -341,7 +341,6 @@
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW"
         },
-    
         {
             "category": "Database",
             "id": "database_count_conlicts",
@@ -550,7 +549,6 @@
             "sql": "WITH t AS (SELECT schemaname,relname,relid,n_live_tup,n_dead_tup,n_mod_since_analyze,last_analyze,last_autoanalyze,pg_total_relation_size(relid) AS table_size_bytes,GREATEST(last_analyze,last_autoanalyze) AS last_any_analyze FROM pg_stat_user_tables),x AS (SELECT *, (n_mod_since_analyze::numeric/NULLIF(n_live_tup,0)) AS churn_ratio,EXTRACT(EPOCH FROM (now()-last_any_analyze))/86400.0 AS stats_age_days FROM t),scored AS (SELECT schemaname,relname,table_size_bytes,pg_size_pretty(table_size_bytes) AS table_size_pretty,n_live_tup,n_dead_tup,n_mod_since_analyze,ROUND(churn_ratio*100,2) AS churn_pct,last_analyze,last_autoanalyze,ROUND(stats_age_days,1) AS stats_age_days,CASE WHEN last_any_analyze IS NULL THEN 'HIGH' WHEN table_size_bytes>=1024*1024*1024 AND (stats_age_days>14 OR churn_ratio>0.20) THEN 'HIGH' WHEN stats_age_days>30 OR churn_ratio>0.30 THEN 'MEDIUM' ELSE 'NONE' END AS pga_recommendation_level,CASE WHEN last_any_analyze IS NULL THEN 'Table has never been analyzed' WHEN table_size_bytes>=1024*1024*1024 AND stats_age_days>14 THEN 'Large table with outdated statistics' WHEN table_size_bytes>=1024*1024*1024 AND churn_ratio>0.20 THEN 'Large table with significant data churn since last analyze' WHEN stats_age_days>30 THEN 'Statistics are older than 30 days' WHEN churn_ratio>0.30 THEN 'High proportion of data modified since last analyze' ELSE 'Statistics require attention' END AS pga_recommendation_comment FROM x) SELECT *,'ANALYZE '||quote_ident(schemaname)||'.'||quote_ident(relname)||';' AS pga_suggestion FROM scored WHERE pga_recommendation_level IN ('HIGH','MEDIUM') ORDER BY CASE pga_recommendation_level WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 1 END DESC,table_size_bytes DESC,schemaname,relname;",
             "type": "select",
             "reference": "https://www.postgresql.org/docs/current/sql-analyze.html"
-        }                          
+        }
     ]
 }
-    

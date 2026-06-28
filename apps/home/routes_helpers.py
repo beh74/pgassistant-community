@@ -152,6 +152,16 @@ def handle_query_index_advisor_get(template: str, segment: str):
     else:
         return redirect("/database.html")
 
+def handle_query_parameter_advisor_get(template: str, segment: str):
+    if session.get("db_name"):
+        return render_template(
+            "home/query_parameter_advisor.html",
+            segment=segment,
+            postgres_major_version=session.get("version"),
+        )
+    else:
+        return redirect("/database.html")
+
 def handle_database_analyze_llm_get(template: str, segment: str):
     if session.get("db_name"):
         return render_template("home/database_analyze_llm.html", segment=segment)
