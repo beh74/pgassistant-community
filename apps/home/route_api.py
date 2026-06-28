@@ -15,6 +15,7 @@ from . import database
 from . import reporting
 from . import sqlhelper
 from . import indexe_helper
+from . import query_index_advisor
 from . import schema_helper
 
 
@@ -126,6 +127,30 @@ def api_rank_top_10_queries():
         return jsonify({"ranked_queries": ranked_queries})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@blueprint.route("/api/v1/query_index_advisor", methods=["GET", "POST"])
+def api_query_index_advisor():
+    try:
+        data = request.get_json(silent=True) or {}
+        db_config = data.get("db_config") or session
+
+        if not db_config or not (db_config.get("db_name") or db_config.get("db_uri")):
+            return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+        limit = data.get("limit", 10)
+        try:
+            limit = max(1, min(int(limit), 50))
+        except (TypeError, ValueError):
+            limit = 10
+
+        result = query_index_advisor.analyze_top_ranked_query_indexes(
+            db_config,
+            limit=limit,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @blueprint.route("/api/v1/global_advisor", methods=["GET"])

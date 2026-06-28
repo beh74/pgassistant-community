@@ -10,23 +10,8 @@
     padding: 1.5rem;
   }
 
-  .schema-llm-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-  }
-
-  .schema-llm-subtitle {
-    color: var(--ga-muted, #64748b);
-    margin: .35rem 0 0;
-  }
-
   .schema-llm-state,
-  .schema-llm-card,
-  .schema-llm-summary-card {
+  .schema-llm-card {
     background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
     border: 1px solid var(--ga-border, #dbe4ef);
     border-radius: 1rem;
@@ -36,32 +21,6 @@
   .schema-llm-state {
     text-align: center;
     padding: 3rem 1rem;
-  }
-
-  .schema-llm-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: .85rem;
-    margin-bottom: 1rem;
-  }
-
-  .schema-llm-summary-card {
-    padding: .9rem 1rem;
-  }
-
-  .schema-llm-summary-label {
-    color: var(--ga-muted-strong, #475569);
-    font-size: .74rem;
-    font-weight: 850;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-  }
-
-  .schema-llm-summary-value {
-    color: var(--ga-text, #0f172a);
-    font-size: 1.35rem;
-    font-weight: 900;
-    margin-top: .15rem;
   }
 
   .schema-llm-card {
@@ -208,14 +167,14 @@
 
 {% block content %}
 <div class="schema-llm-page">
-  <div class="schema-llm-header">
+  <div class="tables-header-row">
     <div>
       <h1 class="h4 mb-1">DB Design</h1>
-      <p class="schema-llm-subtitle">
+      <p class="tables-subtitle">
         Analyze table relationships with a compact PK/FK digest enriched with PostgreSQL statistics.
       </p>
     </div>
-    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
       <i class="bi bi-arrow-clockwise me-1"></i>Refresh
     </button>
   </div>
@@ -232,34 +191,34 @@
   </div>
 
   <div id="schemaContent" class="d-none">
-    <div class="schema-llm-summary">
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">Tables</div>
-        <div class="schema-llm-summary-value" id="schemaTableCount">0</div>
+    <div class="tables-summary">
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Tables</span>
+        <span class="tables-summary-value" id="schemaTableCount">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">Primary keys</div>
-        <div class="schema-llm-summary-value" id="schemaPkCount">0</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Primary keys</span>
+        <span class="tables-summary-value" id="schemaPkCount">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">Foreign keys</div>
-        <div class="schema-llm-summary-value" id="schemaFkCount">0</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Foreign keys</span>
+        <span class="tables-summary-value" id="schemaFkCount">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">FK index gaps</div>
-        <div class="schema-llm-summary-value text-warning" id="schemaFkIndexGaps">0</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">FK index gaps</span>
+        <span class="tables-summary-value text-warning" id="schemaFkIndexGaps">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">Avg live rows</div>
-        <div class="schema-llm-summary-value" id="schemaAverageRows">0</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Avg live rows</span>
+        <span class="tables-summary-value" id="schemaAverageRows">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">PK/FK stats</div>
-        <div class="schema-llm-summary-value" id="schemaColumnStats">0</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">PK/FK stats</span>
+        <span class="tables-summary-value" id="schemaColumnStats">0</span>
       </div>
-      <div class="schema-llm-summary-card">
-        <div class="schema-llm-summary-label">Stats reset</div>
-        <div class="schema-llm-summary-value fs-6" id="schemaStatsReset">-</div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Stats reset</span>
+        <span class="tables-summary-value fs-6" id="schemaStatsReset">-</span>
       </div>
     </div>
 

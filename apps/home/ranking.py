@@ -58,7 +58,7 @@ def normalize_query_row(row):
     normalized = dict(row)
 
     normalized["query"] = row.get("query", "") or ""
-    normalized["queryid"] = row.get("queryid")
+    normalized["queryid"] = str(row.get("queryid")) if row.get("queryid") is not None else None
 
     normalized["calls"] = _to_int(row.get("calls"), 0)
     normalized["rows"] = _to_int(row.get("rows"), 0)

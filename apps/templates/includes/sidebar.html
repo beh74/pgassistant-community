@@ -33,6 +33,7 @@
 {% set is_db_design = current_path == '/database_analyze_llm.html' or segment == 'database_analyze_llm.html' %}
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
 {% set is_rankqueries = current_path == '/rankqueries.html' or 'rankqueries' in segment %}
+{% set is_query_index_advisor = current_path == '/query_index_advisor.html' or segment == 'query_index_advisor.html' %}
 {% set is_stats = current_path == '/stats.html' or segment.startswith('stats') %}
 {% set is_database_connection = current_path == '/database.html' or segment == 'database.html' %}
 {% set is_pgtune = current_path == '/pgtune.html' or 'pgtune' in segment %}
@@ -148,6 +149,18 @@
         </a>
       </li>      
 
+      <li class="nav-item nav-query {% if is_query_index_advisor %}active{% endif %}">
+        <a href="/query_index_advisor.html" class="nav-link" {% if is_query_index_advisor %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 2a2 2 0 0 1 2-2h4.586A2 2 0 0 1 10 .586L13.414 4A2 2 0 0 1 14 5.414V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm7 0v3h3L9 2z"/>
+              <path d="M4.5 7.5A.5.5 0 0 1 5 7h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0 2A.5.5 0 0 1 5 9h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0 2A.5.5 0 0 1 5 11h3a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+          </div>
+          <div class="sidebar-text">Index Advisor</div>
+        </a>
+      </li>
+
 
 
 
@@ -192,20 +205,7 @@
       </li>
 
 
-      {# Issues menu #}
-        <li class="nav-item nav-schema {% if is_tools_issues %}active{% endif %}">
-          <a href="/tools?cat=issues" class="nav-link" {% if is_tools_issues %}aria-current="page"{% endif %}>
-            <div class="sidebar-icon me-2 icon-20">
-              <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"></path>
-                <path fill-rule="evenodd"
-                      d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"
-                      clip-rule="evenodd"></path>
-              </svg>
-            </div>
-            <div class="sidebar-text">Issues</div>
-          </a>
-        </li>      {% endif %}
+      {% endif %}
 
       {# Connexion settings always visible #}
       <li class="sidebar-section-label section-setup">Connection</li>

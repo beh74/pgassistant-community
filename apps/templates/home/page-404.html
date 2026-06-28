@@ -25,7 +25,7 @@
 
         <!-- Message -->
         <p class="text-muted mb-4">
-          The page you are looking for does not exist or has been moved.
+          {{ err|default("The page you are looking for does not exist or has been moved.") }}
         </p>
 
         <!-- Actions -->

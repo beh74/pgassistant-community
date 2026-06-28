@@ -347,10 +347,15 @@ def get_pgstat_query_by_id(db_config, query_id):
     sql=query['sql'].replace ('$1', query_id)
     con, _ = connectdb(db_config)
     sql_text=''
-    if con:
-        sql_rows=json.loads(db_fetch_json(con,sql))
-        sql_text=sql_rows[0]['query']
-    return sql_text
+    try:
+        if con:
+            sql_rows=json.loads(db_fetch_json(con,sql))
+            if sql_rows:
+                sql_text=sql_rows[0].get('query') or ''
+        return sql_text
+    finally:
+        if con:
+            con.close()
 
 
 

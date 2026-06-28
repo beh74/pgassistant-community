@@ -1,0 +1,430 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Index Advisor{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+<style>
+  .query-index-page {
+    padding: 1.5rem;
+  }
+
+  .query-index-actions {
+    display: flex;
+    gap: .65rem;
+    flex-wrap: wrap;
+  }
+
+  .query-index-state,
+  .query-index-card,
+  .query-index-summary-card {
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, 0.06));
+  }
+
+  .query-index-state {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+
+  .query-index-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: .85rem;
+    margin-bottom: 1rem;
+  }
+
+  .query-index-summary-card {
+    padding: .9rem 1rem;
+  }
+
+  .query-index-summary-label {
+    color: var(--ga-muted-strong, #475569);
+    font-size: .74rem;
+    font-weight: 850;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .query-index-summary-value {
+    color: var(--ga-text, #0f172a);
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin-top: .15rem;
+  }
+
+  .query-index-card {
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+
+  .query-index-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--ga-border, #dbe4ef);
+    background: #f8fbff;
+  }
+
+  .query-index-queryid {
+    color: var(--ga-text, #0f172a);
+    font-size: 1rem;
+    font-weight: 900;
+    margin-bottom: .2rem;
+  }
+
+  .query-index-sql {
+    max-height: 10rem;
+    overflow: auto;
+    margin: 0;
+    padding: .85rem;
+    color: #e5e7eb;
+    background: #111827;
+    border-radius: .75rem;
+    font-size: .8rem;
+    white-space: pre-wrap;
+  }
+
+  .query-index-card-body {
+    padding: 1rem;
+  }
+
+  .query-index-rec {
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: .85rem;
+    padding: .9rem;
+    margin-top: .75rem;
+  }
+
+  .query-index-rec-title {
+    color: var(--ga-text, #0f172a);
+    font-weight: 900;
+  }
+
+  .query-index-rec-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+
+  .query-index-rec-meta {
+    color: var(--ga-muted, #64748b);
+    font-size: .82rem;
+    margin-top: .2rem;
+  }
+
+  .query-index-sql-code {
+    margin: .7rem 0 0;
+    padding: .75rem;
+    color: #e5e7eb;
+    background: #111827;
+    border-radius: .65rem;
+    font-size: .78rem;
+    white-space: pre-wrap;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="query-index-page">
+  <div class="pg-page-header">
+    <div>
+      <div class="pg-eyebrow">Query tuning</div>
+      <h1 class="pg-title">Index Advisor</h1>
+      <p class="pg-subtitle">
+        Runs PostgreSQL generic plans for the top ranked queries, then checks whether safe index recommendations are available.
+      </p>
+    </div>
+
+    <div class="pg-actions query-index-actions">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="copyAllRecommendationsBtn" disabled>
+        <i class="bi bi-clipboard me-1"></i>Copy recommendations
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    This feature requires PostgreSQL 16 or newer because it relies on
+    <code>EXPLAIN (GENERIC_PLAN TRUE, ...)</code>.
+    {% if postgres_major_version %}
+      Current detected major version: <strong>{{ postgres_major_version }}</strong>.
+    {% endif %}
+  </div>
+
+  <div id="advisorLoading" class="query-index-state">
+    <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+    <div class="fw-bold">Analyzing top ranked queries</div>
+    <p class="text-muted mb-0">pgAssistant is running generic plans and checking index opportunities.</p>
+  </div>
+
+  <div id="advisorUnsupported" class="query-index-state d-none">
+    <div class="fw-bold">PostgreSQL 16 required</div>
+    <p class="text-muted mb-0" id="advisorUnsupportedMessage">
+      This database version cannot use generic plans.
+    </p>
+  </div>
+
+  <div id="advisorError" class="query-index-state d-none">
+    <div class="fw-bold">Unable to run Index Advisor</div>
+    <p class="text-muted mb-0" id="advisorErrorMessage">The API returned an error.</p>
+  </div>
+
+  <div id="advisorContent" class="d-none">
+    <div class="query-index-summary">
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">Generic plans</div>
+        <div class="query-index-summary-value" id="advisorQueriesPlanned">0</div>
+      </div>
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">Advisor runs</div>
+        <div class="query-index-summary-value" id="advisorQueriesAnalyzed">0</div>
+      </div>
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">Skipped internal</div>
+        <div class="query-index-summary-value" id="advisorSkippedInternal">0</div>
+      </div>
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">No recommendation</div>
+        <div class="query-index-summary-value" id="advisorNoRecommendation">0</div>
+      </div>
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">Actionable</div>
+        <div class="query-index-summary-value" id="advisorActionable">0</div>
+      </div>
+      <div class="query-index-summary-card">
+        <div class="query-index-summary-label">Failures</div>
+        <div class="query-index-summary-value" id="advisorQueriesFailed">0</div>
+      </div>
+    </div>
+
+    <div id="advisorResults"></div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const loading = document.getElementById("advisorLoading");
+  const unsupported = document.getElementById("advisorUnsupported");
+  const unsupportedMessage = document.getElementById("advisorUnsupportedMessage");
+  const error = document.getElementById("advisorError");
+  const errorMessage = document.getElementById("advisorErrorMessage");
+  const content = document.getElementById("advisorContent");
+  const results = document.getElementById("advisorResults");
+  const copyAllRecommendationsBtn = document.getElementById("copyAllRecommendationsBtn");
+  let recommendationsCopyText = "";
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? "0";
+  }
+
+  function appendText(parent, tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    el.textContent = text || "";
+    parent.appendChild(el);
+    return el;
+  }
+
+  async function copyText(value, button, originalLabel) {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    } catch (err) {
+      const fallback = document.createElement("textarea");
+      fallback.value = value || "";
+      document.body.appendChild(fallback);
+      fallback.select();
+      document.execCommand("copy");
+      fallback.remove();
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = originalLabel; }, 1200);
+    }
+  }
+
+  function buildRecommendationsText(items) {
+    const lines = [];
+    (items || []).forEach(function (item) {
+      lines.push(`Query ID ${item.queryid || "-"}`);
+      lines.push(item.query || "");
+      (item.actionable_recommendations || []).forEach(function (rec, index) {
+        lines.push("");
+        lines.push(`${index + 1}. ${rec.schema}.${rec.table}`);
+        lines.push(`Confidence: ${(rec.confidence || "review").toUpperCase()}`);
+        lines.push(`Type: ${(rec.recommendation_type || "index recommendation").replaceAll("_", " ")}`);
+        if (rec.candidate_columns && rec.candidate_columns.length) {
+          lines.push(`Columns: ${rec.candidate_columns.join(", ")}`);
+        }
+        lines.push(`Reason: ${rec.reason || ""}`);
+        if (rec.create_index_sql) {
+          lines.push("SQL:");
+          lines.push(rec.create_index_sql);
+        }
+      });
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+  }
+
+  function renderRecommendation(parent, rec) {
+    const box = document.createElement("div");
+    box.className = "query-index-rec";
+
+    const head = document.createElement("div");
+    head.className = "query-index-rec-head";
+    appendText(head, "div", "query-index-rec-title", `${rec.schema}.${rec.table}`);
+    if (rec.create_index_sql) {
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "btn btn-sm btn-outline-secondary";
+      copyBtn.textContent = "Copy SQL";
+      copyBtn.addEventListener("click", function () {
+        copyText(rec.create_index_sql, copyBtn, "Copy SQL");
+      });
+      head.appendChild(copyBtn);
+    }
+    box.appendChild(head);
+    appendText(
+      box,
+      "div",
+      "query-index-rec-meta",
+      `${(rec.confidence || "review").toUpperCase()} · ${(rec.recommendation_type || "index recommendation").replaceAll("_", " ")}`
+    );
+    appendText(box, "div", "mt-2", rec.reason || "");
+
+    if (rec.candidate_columns && rec.candidate_columns.length) {
+      appendText(box, "div", "query-index-rec-meta", `Columns: ${rec.candidate_columns.join(", ")}`);
+    }
+
+    if (rec.create_index_sql) {
+      appendText(box, "pre", "query-index-sql-code", rec.create_index_sql);
+    }
+
+    parent.appendChild(box);
+  }
+
+  function renderQueryResult(item) {
+    const card = document.createElement("article");
+    card.className = "query-index-card";
+
+    const header = document.createElement("div");
+    header.className = "query-index-card-header";
+    const titleWrap = document.createElement("div");
+    appendText(titleWrap, "div", "query-index-queryid", `Query ID ${item.queryid || "-"}`);
+    appendText(
+      titleWrap,
+      "div",
+      "text-muted small",
+      item.ok ? `${(item.actionable_recommendations || []).length} actionable recommendations` : "Analysis failed"
+    );
+    header.appendChild(titleWrap);
+
+    if (item.queryid) {
+      const link = document.createElement("a");
+      link.className = "btn btn-sm btn-outline-primary";
+      link.href = `/analyze/${encodeURIComponent(item.queryid)}`;
+      link.textContent = "Open query";
+      header.appendChild(link);
+    }
+
+    card.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "query-index-card-body";
+    appendText(body, "pre", "query-index-sql", item.query || "");
+
+    if (item.error) {
+      appendText(body, "div", "alert alert-warning mt-3 mb-0", item.error);
+    } else {
+      const recommendations = item.actionable_recommendations || [];
+      if (!recommendations.length) {
+        appendText(body, "div", "alert alert-secondary mt-3 mb-0", "No actionable index recommendation found for this generic plan.");
+      } else {
+        recommendations.forEach((rec) => renderRecommendation(body, rec));
+      }
+    }
+
+    card.appendChild(body);
+    results.appendChild(card);
+  }
+
+  async function loadAdvisor() {
+    try {
+      const response = await fetch("/api/v1/query_index_advisor", {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      loading.classList.add("d-none");
+
+      if (data.supported === false) {
+        unsupported.classList.remove("d-none");
+        unsupportedMessage.textContent = data.message || "This feature requires PostgreSQL 16 or newer.";
+        return;
+      }
+
+      const summary = data.summary || {};
+      const resultItems = data.results || [];
+      recommendationsCopyText = buildRecommendationsText(resultItems);
+
+      if (copyAllRecommendationsBtn) {
+        copyAllRecommendationsBtn.disabled = !recommendationsCopyText;
+      }
+
+      setText("advisorQueriesPlanned", summary.queries_planned || 0);
+      setText("advisorQueriesAnalyzed", summary.queries_analyzed || 0);
+      setText("advisorSkippedInternal", summary.queries_skipped_internal || 0);
+      setText("advisorNoRecommendation", summary.queries_without_recommendation || 0);
+      setText("advisorQueriesFailed", summary.queries_failed || 0);
+      setText("advisorRecommendations", summary.recommendations || 0);
+      setText("advisorActionable", summary.actionable_recommendations || 0);
+
+      results.innerHTML = "";
+      if (!resultItems.length) {
+        appendText(
+          results,
+          "div",
+          "query-index-state",
+          "No actionable index recommendation was found for the current top ranked queries."
+        );
+      } else {
+        resultItems.forEach(renderQueryResult);
+      }
+
+      content.classList.remove("d-none");
+    } catch (err) {
+      loading.classList.add("d-none");
+      error.classList.remove("d-none");
+      errorMessage.textContent = err.message || "Unable to run Index Advisor.";
+    }
+  }
+
+  copyAllRecommendationsBtn.addEventListener("click", function () {
+    copyText(recommendationsCopyText, copyAllRecommendationsBtn, "Copy recommendations");
+  });
+
+  loadAdvisor();
+});
+</script>
+{% endblock javascripts %}

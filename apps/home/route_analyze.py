@@ -47,6 +47,11 @@ def analyze_query(querid):
 
             # get informations from pg_stat_statements by queryid
             sql_query = database.get_pgstat_query_by_id(session, querid)
+            if not sql_query.strip():
+                return render_template(
+                    'home/page-404.html',
+                    err=f"Query ID {querid} was not found in pg_stat_statements.",
+                ), 404
 
             # format SQL
             # sql_query = sqlhelper.get_formated_sql(sql_query)
