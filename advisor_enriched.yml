@@ -782,15 +782,15 @@ recommendations:
             SELECT
                 st.relid,
                 COALESCE(st.seq_scan, 0) AS seq_scan,
-                COALESCE(SUM(si.idx_scan), 0)::bigint AS total_index_scans,
+                COALESCE(SUM(si.idx_scan), 0)::numeric::bigint AS total_index_scans,
                 (
-                    COALESCE(st.seq_scan, 0)
-                    + COALESCE(SUM(si.idx_scan), 0)
+                    COALESCE(st.seq_scan, 0)::numeric
+                    + COALESCE(SUM(si.idx_scan), 0)::numeric
                 )::bigint AS table_scan_count,
                 (
-                    COALESCE(st.n_tup_ins, 0)
-                    + COALESCE(st.n_tup_upd, 0)
-                    + COALESCE(st.n_tup_del, 0)
+                    COALESCE(st.n_tup_ins, 0)::numeric
+                    + COALESCE(st.n_tup_upd, 0)::numeric
+                    + COALESCE(st.n_tup_del, 0)::numeric
                 )::bigint AS table_write_count
             FROM pg_stat_user_tables AS st
             LEFT JOIN pg_stat_user_indexes AS si
@@ -1189,8 +1189,8 @@ recommendations:
                 pg_relation_size(s.relid) AS table_size_bytes,
                 GREATEST(s.last_vacuum, s.last_autovacuum) AS last_vacuum_at,
                 CASE
-                    WHEN s.n_live_tup + s.n_dead_tup > 0
-                    THEN s.n_dead_tup::numeric / (s.n_live_tup + s.n_dead_tup)
+                    WHEN s.n_live_tup::numeric + s.n_dead_tup::numeric > 0
+                    THEN s.n_dead_tup::numeric / (s.n_live_tup::numeric + s.n_dead_tup::numeric)
                     ELSE 0
                 END AS dead_tuple_ratio
             FROM pg_stat_user_tables s
@@ -1809,10 +1809,10 @@ recommendations:
 
                 -- Ratio of dead tuples among all estimated tuples.
                 CASE
-                    WHEN st.n_live_tup + st.n_dead_tup > 0
+                    WHEN st.n_live_tup::numeric + st.n_dead_tup::numeric > 0
                     THEN
                         st.n_dead_tup::numeric
-                        / (st.n_live_tup + st.n_dead_tup)
+                        / (st.n_live_tup::numeric + st.n_dead_tup::numeric)
                     ELSE 0::numeric
                 END AS dead_tuple_ratio,
 
@@ -2114,25 +2114,25 @@ recommendations:
             pg_size_pretty(indexes_size_bytes) AS indexes_size_pretty,
             total_size_bytes,
             pg_size_pretty(total_size_bytes) AS total_size_pretty,
-            ROUND(indexes_size_bytes::numeric / NULLIF(table_size_bytes, 0), 2) AS index_to_table_ratio,
+            ROUND(indexes_size_bytes::numeric / NULLIF(table_size_bytes::numeric, 0), 2) AS index_to_table_ratio,
             CASE
             WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 2 THEN 'HIGH'
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 2 THEN 'HIGH'
             WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 3 THEN 'HIGH'
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 3 THEN 'HIGH'
             WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 2 THEN 'MEDIUM'
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 2 THEN 'MEDIUM'
             ELSE 'NONE'
             END AS pga_recommendation_level,
             CASE
             WHEN table_size_bytes >= 1024 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 2
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 2
             THEN 'Large table has indexes using more than twice the table size. Review redundant, overlapping, unused, or low-value indexes to reduce storage and write overhead.'
             WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 3
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 3
             THEN 'Table has indexes using more than three times the table size. This may indicate redundant or excessive indexing.'
             WHEN table_size_bytes >= 100 * 1024 * 1024
-                AND indexes_size_bytes > table_size_bytes * 2
+                AND indexes_size_bytes::numeric > table_size_bytes::numeric * 2
             THEN 'Table has indexes using more than twice the table size. Review whether all indexes are still useful.'
             ELSE 'Index size ratio is not significant.'
             END AS recommendation_note

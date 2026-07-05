@@ -1,5 +1,14 @@
 # Change Log
 
+
+## [3.4.1] - 2026-07-05
+
+## Bug fixes
+
+- Fixed potential `bigint out of range` errors in table health, table size, and Global Advisor queries on very large databases.
+See Bug report: [bigint out of range #9](https://github.com/beh74/pgassistant-community/issues/9)
+
+
 ## [3.4] - 2026-06-28
 
 ## Improvements
