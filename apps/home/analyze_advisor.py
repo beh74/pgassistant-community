@@ -290,6 +290,7 @@ def evaluate_indexed_scan_candidate(
         finding.schema,
         finding.table,
         all_predicates,
+        table_rows=meta.reltuples,
     ) if all_predicates else []
 
     stats_reason = (
@@ -502,6 +503,7 @@ def evaluate_seq_scan_candidate(
                 finding.schema,
                 finding.table,
                 predicates,
+                table_rows=meta.reltuples,
             )
 
     stats_reason = (
@@ -962,6 +964,7 @@ def evaluate_order_by_candidate(
             finding.schema,
             finding.table,
             equality_predicates,
+            table_rows=meta.reltuples,
         )
         if equality_predicates
         else []

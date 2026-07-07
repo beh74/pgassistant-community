@@ -1339,7 +1339,10 @@ def _operator_rank_for_btree(op: str) -> int:
     return 9
 
 
-def _column_cardinality_score(stats: Optional[ColumnStats]) -> float:
+def _column_cardinality_score(
+    stats: Optional[ColumnStats],
+    table_rows: Optional[float] = None,
+) -> float:
     """
     Score plus grand = colonne plus discriminante.
     Heuristique:
@@ -1355,7 +1358,10 @@ def _column_cardinality_score(stats: Optional[ColumnStats]) -> float:
         return float(nd)
 
     if nd < 0:
-        return abs(float(nd))
+        distinct_fraction = abs(float(nd))
+        if table_rows and table_rows > 0:
+            return distinct_fraction * float(table_rows)
+        return distinct_fraction
 
     return 0.0
 
@@ -1365,13 +1371,14 @@ def reorder_index_candidate_columns(
     schema: str,
     table: str,
     predicates: List[Dict[str, str]],
+    table_rows: Optional[float] = None,
 ) -> List[str]:
     """
     Reorders candidate columns for a composite index:
     - equality columns first
     - then LIKE / ~~ prefix predicates
     - then range predicates
-    - within each group: descending cardinality
+    - within each group: descending estimated cardinality
     """
     if not predicates:
         return []
@@ -1384,7 +1391,7 @@ def reorder_index_candidate_columns(
         stats = load_column_stats(con, schema, table, col)
 
         op_rank = _operator_rank_for_btree(op)
-        cardinality = _column_cardinality_score(stats)
+        cardinality = _column_cardinality_score(stats, table_rows)
 
         # tri: operator asc, cardinality desc, original position asc
         scored.append((op_rank, -cardinality, pos, col))

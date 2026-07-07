@@ -606,14 +606,44 @@
           {% if rec.table_name %}
               <div class="ga-target-row">
               <span class="ga-target-key">Table</span>
-              <span class="ga-target-value">{{ rec.table_name }}</span>
+              <span class="ga-target-value">
+                {% if rec.schema_name %}
+                  <button
+                    type="button"
+                    class="ga-target-table-link ga-table-index-stats-btn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#gaTableIndexStatsModal"
+                    data-schema-name="{{ rec.schema_name|e }}"
+                    data-table-name="{{ rec.table_name|e }}"
+                  >
+                    {{ rec.table_name }}
+                  </button>
+                {% else %}
+                  {{ rec.table_name }}
+                {% endif %}
+              </span>
               </div>
           {% endif %}
 
           {% if rec.index_name %}
               <div class="ga-target-row">
               <span class="ga-target-key">Index</span>
-              <span class="ga-target-value">{{ rec.index_name }}</span>
+              <span class="ga-target-value">
+                {% if object_type == 'INDEX' and action == 'DROP_INDEX' %}
+                  <button
+                    type="button"
+                    class="ga-target-table-link ga-index-stats-btn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#indexStatsModal"
+                    data-schema-name="{% if rec.schema_name %}{{ rec.schema_name|e }}{% endif %}"
+                    data-index-name="{{ rec.index_name|e }}"
+                  >
+                    {{ rec.index_name }}
+                  </button>
+                {% else %}
+                  {{ rec.index_name }}
+                {% endif %}
+              </span>
               </div>
           {% endif %}
 
@@ -767,6 +797,135 @@
 
 </div>
 
+<div class="modal fade index-stats-modal" id="indexStatsModal" tabindex="-1" aria-labelledby="indexStatsModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="indexStatsModalTitle">Index statistics</h5>
+          <div class="text-muted small mt-1" id="indexStatsModalSubtitle">Usage, cache behavior, table scan context, and recommendation.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="indexStatsModalLoading" class="alert alert-info mb-0">Loading index statistics...</div>
+        <div id="indexStatsModalError" class="alert alert-warning d-none mb-0"></div>
+        <div id="indexStatsModalContent" class="d-none">
+          <div class="index-stats-badges mb-3" id="indexStatsBadges"></div>
+          <div class="index-stats-grid mb-3">
+            <div class="index-stats-kpi"><div class="index-stats-kpi-label">Index scans</div><div class="index-stats-kpi-value" id="indexStatsIdxScan">—</div></div>
+            <div class="index-stats-kpi"><div class="index-stats-kpi-label">Index size</div><div class="index-stats-kpi-value" id="indexStatsSize">—</div></div>
+            <div class="index-stats-kpi"><div class="index-stats-kpi-label">Cache hit ratio</div><div class="index-stats-kpi-value" id="indexStatsCacheHit">—</div></div>
+            <div class="index-stats-kpi"><div class="index-stats-kpi-label">Physical reads</div><div class="index-stats-kpi-value" id="indexStatsBlocksRead">—</div></div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-lg-6"><div class="index-stats-section h-100"><div class="index-stats-section-title">Index usage</div><div class="table-responsive"><table class="table table-sm mb-0 align-middle"><tbody id="indexStatsUsageTable"></tbody></table></div></div></div>
+            <div class="col-12 col-lg-6"><div class="index-stats-section h-100"><div class="index-stats-section-title">Table scan context</div><div class="table-responsive"><table class="table table-sm mb-0 align-middle"><tbody id="indexStatsTableContext"></tbody></table></div></div></div>
+          </div>
+          <div class="index-stats-section mb-3"><div class="index-stats-section-title">Recommendation</div><div id="indexStatsRecommendation" class="small text-muted"></div></div>
+          <div class="index-stats-section">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2"><div class="index-stats-section-title mb-0">Index definition</div><button class="btn btn-sm advisor-copy-btn" type="button" id="copyIndexDefinitionBtn">Copy</button></div>
+            <pre class="advisor-code-block index-stats-definition mb-0"><code id="indexStatsDefinition">—</code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade table-index-modal" id="gaTableIndexStatsModal" tabindex="-1" aria-labelledby="gaTableIndexStatsModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="gaTableIndexStatsModalTitle">Index statistics</h5>
+          <div class="table-index-subtitle" id="gaTableIndexStatsModalSubtitle">Select a table to inspect index usage.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="gaTableIndexStatsLoading" class="alert alert-info mb-0">Loading index statistics...</div>
+        <div id="gaTableIndexStatsError" class="alert alert-warning d-none mb-0"></div>
+
+        <div id="gaTableIndexStatsContent" class="d-none">
+          <div class="table-index-kpis mb-3">
+            <div class="table-index-kpi">
+              <span class="label">Indexes</span>
+              <span class="value" id="gaTableIndexTotalCount">0</span>
+            </div>
+            <div class="table-index-kpi">
+              <span class="label">Used</span>
+              <span class="value" id="gaTableIndexUsedCount">0</span>
+            </div>
+            <div class="table-index-kpi">
+              <span class="label">Unused</span>
+              <span class="value" id="gaTableIndexUnusedCount">0</span>
+            </div>
+            <div class="table-index-kpi">
+              <span class="label">To review</span>
+              <span class="value" id="gaTableIndexReviewCount">0</span>
+            </div>
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-hover table-index-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Type</th>
+                  <th>Size</th>
+                  <th>Scans</th>
+                  <th>Cache hit</th>
+                  <th>Reads</th>
+                  <th>Status</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody id="gaTableIndexStatsRows"></tbody>
+            </table>
+          </div>
+
+          <div id="gaTableIndexDetailPanel" class="table-index-detail-card d-none">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="table-index-detail-label">Selected index</div>
+                <div class="table-index-detail-title" id="gaTableIndexDetailName">-</div>
+              </div>
+              <span id="gaTableIndexDetailStatus" class="table-index-pill table-index-pill-muted">Unknown</span>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-lg-6">
+                <div class="table-index-detail-label mb-1">Recommendation</div>
+                <div id="gaTableIndexDetailRecommendation" class="text-muted small">-</div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="table-index-detail-label mb-1">Useful indicators</div>
+                <div id="gaTableIndexDetailIndicators" class="small text-muted">-</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div class="table-index-detail-label mb-0">Definition</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="gaTableIndexCopyDefinitionBtn">Copy</button>
+              </div>
+              <pre class="table-index-code"><code id="gaTableIndexDetailDefinition">-</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="text-muted small me-auto">Values come from PostgreSQL cumulative statistics since the last statistics reset.</div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="gaAdvisorDetailsModal" tabindex="-1" aria-labelledby="gaAdvisorDetailsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -857,6 +1016,21 @@ document.addEventListener("DOMContentLoaded", function () {
     recommendations: document.getElementById("gaTabRecommendations")
   };
 
+  const gaTableIndexModalTitle = document.getElementById("gaTableIndexStatsModalTitle");
+  const gaTableIndexModalSubtitle = document.getElementById("gaTableIndexStatsModalSubtitle");
+  const gaTableIndexLoading = document.getElementById("gaTableIndexStatsLoading");
+  const gaTableIndexError = document.getElementById("gaTableIndexStatsError");
+  const gaTableIndexContent = document.getElementById("gaTableIndexStatsContent");
+  const gaTableIndexRows = document.getElementById("gaTableIndexStatsRows");
+  const gaTableIndexDetailPanel = document.getElementById("gaTableIndexDetailPanel");
+  const gaTableIndexDetailName = document.getElementById("gaTableIndexDetailName");
+  const gaTableIndexDetailStatus = document.getElementById("gaTableIndexDetailStatus");
+  const gaTableIndexDetailRecommendation = document.getElementById("gaTableIndexDetailRecommendation");
+  const gaTableIndexDetailIndicators = document.getElementById("gaTableIndexDetailIndicators");
+  const gaTableIndexDetailDefinition = document.getElementById("gaTableIndexDetailDefinition");
+  const gaTableIndexCopyDefinitionBtn = document.getElementById("gaTableIndexCopyDefinitionBtn");
+  let currentGaTableIndexDefinition = "";
+
   function normalize(value) {
     return (value || "").toString().toLowerCase().trim();
   }
@@ -927,6 +1101,331 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function formatIndexValue(value, suffix) {
+    if (value === null || value === undefined || value === "") return "-";
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      return numericValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (suffix || "");
+    }
+    return String(value) + (suffix || "");
+  }
+
+  function formatIndexStatValue(value, suffix) {
+    if (value === null || value === undefined || value === "") return "—";
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && value !== true && value !== false) {
+      return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (suffix || "");
+    }
+    return String(value) + (suffix || "");
+  }
+
+  function setIndexStatsState(state, message) {
+    const loading = document.getElementById("indexStatsModalLoading");
+    const error = document.getElementById("indexStatsModalError");
+    const content = document.getElementById("indexStatsModalContent");
+    if (loading) loading.classList.toggle("d-none", state !== "loading");
+    if (error) {
+      error.classList.toggle("d-none", state !== "error");
+      error.textContent = message || "";
+    }
+    if (content) content.classList.toggle("d-none", state !== "content");
+  }
+
+  function indexStatsRow(label, value) {
+    return `<tr><th class="text-muted" style="width: 48%;">${escapeHtml(label)}</th><td>${escapeHtml(formatIndexStatValue(value))}</td></tr>`;
+  }
+
+  function renderIndexStats(indexStats) {
+    const title = document.getElementById("indexStatsModalTitle");
+    const subtitle = document.getElementById("indexStatsModalSubtitle");
+    const badges = document.getElementById("indexStatsBadges");
+    const usageTable = document.getElementById("indexStatsUsageTable");
+    const tableContext = document.getElementById("indexStatsTableContext");
+    const recommendation = document.getElementById("indexStatsRecommendation");
+    const definition = document.getElementById("indexStatsDefinition");
+
+    const qualifiedName = indexStats.qualified_index_name || [indexStats.schemaname, indexStats.index_name].filter(Boolean).join(".");
+    const tableName = [indexStats.schemaname, indexStats.table_name].filter(Boolean).join(".");
+    if (title) title.textContent = qualifiedName || "Index statistics";
+    if (subtitle) subtitle.textContent = tableName ? `Attached to ${tableName}` : "Usage, cache behavior, table scan context, and recommendation.";
+
+    const idxScanEl = document.getElementById("indexStatsIdxScan");
+    const sizeEl = document.getElementById("indexStatsSize");
+    const cacheHitEl = document.getElementById("indexStatsCacheHit");
+    const blocksReadEl = document.getElementById("indexStatsBlocksRead");
+    if (idxScanEl) idxScanEl.textContent = formatIndexStatValue(indexStats.idx_scan);
+    if (sizeEl) sizeEl.textContent = indexStats.index_size_pretty || formatIndexStatValue(indexStats.index_size_bytes, " bytes");
+    if (cacheHitEl) cacheHitEl.textContent = indexStats.cache_hit_pct === null || indexStats.cache_hit_pct === undefined ? "—" : formatIndexStatValue(indexStats.cache_hit_pct, "%");
+    if (blocksReadEl) blocksReadEl.textContent = formatIndexStatValue(indexStats.idx_blks_read);
+
+    if (badges) {
+      const badgeHtml = [];
+      if (indexStats.severity) badgeHtml.push(`<span class="pg-pill">Severity ${escapeHtml(indexStats.severity)}</span>`);
+      if (indexStats.index_type) badgeHtml.push(`<span class="pg-pill">${escapeHtml(indexStats.index_type)}</span>`);
+      if (indexStats.indisprimary) badgeHtml.push('<span class="pg-pill">Primary key</span>');
+      if (indexStats.indisunique) badgeHtml.push('<span class="pg-pill">Unique</span>');
+      if (indexStats.indisvalid === false) badgeHtml.push('<span class="pg-pill">Invalid</span>');
+      if (indexStats.bloat_status) badgeHtml.push(`<span class="pg-pill">Bloat ${escapeHtml(indexStats.bloat_status)}</span>`);
+      badges.innerHTML = badgeHtml.join("");
+    }
+
+    if (usageTable) {
+      usageTable.innerHTML =
+        indexStatsRow("Indexed columns", indexStats.indexed_columns) +
+        indexStatsRow("idx_scan", indexStats.idx_scan) +
+        indexStatsRow("idx_tup_read", indexStats.idx_tup_read) +
+        indexStatsRow("idx_tup_fetch", indexStats.idx_tup_fetch) +
+        indexStatsRow("Avg tuples / index scan", indexStats.avg_tuples_read_per_index_scan) +
+        indexStatsRow("idx_blks_hit", indexStats.idx_blks_hit) +
+        indexStatsRow("idx_blks_read", indexStats.idx_blks_read) +
+        indexStatsRow("Total index block access", indexStats.total_index_block_access);
+    }
+
+    if (tableContext) {
+      tableContext.innerHTML =
+        indexStatsRow("Table size", indexStats.table_size_pretty || indexStats.table_size_bytes) +
+        indexStatsRow("Table seq_scan", indexStats.table_seq_scan) +
+        indexStatsRow("Table seq_tup_read", indexStats.table_seq_tup_read) +
+        indexStatsRow("Avg tuples / seq scan", indexStats.avg_tuples_read_per_seq_scan) +
+        indexStatsRow("Table idx_scan", indexStats.table_idx_scan) +
+        indexStatsRow("Live tuples", indexStats.n_live_tup) +
+        indexStatsRow("Dead tuples", indexStats.n_dead_tup) +
+        indexStatsRow("Stats reset", indexStats.stats_reset);
+    }
+
+    if (recommendation) recommendation.textContent = indexStats.recommendation_action || indexStats.recommendation_short || "No recommendation available for this index.";
+    if (definition) definition.textContent = indexStats.index_definition || "No index definition available.";
+
+    const copyBtn = document.getElementById("copyIndexDefinitionBtn");
+    if (copyBtn) copyBtn.setAttribute("data-index-definition", indexStats.index_definition || "");
+
+    setIndexStatsState("content");
+  }
+
+  async function loadIndexStats(indexName, schemaName) {
+    setIndexStatsState("loading");
+
+    const rawIndexName = (indexName || "").trim();
+    const rawSchemaName = (schemaName || "").trim();
+
+    if (!rawIndexName) {
+      setIndexStatsState("error", "No index name was provided.");
+      return;
+    }
+
+    let effectiveSchemaName = rawSchemaName;
+    let effectiveIndexName = rawIndexName;
+
+    if (rawIndexName.includes(".")) {
+      const parts = rawIndexName.split(".");
+      if (parts.length >= 2) {
+        effectiveSchemaName = effectiveSchemaName || parts[0];
+        effectiveIndexName = parts.slice(1).join(".");
+      }
+    }
+
+    if (!effectiveSchemaName) {
+      setIndexStatsState("error", "No schema name was provided for this existing index.");
+      return;
+    }
+
+    const apiUrl = `/api/v1/indexe_stats/${encodeURIComponent(effectiveSchemaName)}/${encodeURIComponent(effectiveIndexName)}`;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const rawText = await response.text();
+
+      if (!contentType.includes("application/json")) {
+        throw new Error(`API did not return JSON. HTTP ${response.status}. Called URL: ${apiUrl}`);
+      }
+
+      const data = JSON.parse(rawText);
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      const indexStats = Array.isArray(data.indexes) && data.indexes.length > 0 ? data.indexes[0] : null;
+      if (!indexStats) throw new Error("No statistics were returned for this index.");
+
+      renderIndexStats(indexStats);
+    } catch (err) {
+      setIndexStatsState("error", err.message || "Unable to load index statistics.");
+    }
+  }
+
+  function normalizeIndexColumns(indexStats) {
+    const columns = indexStats.indexed_columns || indexStats.columns || indexStats.column_names || "";
+    return Array.isArray(columns) ? columns.join(", ") : String(columns || "");
+  }
+
+  function getIndexStatus(indexStats) {
+    const severity = String(indexStats.severity || indexStats.recommendation_action || "").trim();
+    const scans = Number(indexStats.idx_scan || 0);
+
+    if (severity) {
+      const normalizedSeverity = severity.replace(/_/g, " ").toUpperCase();
+      if (/DROP|INVALID|DANGER|HIGH/.test(normalizedSeverity)) return { label: normalizedSeverity, css: "table-index-pill-danger", review: true };
+      if (/REVIEW|MONITOR|LOW VOLUME|WARNING|MEDIUM|UNUSED/.test(normalizedSeverity)) return { label: normalizedSeverity, css: "table-index-pill-warning", review: true };
+      if (/OK|GOOD|USED/.test(normalizedSeverity)) return { label: normalizedSeverity, css: "table-index-pill-ok", review: false };
+      return { label: normalizedSeverity, css: "table-index-pill-muted", review: true };
+    }
+
+    if (scans === 0) return { label: "UNUSED", css: "table-index-pill-warning", review: true };
+    return { label: "USED", css: "table-index-pill-ok", review: false };
+  }
+
+  function setGaTableIndexState(state, message) {
+    if (gaTableIndexLoading) gaTableIndexLoading.classList.toggle("d-none", state !== "loading");
+    if (gaTableIndexError) gaTableIndexError.classList.toggle("d-none", state !== "error");
+    if (gaTableIndexContent) gaTableIndexContent.classList.toggle("d-none", state !== "ready");
+    if (state === "error" && gaTableIndexError) {
+      gaTableIndexError.textContent = message || "Unable to load index statistics.";
+    }
+  }
+
+  function selectGaTableIndexDetail(indexStats) {
+    if (!indexStats) return;
+
+    const status = getIndexStatus(indexStats);
+    const name = indexStats.index_name || indexStats.qualified_index_name || "-";
+    const definition = indexStats.index_definition || indexStats.definition || "";
+    const columns = normalizeIndexColumns(indexStats);
+
+    currentGaTableIndexDefinition = definition;
+
+    if (gaTableIndexDetailName) gaTableIndexDetailName.textContent = name;
+    if (gaTableIndexDetailStatus) {
+      gaTableIndexDetailStatus.className = "table-index-pill " + status.css;
+      gaTableIndexDetailStatus.textContent = status.label;
+    }
+    if (gaTableIndexDetailRecommendation) {
+      gaTableIndexDetailRecommendation.textContent =
+        indexStats.recommendation ||
+        indexStats.recommendation_text ||
+        indexStats.reason ||
+        "No specific recommendation was returned for this index.";
+    }
+    if (gaTableIndexDetailIndicators) {
+      gaTableIndexDetailIndicators.innerHTML =
+        "Columns: <strong>" + escapeHtml(columns || "-") + "</strong><br>" +
+        "Scans: <strong>" + escapeHtml(formatIndexValue(indexStats.idx_scan)) + "</strong> · " +
+        "Tuples read: <strong>" + escapeHtml(formatIndexValue(indexStats.idx_tup_read)) + "</strong> · " +
+        "Tuples fetched: <strong>" + escapeHtml(formatIndexValue(indexStats.idx_tup_fetch)) + "</strong>";
+    }
+    if (gaTableIndexDetailDefinition) {
+      gaTableIndexDetailDefinition.textContent = definition || "No index definition returned by the API.";
+    }
+
+    if (gaTableIndexDetailPanel) gaTableIndexDetailPanel.classList.remove("d-none");
+
+    if (gaTableIndexRows) {
+      gaTableIndexRows.querySelectorAll("tr").forEach(function (row) {
+        row.classList.toggle("is-selected", row.dataset.indexName === name);
+      });
+    }
+  }
+
+  function renderGaTableIndexStats(data, schemaName, tableName) {
+    const indexes = Array.isArray(data.indexes) ? data.indexes : [];
+
+    if (gaTableIndexModalTitle) gaTableIndexModalTitle.textContent = "Index statistics";
+    if (gaTableIndexModalSubtitle) gaTableIndexModalSubtitle.textContent = schemaName + "." + tableName;
+
+    if (!indexes.length) {
+      setGaTableIndexState("error", "No index statistics were returned for this table.");
+      return;
+    }
+
+    const usedCount = indexes.filter(function (idx) { return Number(idx.idx_scan || 0) > 0; }).length;
+    const reviewCount = indexes.filter(function (idx) { return getIndexStatus(idx).review; }).length;
+
+    const totalEl = document.getElementById("gaTableIndexTotalCount");
+    const usedEl = document.getElementById("gaTableIndexUsedCount");
+    const unusedEl = document.getElementById("gaTableIndexUnusedCount");
+    const reviewEl = document.getElementById("gaTableIndexReviewCount");
+
+    if (totalEl) totalEl.textContent = String(indexes.length);
+    if (usedEl) usedEl.textContent = String(usedCount);
+    if (unusedEl) unusedEl.textContent = String(indexes.length - usedCount);
+    if (reviewEl) reviewEl.textContent = String(reviewCount);
+
+    if (gaTableIndexRows) {
+      gaTableIndexRows.innerHTML = indexes.map(function (idx, index) {
+        const name = idx.index_name || idx.qualified_index_name || "-";
+        const status = getIndexStatus(idx);
+        const columns = normalizeIndexColumns(idx);
+        const type = idx.index_type || idx.amname || "-";
+        const size = idx.index_size_pretty || idx.index_size || "-";
+        const scans = idx.idx_scan ?? 0;
+        const cacheHit = idx.cache_hit_pct === null || idx.cache_hit_pct === undefined ? "-" : formatIndexValue(idx.cache_hit_pct, "%");
+        const reads = idx.idx_blks_read ?? idx.blocks_read ?? "-";
+
+        return '<tr class="table-index-row" data-index-name="' + escapeHtml(name) + '">' +
+          '<td><div class="table-index-name">' + escapeHtml(name) + '</div><div class="table-index-columns">' + escapeHtml(columns || "-") + '</div></td>' +
+          '<td>' + escapeHtml(type) + '</td>' +
+          '<td>' + escapeHtml(size) + '</td>' +
+          '<td>' + escapeHtml(formatIndexValue(scans)) + '</td>' +
+          '<td>' + escapeHtml(cacheHit) + '</td>' +
+          '<td>' + escapeHtml(formatIndexValue(reads)) + '</td>' +
+          '<td><span class="table-index-pill ' + status.css + '">' + escapeHtml(status.label) + '</span></td>' +
+          '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary ga-table-index-detail-btn" data-index-position="' + index + '">Details</button></td>' +
+        '</tr>';
+      }).join("");
+
+      gaTableIndexRows.querySelectorAll(".ga-table-index-detail-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+          const position = Number(button.dataset.indexPosition || 0);
+          selectGaTableIndexDetail(indexes[position]);
+        });
+      });
+    }
+
+    setGaTableIndexState("ready");
+
+    const firstReviewIndex = indexes.find(function (idx) { return getIndexStatus(idx).review; });
+    selectGaTableIndexDetail(firstReviewIndex || indexes[0]);
+  }
+
+  async function loadGaTableIndexStats(schemaName, tableName) {
+    const encodedSchemaName = encodeURIComponent(schemaName || "");
+    const encodedTableName = encodeURIComponent(tableName || "");
+
+    if (!encodedSchemaName || !encodedTableName) {
+      setGaTableIndexState("error", "No schema or table name was provided.");
+      return;
+    }
+
+    setGaTableIndexState("loading");
+    if (gaTableIndexDetailPanel) gaTableIndexDetailPanel.classList.add("d-none");
+    if (gaTableIndexRows) gaTableIndexRows.innerHTML = "";
+
+    try {
+      const apiUrl = "/api/v1/table_indexe_stats/" + encodedSchemaName + "/" + encodedTableName;
+      const response = await fetch(apiUrl, { method: "GET", headers: { "Accept": "application/json" } });
+      const contentType = response.headers.get("content-type") || "";
+      const rawText = await response.text();
+
+      if (!contentType.includes("application/json")) {
+        throw new Error("API did not return JSON. HTTP " + response.status + ". Called URL: " + apiUrl);
+      }
+
+      const data = JSON.parse(rawText);
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      renderGaTableIndexStats(data, schemaName, tableName);
+    } catch (err) {
+      setGaTableIndexState("error", err.message || "Unable to load index statistics.");
+    }
   }
 
   function advisorDetailSection(title, value) {
@@ -1039,6 +1538,48 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (visibleCount) visibleCount.textContent = count;
     if (emptyState) emptyState.classList.toggle("d-none", count > 0);
+  }
+
+  document.querySelectorAll(".ga-table-index-stats-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      loadGaTableIndexStats(button.dataset.schemaName || "", button.dataset.tableName || "");
+    });
+  });
+
+  document.querySelectorAll(".ga-index-stats-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      loadIndexStats(button.dataset.indexName || "", button.dataset.schemaName || "");
+    });
+  });
+
+  const copyIndexDefinitionBtn = document.getElementById("copyIndexDefinitionBtn");
+  if (copyIndexDefinitionBtn) {
+    copyIndexDefinitionBtn.addEventListener("click", async function () {
+      const definition = this.getAttribute("data-index-definition") || "";
+      if (!definition) return;
+      try {
+        await copyTextToClipboard(definition);
+        const original = this.innerText;
+        this.innerText = "Copied";
+        setTimeout(() => { this.innerText = original; }, 1000);
+      } catch (err) {
+        this.innerText = "Copy failed";
+        setTimeout(() => { this.innerText = "Copy"; }, 1200);
+      }
+    });
+  }
+
+  if (gaTableIndexCopyDefinitionBtn) {
+    gaTableIndexCopyDefinitionBtn.addEventListener("click", async function () {
+      try {
+        await copyTextToClipboard(currentGaTableIndexDefinition || "");
+        gaTableIndexCopyDefinitionBtn.textContent = "Copied";
+        setTimeout(function () { gaTableIndexCopyDefinitionBtn.textContent = "Copy"; }, 1200);
+      } catch (err) {
+        gaTableIndexCopyDefinitionBtn.textContent = "Copy failed";
+        setTimeout(function () { gaTableIndexCopyDefinitionBtn.textContent = "Copy"; }, 1200);
+      }
+    });
   }
 
   tabButtons.forEach(function (button) {

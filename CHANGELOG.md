@@ -1,6 +1,18 @@
 # Change Log
 
 
+## [3.4.2] - 2026-07-07
+
+## Improvements
+
+- Global Advisor: table names now open the table index statistics view when schema and table information are available.
+- Global Advisor: existing indexes targeted by index cleanup recommendations now open the same index statistics zoom used by the query Index Advisor.
+
+## Bug fixes
+
+- Index Advisor: fixed composite index column ordering when PostgreSQL reports negative `n_distinct` values. Negative values are now interpreted as a fraction of table rows before comparing column cardinality.
+
+
 ## [3.4.1] - 2026-07-05
 
 ## Bug fixes
