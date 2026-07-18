@@ -1,20 +1,20 @@
 {
-  "name": "Bootstrap",
-  "short_name": "Bootstrap",
+  "name": "pgAssistant",
+  "short_name": "pgAssistant",
   "icons": [
     {
-      "src": "/static/assets/img/favicon/android-chrome-192x192.png",
+      "src": "/static/assets/img/favicon/android-chrome-192x192.png?v=3",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/static/assets/img/favicon/android-chrome-512x512.png",
+      "src": "/static/assets/img/favicon/android-chrome-512x512.png?v=3",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
   "start_url": "/?utm_source=a2hs",
-  "theme_color": "#563d7c",
-  "background_color": "#563d7c",
+  "theme_color": "#4b5563",
+  "background_color": "#f3f4f6",
   "display": "standalone"
 }

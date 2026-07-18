@@ -1,6 +1,18 @@
 # Change Log
 
 
+## [3.4.3] - 2026-07-18
+
+## Improvements
+
+- Favicon design
+
+## Bug fixes
+
+- https://github.com/beh74/pgassistant-community/issues/10
+- https://github.com/beh74/pgassistant-community/issues/12
+
+
 ## [3.4.2] - 2026-07-07
 
 ## Improvements

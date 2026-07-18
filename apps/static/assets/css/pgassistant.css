@@ -861,9 +861,6 @@
 }
 
 
-/* ============================================================
-   Source: pgassistant-ui.css
-   ============================================================ */
 
 :root {
   --pga-bg: #f4f7fb;
@@ -1211,7 +1208,7 @@ body {
    Source: pgassistant-dashboard.css
    ============================================================ */
 
-/* Dashboard styles. Depends on pgassistant-ui.css. */
+
 
 .dashboard-command-hero {
   display: grid;
@@ -1604,7 +1601,7 @@ body {
    Source: pgassistant-queries.css
    ============================================================ */
 
-/* Shared styles for Query Activity and Query Ranking pages. Depends on pgassistant-ui.css. */
+
 
 .query-workload-hero {
   display: grid;
@@ -2569,8 +2566,7 @@ body {
    Source: pgassistant-tables.css
    ============================================================ */
 
-/* pgAssistant table advisor page
-   Shared visual language with pgassistant-ui.css. */
+
 
 .tables-page {
   color: var(--pga-text);

@@ -23,8 +23,6 @@
 {% set tools_cat = request.args.get('cat', '') %}
 
 
-{# ------------------- pgAssistant sidebar stylesheet ------------------- #}
-<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant-sidebar.css">
 
 {# ------------------- Active state helpers ------------------- #}
 {% set is_dashboard = current_path == '/dashboard.html' or 'dashboard' in segment %}

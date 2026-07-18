@@ -1,19 +1,19 @@
 {
-    "name": "Themesberg",
-    "short_name": "Themesberg",
+    "name": "pgAssistant",
+    "short_name": "pgAssistant",
     "icons": [
         {
-            "src": "/static/assets/img/favicon/android-chrome-192x192.png",
+            "src": "/static/assets/img/favicon/android-chrome-192x192.png?v=3",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "/static/assets/img/favicon/android-chrome-512x512.png",
+            "src": "/static/assets/img/favicon/android-chrome-512x512.png?v=3",
             "sizes": "512x512",
             "type": "image/png"
         }
     ],
-    "theme_color": "#ffffff",
-    "background_color": "#ffffff",
+    "theme_color": "#4b5563",
+    "background_color": "#f3f4f6",
     "display": "standalone"
 }

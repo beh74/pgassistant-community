@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="64 64 400 400" role="img" aria-labelledby="title">
+  <title id="title">pgAssistant database assistant icon</title>
+  <path fill="#4b5563" fill-rule="evenodd" d="M96 168c0-43 61-72 144-72s144 29 144 72v176c0 43-61 72-144 72S96 387 96 344V168Zm32 0c0 18 43 40 112 40s112-22 112-40-43-40-112-40-112 22-112 40Zm224 44c-27 18-67 28-112 28s-85-10-112-28v44c0 18 43 40 112 40s112-22 112-40v-44Zm0 88c-27 18-67 28-112 28s-85-10-112-28v44c0 18 43 40 112 40s112-22 112-40v-44Z"/>
+  <path fill="#9ca3af" d="m390 76 12.4 35.6L438 124l-35.6 12.4L390 172l-12.4-35.6L342 124l35.6-12.4L390 76Z"/>
+</svg>

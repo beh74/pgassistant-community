@@ -187,14 +187,6 @@
     </div>
   </div>
 
-  <div class="alert alert-info">
-    This feature requires PostgreSQL 16 or newer because it relies on
-    <code>EXPLAIN (GENERIC_PLAN TRUE, ...)</code>.
-    {% if postgres_major_version %}
-      Current detected major version: <strong>{{ postgres_major_version }}</strong>.
-    {% endif %}
-  </div>
-
   <div class="alert alert-warning">
     <strong>Experimental feature.</strong>
     Parameter Advisor provides workload-based review hints, not automatic tuning decisions.
