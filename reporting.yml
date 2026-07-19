@@ -33,87 +33,24 @@
     description: Lists database profile information
     enabled: true
     template: generic_select.md
-    
-  - chapter_name: Cache usage statistics
-    query_id: top_cache_usage
-    description: Lists database parameters used with pg_tune
-    enabled: true
-    template: generic_select.md
 
-  - chapter_name: pg_stat_database
-    query_id: reporting_pg_stat_database
-    description: Lists pg_stat_database informations
+  - chapter_name: Top 10 Query Ranking
+    source: query_ranking
+    description: Highest-priority queries based on workload impact and tuning signals
     enabled: true
-    template: generic_select_with_sql.md 
+    template: query_ranking.md
+    limit: 10
 
-  - chapter_name: pg_stat_checkpointer + pg_stat_bgwriter statistics (PostgreSQL>=17)
-    query_id: reporting_bgwritter17
-    description: pg_stat_checkpointer + pg_stat_bgwriter statistics (PostgreSQL>=17)
+  - chapter_name: Global Advisor
+    source: global_advisor
+    description: Prioritized database-wide recommendations from Global Advisor
     enabled: true
-    template: db_wal.md
+    template: global_advisor.md
+    advisor_yaml_path: advisor_enriched.yml
 
-  - chapter_name: pg_stat_bgwriter statistics (PostgreSQL<=16)
-    query_id: reporting_bgwritter16
-    description: pg_stat_bgwriter statistics (PostgreSQL<=16)
+  - chapter_name: Index Advisor
+    source: index_advisor
+    description: Index recommendations for the highest-ranked workload queries
     enabled: true
-    template: db_wal.md    
-
-  - chapter_name: Vacuum statistics
-    query_id: reporting_vacuum_stats
-    description: Lists vacuum informations
-    enabled: true
-    template: generic_select_with_sql.md  
-
-  - chapter_name: Table that need to be analyzed
-    query_id: dba_action_table_analyze
-    description: Lists tables that need to be analyzed
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Top queries by total time
-    query_id: reporting_top_queries_by_time
-    description: Top queries by total time
-    enabled: true
-    template: generic_select_with_sql.md
-
-  - chapter_name: Top queries by mean time
-    query_id: reporting_top_queries_by_mean_time
-    description: Top queries by mean execution time
-    enabled: true
-    template: generic_select_with_sql.md    
-
-  - chapter_name: TOP 20 Unused indexes (excluding those supporting primary keys, unique constraints ordered by index size)
-    query_id: index_unused
-    description: Unused indexes (excluding those supporting primary keys, unique constraints)
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Tables that need to be analyzed
-    query_id: action_table_analyze
-    description: Tables requiring statistics refresh (HIGH / MEDIUM priority). Lists user tables where PostgreSQL statistics are missing, outdated, or potentially inaccurate due to table size or data churn. 
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Database issues - Missing indexes on foreign keys
-    query_id: issue_idx_fk_missing
-    description: Lists foreign keys without indexes
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Database issues - Indexes duplicated
-    query_id: issue_idx_redundant
-    description: Lists duplicated indexes
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Database issues - Tables without primary key
-    query_id: issue_no_pk
-    description: Lists tables without primary keys
-    enabled: true
-    template: generic_issue.md
-
-  - chapter_name: Database issues - Datatype on foreign keys are different
-    query_id: issue_idx_fk_datatype
-    description: Datatype on foreign keys are different
-    enabled: true
-    template: generic_issue.md
+    template: index_advisor.md
+    limit: 10

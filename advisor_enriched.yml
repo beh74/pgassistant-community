@@ -2470,6 +2470,333 @@ recommendations:
           schema_name,
           table_name;        
 
+  - id: long_running_transactions
+    label: Abnormally long-running transaction
+    source: maintenance_checks
+    team: OPS
+    category_id: MAINTENANCE
+    object_type: OTHER
+    outcome_id: OPERABILITY
+    advisor_group: MAINTENANCE_RISKS
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 100
+    impact: 100
+    effort: 25
+
+    risk_level: HIGH
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_ONLY
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+
+    tags:
+      - transaction
+      - long-running
+      - idle-in-transaction
+      - vacuum
+      - xid
+      - maintenance
+      - operability
+
+    why_it_matters: >
+      An old open transaction can retain locks or hold back PostgreSQL's MVCC
+      horizon. This can prevent VACUUM from removing dead row versions that may
+      still be visible to the transaction, contribute to table and index bloat,
+      delay tuple freezing, and increase transaction ID wraparound risk.
+
+    fix_strategy: >
+      Review the session owner, application, state, query, transaction age, and
+      backend XID/XMIN age. Ask the application to commit or roll back whenever
+      possible. Terminate the backend only after confirming that rolling back its
+      transaction is acceptable. Consider transaction or idle-in-transaction
+      timeouts where appropriate to prevent recurrence.
+
+    expected_benefit: >
+      Releases retained locks and old MVCC horizons, allows VACUUM to reclaim
+      eligible dead tuples and advance freezing, and reduces bloat and wraparound
+      risk.
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      recommendation_note: recommendation_note
+      improvement_sql: improvement_sql
+      recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH params AS (
+            SELECT
+                interval '1 minute' AS warning_after,
+                interval '1 hour' AS high_after,
+                current_setting('server_version_num')::integer
+                    AS server_version_num
+        ),
+        long_transactions AS (
+            SELECT
+                a.pid,
+                a.datname,
+                a.usename,
+                a.application_name,
+                a.client_addr,
+                a.state,
+                a.xact_start,
+                a.query_start,
+                a.state_change,
+                a.wait_event_type,
+                a.wait_event,
+                a.backend_xid,
+                a.backend_xmin,
+                now() - a.xact_start AS transaction_duration,
+                now() - a.state_change AS state_duration,
+
+                ROUND(
+                    (
+                        EXTRACT(EPOCH FROM (now() - a.xact_start)) / 60
+                    )::numeric,
+                    1
+                ) AS transaction_age_minutes,
+
+                CASE
+                    WHEN a.backend_xid IS NOT NULL
+                    THEN age(a.backend_xid)
+                END AS backend_xid_age,
+
+                CASE
+                    WHEN a.backend_xmin IS NOT NULL
+                    THEN age(a.backend_xmin)
+                END AS backend_xmin_age,
+
+                COALESCE(
+                    NULLIF(
+                        btrim(
+                            left(
+                                regexp_replace(
+                                    a.query,
+                                    E'[\n\r\t]+',
+                                    ' ',
+                                    'g'
+                                ),
+                                100
+                            )
+                        ),
+                        ''
+                    ),
+                    '<query not visible>'
+                ) AS current_or_last_query,
+                p.high_after,
+                p.server_version_num
+
+            FROM pg_stat_activity AS a
+            CROSS JOIN params AS p
+
+            WHERE a.backend_type = 'client backend'
+            AND a.pid <> pg_backend_pid()
+            AND a.xact_start IS NOT NULL
+            AND a.datname IS NOT NULL
+            AND a.usename IS NOT NULL
+            AND now() - a.xact_start >= p.warning_after
+        )
+        SELECT
+            pid AS object_id,
+
+            format(
+                '%s / %s / pid %s',
+                datname,
+                usename,
+                pid
+            ) AS object_name,
+
+            CASE
+                WHEN state = 'idle in transaction (aborted)'
+                THEN 'HIGH'
+
+                WHEN state = 'idle in transaction'
+                    AND transaction_duration >= high_after
+                THEN 'HIGH'
+
+                WHEN (
+                        backend_xid IS NOT NULL
+                        OR backend_xmin IS NOT NULL
+                    )
+                    AND transaction_duration >= high_after
+                THEN 'HIGH'
+
+                ELSE 'MEDIUM'
+            END AS pga_recommendation_level,
+
+            pid,
+            datname,
+            usename,
+            application_name,
+            client_addr,
+            state,
+            xact_start,
+            transaction_duration,
+            transaction_age_minutes,
+            state_duration,
+            backend_xid,
+            backend_xmin,
+            backend_xid_age,
+            backend_xmin_age,
+
+            (
+                backend_xid IS NOT NULL
+                OR backend_xmin IS NOT NULL
+            ) AS may_hold_back_vacuum_horizon,
+
+            wait_event_type,
+            wait_event,
+            current_or_last_query,
+
+            format(
+                'Long-running transaction detected. '
+                || 'Database: %s. '
+                || 'PID: %s. '
+                || 'User: %s. '
+                || 'Application: %s. '
+                || 'Client: %s. '
+                || 'State: %s. '
+                || 'Started at: %s. '
+                || 'Transaction age: %s (%s minutes). '
+                || 'Time in current state: %s. '
+                || 'Backend XID age: %s. '
+                || 'Backend XMIN age: %s. '
+                || 'Last known query, limited to 100 characters: %s. '
+                || '%s %s',
+                datname,
+                pid,
+                usename,
+                COALESCE(
+                    NULLIF(application_name, ''),
+                    '<application not provided>'
+                ),
+                COALESCE(
+                    client_addr::text,
+                    '<local connection or Unix socket>'
+                ),
+                state,
+                to_char(
+                    xact_start,
+                    'YYYY-MM-DD HH24:MI:SS TZ'
+                ),
+                transaction_duration,
+                transaction_age_minutes,
+                state_duration,
+                COALESCE(
+                    backend_xid_age::text,
+                    '<no XID assigned>'
+                ),
+                COALESCE(
+                    backend_xmin_age::text,
+                    '<no XMIN horizon>'
+                ),
+                current_or_last_query,
+                CASE
+                    WHEN state = 'idle in transaction (aborted)'
+                    THEN
+                        'The transaction is idle and aborted. It cannot perform '
+                        || 'useful work until it is rolled back and should be '
+                        || 'reviewed urgently.'
+                    WHEN state = 'idle in transaction'
+                    THEN
+                        'The session is waiting for its client inside an open '
+                        || 'transaction. It may retain locks or prevent VACUUM '
+                        || 'from removing row versions still visible to this '
+                        || 'transaction.'
+                    WHEN backend_xmin IS NOT NULL
+                    THEN
+                        'The transaction has an active XMIN horizon and may hold '
+                        || 'back VACUUM cleanup and tuple freezing.'
+                    WHEN backend_xid IS NOT NULL
+                    THEN
+                        'The transaction has an assigned transaction ID and may '
+                        || 'affect the global XID horizon.'
+                    ELSE
+                        'The transaction is still active. Review the workload and '
+                        || 'its expected execution time before terminating it.'
+                END,
+                CASE
+                    WHEN server_version_num >= 170000
+                    THEN
+                        'PostgreSQL 17 or newer supports transaction_timeout, '
+                        || 'which can limit the total duration of future '
+                        || 'transactions for this role.'
+                    ELSE
+                        'This PostgreSQL version does not support '
+                        || 'transaction_timeout. Use '
+                        || 'idle_in_transaction_session_timeout for abandoned '
+                        || 'transactions and consider statement_timeout for '
+                        || 'individual long-running statements.'
+                END
+            ) AS recommendation_note,
+
+            '-- Immediate remediation'
+            || chr(10)
+            || '-- WARNING: terminating the backend rolls back its transaction.'
+            || chr(10)
+            || format(
+                'SELECT pg_terminate_backend(%s);',
+                pid
+            )
+            || chr(10)
+            || chr(10)
+
+            || '-- Prevention for future sessions'
+            || chr(10)
+            || '-- Review these values and the impact on connection pools before applying.'
+            || chr(10)
+            || format(
+                'ALTER ROLE %I IN DATABASE %I '
+                || 'SET idle_in_transaction_session_timeout = ''15min'';',
+                usename,
+                datname
+            )
+            || chr(10)
+
+            || CASE
+                WHEN server_version_num >= 170000
+                THEN
+                    '-- PostgreSQL 17 or newer: limit the total transaction duration.'
+                    || chr(10)
+                    || format(
+                        'ALTER ROLE %I IN DATABASE %I '
+                        || 'SET transaction_timeout = ''1h'';',
+                        usename,
+                        datname
+                    )
+
+                ELSE
+                    '-- PostgreSQL 16 or older: transaction_timeout is unavailable.'
+                    || chr(10)
+                    || '-- statement_timeout limits each statement, not the complete transaction.'
+                    || chr(10)
+                    || format(
+                        'ALTER ROLE %I IN DATABASE %I '
+                        || 'SET statement_timeout = ''1h'';',
+                        usename,
+                        datname
+                    )
+            END AS improvement_sql,
+
+            server_version_num
+
+        FROM long_transactions
+
+        ORDER BY
+            CASE
+                WHEN state = 'idle in transaction (aborted)' THEN 1
+                WHEN state = 'idle in transaction' THEN 2
+                WHEN backend_xmin IS NOT NULL THEN 3
+                WHEN backend_xid IS NOT NULL THEN 4
+                ELSE 5
+            END,
+            transaction_duration DESC;
+
   - id: Sequences approaching maximum value
     source: schema_checks
     team: OPS

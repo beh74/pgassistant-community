@@ -1,5 +1,13 @@
 # Change Log
 
+## [3.4.4] - 2026-07-19
+
+## Improvements
+
+- Global advisor : added a new advisor : Abnormally long-running transaction. pgAssistant will recommand to run pg_terminate_backend and change idle_in_transaction_session_timeout or/and transaction_timeout.
+
+- Dababase report API : review report by using query ranking, global advisor and index advisor
+
 
 ## [3.4.3] - 2026-07-18
 
