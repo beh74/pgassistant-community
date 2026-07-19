@@ -84,20 +84,28 @@ def _render_global_advisor_chapter(
     entry: Dict[str, Any],
     template_folder: str,
 ) -> str:
+    try:
+        limit = max(1, min(int(entry.get("limit", 20)), 100))
+    except (TypeError, ValueError):
+        limit = 20
+
     result = global_advisor.run_global_advisor(
         db_config,
         yaml_path=entry.get("advisor_yaml_path", "advisor_enriched.yml"),
     )
-    recommendations = [
+    all_recommendations = [
         _recommendation_to_dict(recommendation)
         for recommendation in result.get("recommendations", [])
     ]
+    recommendations = all_recommendations[:limit]
 
     return render_template(
         f"{template_folder}/{entry['template']}",
         chapter_name=entry["chapter_name"],
         result=result,
         recommendations=recommendations,
+        recommendations_available=len(all_recommendations),
+        recommendation_limit=limit,
         summary=result.get("summary") or {},
         errors=result.get("errors") or [],
     )

@@ -59,8 +59,8 @@ def _load_reporting_module(rendered_templates):
     global_module = types.ModuleType("apps.home.global_advisor")
     global_module.run_global_advisor = lambda _config, yaml_path: {
         "status": "ok",
-        "recommendations": [_Recommendation()],
-        "summary": {"total": 1},
+        "recommendations": [_Recommendation() for _index in range(25)],
+        "summary": {"total": 25},
         "errors": [],
         "yaml_path": yaml_path,
     }
@@ -129,6 +129,7 @@ class DatabaseReportOrchestrationTest(unittest.TestCase):
   enabled: true
   template: global_advisor.md
   advisor_yaml_path: advisor_enriched.yml
+  limit: 20
 - chapter_name: Index Advisor
   source: index_advisor
   description: Index findings
@@ -183,6 +184,9 @@ class DatabaseReportOrchestrationTest(unittest.TestCase):
                 global_context["recommendations"][0]["recommendation_id"],
                 "test_recommendation",
             )
+            self.assertEqual(len(global_context["recommendations"]), 20)
+            self.assertEqual(global_context["recommendations_available"], 25)
+            self.assertEqual(global_context["recommendation_limit"], 20)
             index_context = rendered_templates[4][1]
             self.assertEqual(index_context["result"]["query_limit"], 12)
         finally:

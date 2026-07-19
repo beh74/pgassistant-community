@@ -47,6 +47,7 @@
     enabled: true
     template: global_advisor.md
     advisor_yaml_path: advisor_enriched.yml
+    limit: 20
 
   - chapter_name: Index Advisor
     source: index_advisor

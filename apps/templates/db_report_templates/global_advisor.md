@@ -1,3 +1,4 @@
+
 ## {{ chapter_name }}
 
 {% if result.status == 'error' %}
@@ -26,6 +27,9 @@
 
 {% if recommendations %}
 ### Prioritized recommendations
+
+{% set available_count = recommendations_available|default(recommendations|length, true) %}
+Displaying the top **{{ recommendations|length }}** recommendation{% if recommendations|length != 1 %}s{% endif %}{% if available_count > recommendations|length %} out of **{{ available_count }}** active recommendations{% endif %}, ordered by rank.
 
 {% for rec in recommendations %}
 #### {{ loop.index }}. {{ rec.label or rec.recommendation_id or 'Recommendation' }}
