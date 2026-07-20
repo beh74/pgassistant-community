@@ -2531,7 +2531,7 @@ recommendations:
     sql: |
         WITH params AS (
             SELECT
-                interval '1 minute' AS warning_after,
+                interval '15 minute' AS warning_after,
                 interval '1 hour' AS high_after,
                 current_setting('server_version_num')::integer
                     AS server_version_num
