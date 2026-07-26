@@ -1,5 +1,11 @@
 # Change Log
 
+## [3.4.5] - 2026-07-26
+
+## Bug fixes
+
+On database connexion, pgAssistant checks pg_catalog.pg_extension : if you use pgAssistant with a read only role.
+
 ## [3.4.4] - 2026-07-19
 
 ## Improvements

@@ -261,6 +261,72 @@ def generic_select_with_sql(db_config,sql):
        con.close()
     return rows
 
+
+def ensure_pg_stat_statements(con):
+    """Ensure pg_stat_statements exists without issuing DDL unnecessarily.
+
+    CREATE EXTENSION is rejected in a read-only transaction even when used with
+    IF NOT EXISTS. Check pg_extension first so read-only monitoring roles can
+    connect when the extension was installed by an administrator.
+    """
+    cursor = None
+
+    try:
+        cursor = con.cursor()
+        cursor.execute(
+            """
+            /* launched by pgAssistant */
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_extension
+                WHERE extname = 'pg_stat_statements'
+            );
+            """
+        )
+        extension_installed = bool(cursor.fetchone()[0])
+
+        if extension_installed:
+            return True, None
+
+        cursor.execute(
+            "/* launched by pgAssistant */ SHOW transaction_read_only;"
+        )
+        transaction_read_only = str(cursor.fetchone()[0]).lower() in {
+            "on",
+            "true",
+            "1",
+        }
+
+        if transaction_read_only:
+            return False, (
+                "pg_stat_statements is not installed in this database. "
+                "The connected role is read-only, so a PostgreSQL "
+                "administrator must run: "
+                "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+            )
+
+        cursor.execute(
+            "/* launched by pgAssistant */ "
+            "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+        )
+        return True, None
+
+    except psycopg2.Error as exc:
+        return False, (
+            "Error while checking or enabling pg_stat_statements: "
+            f"{exc.pgcode or 'Unknown Code'} - "
+            f"{exc.pgerror or str(exc)}"
+        )
+    except Exception as exc:
+        return False, (
+            "Unexpected error while checking or enabling "
+            f"pg_stat_statements: {exc}"
+        )
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+
 def get_db_info(db_config,con=None):
     info = {}
 
@@ -269,20 +335,10 @@ def get_db_info(db_config,con=None):
 
     if con:
         if db_config:
-            # Enable pg_stat_statements_enable if it is not enabled (it is not enable by default)
-            try:
-                cursor = con.cursor()
-                cursor.execute('/* launched by pgAssistant */ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;')
-            except psycopg2.Error as e:  # Catch PostgreSQL-specific errors
-                error_msg = f"Error while enabling pg_stat_statements: {e.pgcode or 'Unknown Code'} - {e.pgerror or str(e)}"
-                info["error"] = error_msg  
+            pgss_available, pgss_error = ensure_pg_stat_statements(con)
+            if not pgss_available:
+                info["error"] = pgss_error
                 return info
-            except Exception as e:  # Catch any other exceptions
-                info["error"] = f"Unexpected error: {str(e)}"
-                return info
-            finally:
-                if cursor is not None:  
-                    cursor.close()  # Ensure the cursor is closed properly
 
             version, _= db_query(con,'db_version')
             info['version']=version[0]['server_version']
