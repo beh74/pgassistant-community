@@ -21,6 +21,16 @@ def _load_helpers_module():
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
+
+    # Drop shim modules so later tests can import the real apps.home package.
+    for name in (
+        module_name,
+        "apps.home.database",
+        "apps.home",
+        "apps",
+    ):
+        sys.modules.pop(name, None)
+
     return module
 
 

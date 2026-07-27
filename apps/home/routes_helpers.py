@@ -15,34 +15,189 @@ from . import schema_helper
 from . import sqlcolumns
 from . import sqlhelper
 from . import stats
+from . import table_autovacuum_advisor
+
+
+def is_db_connected(session_obj) -> bool:
+    return bool(session_obj.get("db_connected"))
+
+
+def is_multi_db_session(session_obj) -> bool:
+    return is_db_connected(session_obj) and database.is_multi_db(session_obj)
+
+
+def get_active_db(session_obj) -> str:
+    if is_multi_db_session(session_obj):
+        return (session_obj.get("active_db") or session_obj.get("db_name") or "").strip()
+    return (session_obj.get("db_name") or "").strip()
+
+
+def get_cluster_database_names(session_obj) -> list[str]:
+    cached = session_obj.get("cluster_databases")
+    if cached:
+        return list(cached)
+
+    databases, _ = database.list_cluster_databases(session_obj)
+    names = [db["name"] for db in databases]
+    if names:
+        session_obj["cluster_databases"] = names
+        session_obj.modified = True
+    return names
+
+
+def set_active_db(session_obj, db_name: str) -> bool:
+    db_name = (db_name or "").strip()
+    if not db_name or not is_multi_db_session(session_obj):
+        return False
+
+    allowed = get_cluster_database_names(session_obj)
+    if db_name not in allowed:
+        session_obj.pop("cluster_databases", None)
+        allowed = get_cluster_database_names(session_obj)
+        if db_name not in allowed:
+            return False
+
+    session_obj["active_db"] = db_name
+    session_obj.modified = True
+    return True
+
+
+def sync_cluster_databases(session_obj):
+    if not database.is_multi_db(session_obj):
+        session_obj.pop("cluster_databases", None)
+        session_obj.pop("active_db", None)
+        return
+
+    names = get_cluster_database_names(session_obj)
+    active_db = (session_obj.get("db_name") or session_obj.get("active_db") or "").strip()
+    if active_db not in names and names:
+        active_db = names[0]
+    elif not active_db and names:
+        active_db = names[0]
+    session_obj["active_db"] = active_db
+    session_obj.modified = True
+
+
+def apply_active_db_from_request():
+    if not is_multi_db_session(session):
+        return
+    db_name = (request.args.get("db") or request.form.get("db") or "").strip()
+    if db_name:
+        set_active_db(session, db_name)
+
+
+def multi_db_template_context(session_obj):
+    if not is_multi_db_session(session_obj):
+        return {
+            "multi_db_filter": False,
+            "cluster_databases": [],
+            "active_db": get_active_db(session_obj),
+        }
+    return {
+        "multi_db_filter": True,
+        "cluster_databases": get_cluster_database_names(session_obj),
+        "active_db": get_active_db(session_obj),
+    }
+
+
+def require_db_connection():
+    if not is_db_connected(session):
+        return redirect("/database.html")
+    return None
+
+
+def _db_config_from_form(form, session_obj):
+    merged = dict(session_obj)
+    for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password"):
+        if key not in form:
+            if key != "db_uri" and session_obj.get(key):
+                merged[key] = session_obj[key]
+            continue
+        val = form.get(key, "")
+        if key == "db_uri":
+            uri = str(val or "").strip()
+            if uri:
+                merged["db_uri"] = uri
+            else:
+                merged.pop("db_uri", None)
+        elif str(val or "").strip():
+            merged[key] = val
+    merged["multi_db"] = form.get("multi_db") == "on"
+    return merged
+
+
+def _connection_error_response(error_message: str, segment: str = "database.html"):
+    session["db_connected"] = False
+    session.modified = True
+    connection_form = {
+        key: session.get(key, "")
+        for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password", "multi_db")
+    }
+    return render_template(
+        "home/database.html",
+        segment=segment,
+        dbinfo={"error": error_message},
+        connection_form=connection_form,
+    )
+
+
+def generic_select_session(query_id: str):
+    """Run generic_select with session and return a connection-error response when needed."""
+    rows, description = database.generic_select(session, query_id)
+    if isinstance(description, dict) and description.get("connection_error"):
+        return None, _connection_error_response(description["connection_error"])
+    return (rows, description), None
 
 
 def handle_database_post(segment: str):
     dbinfo = {}
+    merged = _db_config_from_form(request.form, session)
+    con, message = database.connectdb(merged)
+
+    if con is None:
+        return render_template(
+            f"home/{segment}",
+            segment=segment,
+            dbinfo={"error": message},
+            connection_form=merged,
+        )
+
     session.permanent = True
     for key, val in request.form.items():
+        if key == "multi_db":
+            continue
         session[key] = val
+    session["multi_db"] = request.form.get("multi_db") == "on"
+    session["db_connected"] = True
+    session.pop("cluster_databases", None)
+    session.pop("active_db", None)
+    sync_cluster_databases(session)
 
-    dbinfo = database.get_db_info(session)
-    
+    try:
+        dbinfo = database.get_db_info(session)
+        if dbinfo.get("error"):
+            session["db_connected"] = False
+            return render_template(
+                f"home/{segment}",
+                segment=segment,
+                dbinfo=dbinfo,
+                connection_form=merged,
+            )
+    finally:
+        con.close()
 
-    if "error" in dbinfo:
-        return render_template(f"home/{segment}", segment=segment, dbinfo=dbinfo)  
-
-    session['version']=database.get_pg_major_version(str(dbinfo['version']))
+    session["version"] = database.get_pg_major_version(str(dbinfo["version"]))
     session.modified = True
-
     return redirect("/dashboard.html")
 
 def handle_database_get(segment: str):
     return render_template(f"home/{segment}", segment=segment, dbinfo={})
 
 def handle_dashboard_get(segment: str):
-    if session.get("db_name"):
-        dbinfo = database.get_db_info(session)
-        return render_template("home/dashboard.html", segment=segment, dbinfo=dbinfo)
-    else:
+    if not is_db_connected(session):
         return redirect("/database.html")
+    dbinfo = database.get_db_info(session)
+    return render_template("home/dashboard.html", segment=segment, dbinfo=dbinfo)
 
 def handle_topqueries_get(template: str, segment: str, tablename: str = None):
 
@@ -123,18 +278,26 @@ def handle_topstatistics_get(template: str, segment: str):
         return redirect("/database.html")
 
 def handle_primarykey_get(template: str, segment: str):
-    if session.get("db_name"):
-            query_rows,description=database.generic_select(session,"issue_no_pk")
-            return render_template("home/primary_key.html", rows=query_rows, segment=segment, description=description )
-    else:
-        return redirect("/database.html")
+    redirect_response = require_db_connection()
+    if redirect_response:
+        return redirect_response
+
+    result, error_response = generic_select_session("issue_no_pk")
+    if error_response:
+        return error_response
+    query_rows, description = result
+    return render_template("home/primary_key.html", rows=query_rows, segment=segment, description=description)
 
 def handle_table_rfc_get(template: str, segment: str):
-    if session.get("db_name"):
-            query_rows,description=database.generic_select(session,"table_size")
-            return render_template("home/tables_cards.html", tables=query_rows, segment="tables_cards.html" )
-    else:
-        return redirect("/database.html")
+    redirect_response = require_db_connection()
+    if redirect_response:
+        return redirect_response
+
+    result, error_response = generic_select_session("table_size")
+    if error_response:
+        return error_response
+    query_rows, _description = result
+    return render_template("home/tables_cards.html", tables=query_rows, segment="tables_cards.html")
 
 def handle_indexes_get(template: str, segment: str):
     if session.get("db_name"):
@@ -197,24 +360,25 @@ def handle_database_analyze_llm_post(template: str, segment: str):
     )
 
 def handle_cache_table_get(template: str, segment: str):
-    if session.get("db_name"):
-            query_rows,description=database.generic_select(session,"hit_cache_by_table")
-            for row in query_rows:
-                # check and convert 'table_cache_hit_ratio'
-                try:
-                    row['table_cache_hit_ratio'] = float(row['table_cache_hit_ratio'])
-                except (ValueError, TypeError):
-                    row['table_cache_hit_ratio'] = 0  # Valeur invalide remplacée par None
+    redirect_response = require_db_connection()
+    if redirect_response:
+        return redirect_response
 
+    result, error_response = generic_select_session("hit_cache_by_table")
+    if error_response:
+        return error_response
+    query_rows, description = result
+    for row in query_rows:
+        try:
+            row['table_cache_hit_ratio'] = float(row['table_cache_hit_ratio'])
+        except (ValueError, TypeError):
+            row['table_cache_hit_ratio'] = 0
 
-                # check and convert 'index_cache_hit_ratio'
-                try:
-                    row['index_cache_hit_ratio'] = float(row['index_cache_hit_ratio'])
-                except (ValueError, TypeError):
-                    row['index_cache_hit_ratio'] = 0  # Invalid value replaced by 0          
-            return render_template("home/cache_table.html", rows=query_rows, segment=segment, description=description )
-    else:
-        return redirect("/database.html")
+        try:
+            row['index_cache_hit_ratio'] = float(row['index_cache_hit_ratio'])
+        except (ValueError, TypeError):
+            row['index_cache_hit_ratio'] = 0
+    return render_template("home/cache_table.html", rows=query_rows, segment=segment, description=description)
 
 def handle_reset_pg_stat():
     database.exec_cmd(session, "pg_stat_reset")
@@ -275,11 +439,56 @@ def handle_pgtune_post():
                            kubernetes_cmd=kubernetes_cmd
                            )
 
+def handle_table_autovacuum_tune_get(template: str, segment: str):
+    redirect_response = require_db_connection()
+    if redirect_response:
+        return redirect_response
+
+    stale_days = table_autovacuum_advisor.normalize_stale_days(
+        request.args.get("stale_days") or session.get("autovacuum_stale_days")
+    )
+    result = table_autovacuum_advisor.run_table_autovacuum_advisor(
+        session,
+        stale_days=stale_days,
+    )
+    return render_template(
+        f"home/{template}",
+        segment=segment,
+        advisor_result=result,
+        stale_days=stale_days,
+        criteria_help=table_autovacuum_advisor.build_criteria_help(stale_days),
+    )
+
+
+def handle_table_autovacuum_tune_post(template: str, segment: str):
+    redirect_response = require_db_connection()
+    if redirect_response:
+        return redirect_response
+
+    stale_days = table_autovacuum_advisor.normalize_stale_days(
+        request.form.get("stale_days") or session.get("autovacuum_stale_days")
+    )
+    session["autovacuum_stale_days"] = stale_days
+    session.modified = True
+
+    result = table_autovacuum_advisor.run_table_autovacuum_advisor(
+        session,
+        stale_days=stale_days,
+    )
+    return render_template(
+        f"home/{template}",
+        segment=segment,
+        advisor_result=result,
+        stale_days=stale_days,
+        criteria_help=table_autovacuum_advisor.build_criteria_help(stale_days),
+    )
+
+
 def get_segment(request):
     try:
         segment = request.path.split('/')[-1]
         if segment == '':
             segment = 'database'
         return segment
-    except:
+    except Exception:
         return None

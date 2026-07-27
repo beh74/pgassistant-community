@@ -144,6 +144,10 @@
         <span class="dashboard-action-main"><i class="bi bi-trophy"></i> Prioritize queries</span>
         <span class="dashboard-action-meta">ranking</span>
       </a>
+      <a href="/table_autovacuum_tune.html" class="dashboard-action-pill">
+        <span class="dashboard-action-main"><i class="bi bi-sliders2"></i> Autovacuum tuning</span>
+        <span class="dashboard-action-meta">per table</span>
+      </a>
       <a href="/pgtune.html" class="dashboard-action-pill">
         <span class="dashboard-action-main"><i class="bi bi-sliders"></i> Check configuration</span>
         <span class="dashboard-action-meta">pgTune</span>
@@ -166,16 +170,22 @@
     <div class="pg-card pg-card-body dashboard-kpi-card">
       <div class="dashboard-kpi-icon"><i class="bi bi-hdd-rack"></i></div>
       <div>
-        <div class="dashboard-kpi-label">Database size</div>
+        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster size{% else %}Database size{% endif %}</div>
         <h2 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h2>
-        <p class="dashboard-kpi-subtext">Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a></p>
+        <p class="dashboard-kpi-subtext">
+          {% if dbinfo.get('multi_db') %}
+          {{ dbinfo.get('databases', [])|length }} databases on cluster
+          {% else %}
+          Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a>
+          {% endif %}
+        </p>
       </div>
     </div>
 
     <div class="pg-card pg-card-body dashboard-kpi-card">
       <div class="dashboard-kpi-icon"><i class="bi bi-speedometer2"></i></div>
       <div>
-        <div class="dashboard-kpi-label">Hit cache ratio</div>
+        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster hit cache{% else %}Hit cache ratio{% endif %}</div>
         <a href="/cache_table.html" class="text-decoration-none">
           <h2 class="dashboard-kpi-value">{{ dbinfo['cache'] }}%</h2>
         </a>
@@ -198,6 +208,29 @@
       </div>
     </div>
   </div>
+
+  {% if dbinfo.get('multi_db') and dbinfo.get('databases') %}
+  <div class="pg-card mb-4">
+    <div class="dashboard-card-header">
+      <span class="dashboard-section-title"><i class="bi bi-collection"></i><span>Cluster databases</span></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Database</th><th>Owner</th><th>Encoding</th><th class="text-end">Size</th></tr></thead>
+        <tbody>
+          {% for db in dbinfo.databases %}
+          <tr{% if db.is_connected %} class="table-primary-subtle"{% endif %}>
+            <td>{{ db.name }}{% if db.is_connected %} <span class="badge bg-primary-subtle text-primary">connected</span>{% endif %}</td>
+            <td>{{ db.owner }}</td>
+            <td>{{ db.encoding }}</td>
+            <td class="text-end">{{ db.size_pretty }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="dashboard-section-grid">
     <div class="dashboard-main-grid">

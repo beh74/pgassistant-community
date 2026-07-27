@@ -254,7 +254,19 @@
       </div>
 
       <div class="pga-topnav-right">
-        {% if session['db_host'] %}
+        {% if session.get('db_host') and session.get('db_connected') %}
+          {% if multi_db_filter and cluster_databases %}
+          <div class="pga-db-context d-none d-lg-inline-flex">
+            <span class="pga-db-context-icon" aria-hidden="true">
+              <i class="bi bi-collection"></i>
+            </span>
+            <span class="pga-db-context-text">
+              <span class="pga-db-context-label">Cluster</span>
+              <span class="pga-db-context-value">{{ session['db_host'] }}</span>
+            </span>
+          </div>
+          {% include "includes/multi_db_filter.html" %}
+          {% else %}
           <div class="pga-db-context d-none d-lg-inline-flex" title="{{ session['db_host'] }} : {{ session['db_name'] }}">
             <span class="pga-db-context-icon" aria-hidden="true">
               <i class="bi bi-database"></i>
@@ -266,6 +278,7 @@
               </span>
             </span>
           </div>
+          {% endif %}
         {% endif %}
 
         <div class="nav-item dropdown">

@@ -293,6 +293,16 @@
         </li>
 
         {# DBA Corner menu #}
+        <li class="nav-item nav-tooling {% if 'table_autovacuum_tune' in segment %}active{% endif %}">
+          <a href="/table_autovacuum_tune.html" class="nav-link" {% if 'table_autovacuum_tune' in segment %}aria-current="page"{% endif %}>
+            <div class="sidebar-icon me-2 icon-20">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders2" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M10.5 3a.5.5 0 0 0-.5-.5H1.5a.5.5 0 0 0 0 1H10a.5.5 0 0 0 .5-.5m0 4a.5.5 0 0 0-.5-.5H6.5a.5.5 0 0 0 0 1H10a.5.5 0 0 0 .5-.5M1.5 10.5a.5.5 0 0 0 0 1H10a.5.5 0 0 0 0-1H1.5a.5.5 0 0 0 0 1m10.5-6.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
+              </svg>
+            </div>
+            <div class="sidebar-text">Autovacuum tuning</div>
+          </a>
+        </li>
         <li class="nav-item nav-tooling {% if is_tools_dba %}active{% endif %}">
           <a href="/tools?cat=dba" class="nav-link" {% if is_tools_dba %}aria-current="page"{% endif %}>
             <div class="sidebar-icon me-2 icon-20">

@@ -1,0 +1,17 @@
+{% if multi_db_filter and cluster_databases %}
+<div class="pga-multi-db-filter d-flex align-items-center flex-wrap gap-2">
+  <span class="small text-muted">Database</span>
+  <form method="GET" action="{{ request.path }}" class="d-flex align-items-center gap-2 mb-0">
+    {% for key, value in request.args.items() %}
+      {% if key != 'db' %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+    <select class="form-select form-select-sm pga-multi-db-select" name="db" aria-label="Filter by database" onchange="this.form.submit()">
+      {% for db_name in cluster_databases %}
+      <option value="{{ db_name }}" {% if db_name == active_db %}selected{% endif %}>{{ db_name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+{% endif %}

@@ -57,6 +57,7 @@
       <p class="pg-subtitle">
         Prioritize the queries that deserve investigation first. Scores are relative to the current workload snapshot
         and should be interpreted with execution pattern and business context.
+        {% if multi_db_filter %}<span class="d-block mt-1">Database filter: <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
 

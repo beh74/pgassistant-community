@@ -1,0 +1,1221 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Table autovacuum tuning{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
+<style>
+  .autovac-page { padding: 1.5rem; }
+  .autovac-table-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: .75rem;
+    margin-bottom: 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+  .autovac-table-scroll::-webkit-scrollbar { height: 10px; }
+  .autovac-table-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+  .autovac-table-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
+  .autovac-table {
+    min-width: 1800px;
+    margin-bottom: 0;
+  }
+  .autovac-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .autovac-table th.sortable .sort-indicator {
+    font-size: .7rem;
+    color: #94a3b8;
+    margin-left: .2rem;
+  }
+  .autovac-table th.sortable.active .sort-indicator {
+    color: #2563eb;
+  }
+  .autovac-table .autovac-col-filter {
+    min-width: 88px;
+    font-size: .72rem;
+    padding: .2rem .35rem;
+  }
+  .autovac-table thead tr.autovac-filter-row th {
+    background: #fff;
+    border-top: 0;
+    padding-top: 0;
+    vertical-align: top;
+  }
+  .autovac-table th,
+  .autovac-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .autovac-table .autovac-note {
+    white-space: normal;
+    min-width: 220px;
+    max-width: 320px;
+  }
+  .autovac-actions {
+    min-width: 280px;
+  }
+  .autovac-actions .btn { white-space: nowrap; }
+  .autovac-risk-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: .84rem;
+  }
+  .autovac-risk-list li + li { margin-top: .35rem; }
+  .autovac-exec-result {
+    border-radius: .75rem;
+    padding: .75rem .9rem;
+    font-size: .82rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .autovac-snippet {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: .75rem;
+    padding: .75rem .9rem;
+    font-size: .78rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+  .pagination-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: .5rem;
+  }
+  .pagination-info { color: #64748b; font-size: .875rem; }
+  .pagination-controls { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .criteria-help-toggle { cursor: pointer; }
+  .criteria-help-body { font-size: .875rem; color: #475569; }
+  .criteria-help-body ul { margin-bottom: .75rem; padding-left: 1.25rem; }
+  .criteria-help-body li { margin-bottom: .35rem; }
+  .autovac-calc-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    line-height: 1;
+    font-size: .75rem;
+    font-weight: 700;
+    border-radius: 999px;
+  }
+  .autovac-calc-section + .autovac-calc-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+  }
+  .autovac-calc-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: .875rem;
+  }
+  .autovac-calc-list li + li { margin-top: .3rem; }
+  .autovac-calc-params {
+    font-size: .875rem;
+    margin: 0;
+  }
+  .autovac-calc-params dt { font-weight: 600; }
+  .autovac-calc-formula {
+    font-size: .84rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: .5rem;
+    padding: .5rem .65rem;
+    margin-bottom: .35rem;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="container-fluid autovac-page">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+      <h1 class="h4 mb-1">Table autovacuum tuning</h1>
+      <p class="text-muted mb-0">
+        Per-table and global autovacuum recommendations from <code>advisor_enriched.yml</code>
+        (<code>table_autovacuum_maintenance_flagged</code>, <code>table_autovacuum_cluster_load</code>).
+        {% if multi_db_filter %}<span class="ms-1">· Database <strong>{{ active_db }}</strong></span>{% endif %}
+      </p>
+    </div>
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      {% if multi_db_filter %}{% include "includes/multi_db_filter.html" %}{% endif %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST" action="/table_autovacuum_tune.html" class="row g-3 align-items-end">
+        {% if multi_db_filter %}<input type="hidden" name="db" value="{{ active_db }}">{% endif %}
+        <div class="col-12 col-md-4">
+          <label for="stale_days" class="form-label">Stale statistics threshold (days)</label>
+          <input class="form-control" id="stale_days" name="stale_days" type="number" min="1" max="365"
+                 value="{{ stale_days }}">
+          <div class="form-text">
+            Default: 7 days. ANALYZE is flagged when manual or auto statistics are missing or older than this.
+            VACUUM is flagged only when dead tuple pressure is significant, not from an old vacuum date alone.
+          </div>
+        </div>
+        <div class="col-12 col-md-3">
+          <button type="submit" class="btn btn-primary">Analyze tables</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if criteria_help %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+      <button class="btn btn-link p-0 text-decoration-none criteria-help-toggle d-flex align-items-center gap-2"
+              type="button" data-bs-toggle="collapse" data-bs-target="#autovac-criteria-help"
+              aria-expanded="false" aria-controls="autovac-criteria-help">
+        <span class="fw-semibold text-body">Criteria &amp; algorithms</span>
+        <span class="small text-muted">(threshold {{ criteria_help.stale_days }} day(s))</span>
+      </button>
+      <div class="collapse mt-3" id="autovac-criteria-help">
+        <div class="criteria-help-body">
+          {% for section in criteria_help.sections %}
+          <h3 class="h6 text-body mb-2">{{ section.title }}</h3>
+          <ul>
+            {% for item in section.points %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if advisor_result and not advisor_result.ok %}
+  <div class="alert alert-warning">{{ advisor_result.error }}</div>
+  {% elif advisor_result and advisor_result.ok %}
+  {% set global_tuning = advisor_result.global_tuning %}
+  {% if global_tuning and global_tuning.ok %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Global autovacuum tuning</h2>
+          <p class="text-muted small mb-0">
+            Cluster-wide <code>ALTER SYSTEM</code> proposals based on dead tuple pressure, flagged tables,
+            and active autovacuum workers.
+          </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          {% if global_tuning.load_level == 'critical' %}
+          <span class="badge bg-danger">{{ global_tuning.load_label }}</span>
+          {% elif global_tuning.load_level == 'high' %}
+          <span class="badge bg-warning text-dark">{{ global_tuning.load_label }}</span>
+          {% elif global_tuning.load_level == 'medium' %}
+          <span class="badge bg-info text-dark">{{ global_tuning.load_label }}</span>
+          {% else %}
+          <span class="badge bg-success-subtle text-success">{{ global_tuning.load_label }}</span>
+          {% endif %}
+          {% if global_tuning.recommendations %}
+          <button type="button" class="btn btn-outline-primary btn-sm" id="autovac-global-copy">Copy all</button>
+          <button type="button" class="btn btn-warning btn-sm" id="autovac-global-run-all">Run all + reload</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">Dead tuples (cluster)</div><div class="h5 mb-0">{{ global_tuning.metrics.total_dead_tuples }}</div></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">High dead pressure tables</div><div class="h5 mb-0">{{ global_tuning.metrics.high_dead_pressure_tables }}</div></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">Autovacuum workers</div><div class="h5 mb-0">{{ global_tuning.metrics.active_autovacuum_workers }} / {{ global_tuning.current_settings.autovacuum_max_workers or '—' }}</div></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">Flagged tables</div><div class="h5 mb-0">{{ global_tuning.metrics.flagged_table_count }}</div></div></div>
+      </div>
+
+      {% if global_tuning.recommendations %}
+      <div class="autovac-table-scroll mb-3">
+        <table class="table table-sm autovac-table mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Parameter</th>
+              <th>Current</th>
+              <th>Recommended</th>
+              <th>Apply</th>
+              <th>Rationale</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in global_tuning.recommendations %}
+            <tr>
+              <td><code>{{ item.parameter }}</code></td>
+              <td>{{ item.current_value }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
+              <td class="fw-semibold">{{ item.recommended_value }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
+              <td>
+                {% if item.context == 'postmaster' %}
+                <span class="badge bg-warning-subtle text-warning">Restart</span>
+                {% else %}
+                <span class="badge bg-success-subtle text-success">Reload</span>
+                {% endif %}
+              </td>
+              <td class="autovac-note small text-muted">{{ item.rationale }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                  <button type="button" class="btn btn-outline-secondary btn-sm autovac-global-copy-one"
+                          data-sql="{{ item.sql | e }}">Copy</button>
+                  <button type="button" class="btn btn-warning btn-sm autovac-global-run-one"
+                          data-global-index="{{ loop.index0 }}">Run</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <pre class="autovac-snippet d-none" id="autovac-global-script">{{ global_tuning.script_sql }}</pre>
+      {% if global_tuning.restart_required %}
+      <div class="alert alert-warning small mb-0">
+        <code>autovacuum_max_workers</code> requires a PostgreSQL restart. Other parameters can use
+        <code>SELECT pg_reload_conf();</code> after <code>ALTER SYSTEM</code>.
+      </div>
+      {% else %}
+      <div class="alert alert-info small mb-0">
+        Review workload and I/O capacity before applying. Reload with <code>SELECT pg_reload_conf();</code>
+        after applying the <code>ALTER SYSTEM</code> commands.
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="alert alert-success small mb-0">
+        {{ global_tuning.summary }} No global parameter change is recommended right now.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if advisor_result.tables %}
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="small text-muted">Tables flagged</div><div class="h4 mb-0">{{ advisor_result.summary.total }}</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="small text-muted">Analyze issues</div><div class="h4 mb-0">{{ advisor_result.summary.never_analyzed + advisor_result.summary.stale_analyze }}</div><div class="small text-muted">{{ advisor_result.summary.never_analyzed }} never · {{ advisor_result.summary.stale_analyze }} stale</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="small text-muted">Vacuum issues</div><div class="h4 mb-0">{{ advisor_result.summary.never_vacuumed + advisor_result.summary.stale_vacuum }}</div><div class="small text-muted">{{ advisor_result.summary.never_vacuumed }} never · {{ advisor_result.summary.stale_vacuum }} stale</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body"><div class="small text-muted">Threshold</div><div class="h4 mb-0">{{ stale_days }} d</div><div class="small text-muted">Analyze age · vacuum + dead pressure</div></div></div></div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted me-1">Run all flagged tables ({{ advisor_result.summary.total }}):</span>
+        <button type="button" class="btn btn-warning btn-sm" id="autovac-batch-vacuum">Run all VACUUM</button>
+        <button type="button" class="btn btn-success btn-sm" id="autovac-batch-analyze">Run all ANALYZE</button>
+        <button type="button" class="btn btn-primary btn-sm" id="autovac-batch-alter"
+                {% if not advisor_result.batch_actions.alter_eligible_count %}disabled{% endif %}>
+          Run all ALTER{% if advisor_result.batch_actions.alter_eligible_count < advisor_result.summary.total %}
+          ({{ advisor_result.batch_actions.alter_eligible_count }}){% endif %}
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" id="autovac-batch-all">Run all (VACUUM → ANALYZE → ALTER)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <label for="autovac-per-page" class="form-label mb-0 small text-muted">Rows per page</label>
+      <select id="autovac-per-page" class="form-select form-select-sm" style="width: auto;">
+        <option value="10">10</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="autovac-reset-filters">Reset filters</button>
+      <span class="small text-muted" id="autovac-visible-count"></span>
+    </div>
+    <div class="small text-muted">Click column headers to sort · filter in the row below headers</div>
+  </div>
+
+  <div class="autovac-table-scroll">
+    <table class="table table-sm autovac-table align-middle">
+      <thead class="table-light">
+        <tr id="autovac-header-row">
+          <th class="sortable" data-sort-key="object_name">Table <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="issue">Issue <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="last_analyze">Last analyze <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="last_autoanalyze">Last autoanalyze <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="stats_age_days">Stats age <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="last_vacuum">Last vacuum <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="last_autovacuum">Last autovacuum <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="vacuum_age_days">Vacuum age <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="n_live_tup">Rows <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="n_dead_tup">Dead tuples <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort-key="vacuum_urgency">Vacuum urgency <span class="sort-indicator"></span></th>
+          <th class="text-end autovac-actions">Commands</th>
+        </tr>
+        <tr class="autovac-filter-row">
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="object_name" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="issue" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="last_analyze" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="last_autoanalyze" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="stats_age_days" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="last_vacuum" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="last_autovacuum" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="vacuum_age_days" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="n_live_tup" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="n_dead_tup" placeholder="Filter"></th>
+          <th><input type="text" class="form-control form-control-sm autovac-col-filter" data-filter-key="vacuum_urgency" placeholder="Filter"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="autovac-table-body"></tbody>
+    </table>
+  </div>
+
+  <div id="autovac-empty-filter" class="alert alert-light border d-none mb-3">
+    No table matches the current column filters.
+  </div>
+
+  <div id="autovac-pagination" class="pagination-wrapper">
+    <div id="autovac-pagination-info" class="pagination-info"></div>
+    <div id="autovac-pagination-controls" class="pagination-controls"></div>
+  </div>
+  {% elif advisor_result.tables is defined and not advisor_result.tables %}
+  <div class="alert alert-info mb-0">
+    No tables require maintenance for the current criteria
+    (fresh analyze within {{ stale_days }} day(s), or no significant dead tuple pressure for vacuum).
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+{% if advisor_result and advisor_result.ok and advisor_result.tables %}
+<script type="application/json" id="autovac-rows-json">{{ advisor_result.tables | tojson }}</script>
+<script type="application/json" id="autovac-batch-json">{{ advisor_result.batch_actions | tojson }}</script>
+{% endif %}
+
+{% if advisor_result and advisor_result.ok and advisor_result.global_tuning and advisor_result.global_tuning.recommendations %}
+<script type="application/json" id="autovac-global-json">{{ advisor_result.global_tuning.recommendations | tojson }}</script>
+{% endif %}
+
+<div class="modal fade" id="autovacCalcModal" tabindex="-1" aria-labelledby="autovacCalcModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="h5 modal-title" id="autovacCalcModalLabel">Table calculation details</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="autovac-calc-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="autovacExecModal" tabindex="-1" aria-labelledby="autovacExecModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="h5 modal-title" id="autovacExecModalLabel">Run maintenance command</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <dl class="row small mb-3">
+          <dt class="col-sm-3">Target</dt>
+          <dd class="col-sm-9" id="autovac-exec-target"></dd>
+          <dt class="col-sm-3">Action</dt>
+          <dd class="col-sm-9" id="autovac-exec-action"></dd>
+        </dl>
+        <p class="small text-muted mb-2" id="autovac-exec-rationale"></p>
+
+        <div class="alert alert-warning py-2 px-3 mb-3">
+          <div class="fw-semibold small mb-2">Risks and operational impact</div>
+          <ul class="autovac-risk-list" id="autovac-exec-risks"></ul>
+        </div>
+
+        <div class="mb-2 fw-semibold small">SQL to execute</div>
+        <pre class="autovac-snippet" id="autovac-exec-sql"></pre>
+
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="autovac-exec-confirm">
+          <label class="form-check-label small" for="autovac-exec-confirm">
+            I reviewed the risks and want to run this command on the connected database.
+          </label>
+        </div>
+
+        <div id="autovac-exec-result-wrapper" class="mt-3 d-none">
+          <div class="small text-muted mb-1">Execution result</div>
+          <div id="autovac-exec-result" class="autovac-exec-result"></div>
+          <div class="small text-muted mt-2 mb-1">Execution time</div>
+          <div id="autovac-exec-time" class="fw-semibold small">Pending...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-primary" id="autovac-exec-copy">Copy SQL</button>
+        <button type="button" class="btn btn-warning" id="autovac-exec-run" disabled>Run now</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const rowsDataEl = document.getElementById("autovac-rows-json");
+  const globalDataEl = document.getElementById("autovac-global-json");
+  const batchDataEl = document.getElementById("autovac-batch-json");
+  const rowsData = rowsDataEl ? JSON.parse(rowsDataEl.textContent || "[]") : [];
+  const globalData = globalDataEl ? JSON.parse(globalDataEl.textContent || "[]") : [];
+  const batchData = batchDataEl ? JSON.parse(batchDataEl.textContent || "{}") : {};
+  const tableBody = document.getElementById("autovac-table-body");
+  const emptyFilter = document.getElementById("autovac-empty-filter");
+  const visibleCount = document.getElementById("autovac-visible-count");
+  const filterInputs = Array.from(document.querySelectorAll(".autovac-col-filter"));
+  const sortHeaders = Array.from(document.querySelectorAll("#autovac-header-row .sortable"));
+  const perPageSelect = document.getElementById("autovac-per-page");
+  const paginationInfo = document.getElementById("autovac-pagination-info");
+  const paginationControls = document.getElementById("autovac-pagination-controls");
+  const paginationWrapper = document.getElementById("autovac-pagination");
+  const modalEl = document.getElementById("autovacExecModal");
+  const calcModalEl = document.getElementById("autovacCalcModal");
+  const calcModalBody = document.getElementById("autovac-calc-body");
+  const calcModalTitle = document.getElementById("autovacCalcModalLabel");
+  const modalTitle = document.getElementById("autovacExecModalLabel");
+  const execTarget = document.getElementById("autovac-exec-target");
+  const execAction = document.getElementById("autovac-exec-action");
+  const execRationale = document.getElementById("autovac-exec-rationale");
+  const execRisks = document.getElementById("autovac-exec-risks");
+  const execSql = document.getElementById("autovac-exec-sql");
+  const execConfirm = document.getElementById("autovac-exec-confirm");
+  const execCopy = document.getElementById("autovac-exec-copy");
+  const execRun = document.getElementById("autovac-exec-run");
+  const execResultWrapper = document.getElementById("autovac-exec-result-wrapper");
+  const execResult = document.getElementById("autovac-exec-result");
+  const execTime = document.getElementById("autovac-exec-time");
+  let currentPage = 1;
+  let sortKey = "object_name";
+  let sortDirection = "asc";
+  let pendingExec = { sql: "", statements: [], label: "Run now" };
+
+  const issueLabels = {
+    never_analyzed: "Never analyzed",
+    stale_analyze: "Stale stats",
+    never_vacuumed: "Never vacuumed",
+    stale_vacuum: "Stale vacuum",
+  };
+
+  function formatTimestamp(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    return String(value).replace("T", " ").slice(0, 19);
+  }
+
+  function formatAge(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    return String(value) + " d";
+  }
+
+  function rowIssueText(row) {
+    const badges = (row.issue_types || []).map(function (issue) {
+      return issueLabels[issue] || issue;
+    });
+    return badges.concat(row.recommendation_note || "").join(" ");
+  }
+
+  function rowFilterText(row, key) {
+    switch (key) {
+      case "object_name":
+        return [row.object_name, row.table_size_pretty].filter(Boolean).join(" ");
+      case "issue":
+        return rowIssueText(row);
+      case "last_analyze":
+        return formatTimestamp(row.last_analyze);
+      case "last_autoanalyze":
+        return formatTimestamp(row.last_autoanalyze);
+      case "stats_age_days":
+        return formatAge(row.stats_age_days);
+      case "last_vacuum":
+        return formatTimestamp(row.last_vacuum);
+      case "last_autovacuum":
+        return formatTimestamp(row.last_autovacuum);
+      case "vacuum_age_days":
+        return formatAge(row.vacuum_age_days);
+      case "n_live_tup":
+        return String(row.n_live_tup ?? "");
+      case "n_dead_tup":
+        return String(row.n_dead_tup ?? "");
+      case "vacuum_urgency":
+        return String(row.vacuum_urgency ?? "");
+      default:
+        return "";
+    }
+  }
+
+  function rowSortValue(row, key) {
+    switch (key) {
+      case "object_name":
+        return row.object_name || "";
+      case "issue":
+        return rowIssueText(row);
+      case "last_analyze":
+      case "last_autoanalyze":
+      case "last_vacuum":
+      case "last_autovacuum":
+        return row[key] ? Date.parse(String(row[key]).replace(" ", "T")) : null;
+      case "stats_age_days":
+      case "vacuum_age_days":
+      case "n_live_tup":
+      case "n_dead_tup":
+      case "vacuum_urgency":
+        return row[key] === null || row[key] === undefined || row[key] === "" ? null : Number(row[key]);
+      default:
+        return null;
+    }
+  }
+
+  function getActiveFilters() {
+    const filters = {};
+    filterInputs.forEach(function (input) {
+      const value = (input.value || "").trim().toLowerCase();
+      if (value) filters[input.dataset.filterKey] = value;
+    });
+    return filters;
+  }
+
+  function getFilteredRows() {
+    const filters = getActiveFilters();
+    return rowsData
+      .map(function (row, index) { return { row: row, index: index }; })
+      .filter(function (entry) {
+        return Object.keys(filters).every(function (key) {
+          return rowFilterText(entry.row, key).toLowerCase().includes(filters[key]);
+        });
+      });
+  }
+
+  function getFilteredSortedRows() {
+    const filtered = getFilteredRows().slice();
+    filtered.sort(function (a, b) {
+      const left = rowSortValue(a.row, sortKey);
+      const right = rowSortValue(b.row, sortKey);
+      if (left === null && right === null) return a.index - b.index;
+      if (left === null) return 1;
+      if (right === null) return -1;
+      if (left < right) return sortDirection === "asc" ? -1 : 1;
+      if (left > right) return sortDirection === "asc" ? 1 : -1;
+      return a.index - b.index;
+    });
+    return filtered;
+  }
+
+  function renderIssueCell(row) {
+    const badges = (row.issue_types || []).map(function (issue) {
+      if (issue === "never_analyzed") return '<span class="badge bg-danger-subtle text-danger me-1">Never analyzed</span>';
+      if (issue === "stale_analyze") return '<span class="badge bg-warning-subtle text-warning me-1">Stale stats</span>';
+      if (issue === "never_vacuumed") return '<span class="badge bg-danger-subtle text-danger me-1">Never vacuumed</span>';
+      if (issue === "stale_vacuum") return '<span class="badge bg-warning-subtle text-warning me-1">Stale vacuum</span>';
+      return "";
+    }).join("");
+    return badges + '<div class="small text-muted mt-1">' + escapeHtml(row.recommendation_note || "") + "</div>";
+  }
+
+  function renderListItems(items) {
+    if (!items || !items.length) return '<p class="small text-muted mb-0">—</p>';
+    return '<ul class="autovac-calc-list">' + items.map(function (item) {
+      return "<li>" + escapeHtml(item) + "</li>";
+    }).join("") + "</ul>";
+  }
+
+  function renderCalculationHelp(help) {
+    if (!help) return '<p class="text-muted mb-0">No calculation details available.</p>';
+
+    let html = '<div class="autovac-calc-section">'
+      + '<div class="fw-semibold mb-2">Why this table is flagged</div>'
+      + renderListItems(help.flagging || [])
+      + '</div>';
+
+    html += '<div class="autovac-calc-section">'
+      + '<div class="fw-semibold mb-2">Metrics used</div>'
+      + renderListItems(help.metrics || [])
+      + '</div>';
+
+    if (help.recommendation_note) {
+      html += '<div class="autovac-calc-section">'
+        + '<div class="fw-semibold mb-2">Summary note</div>'
+        + '<p class="small mb-0">' + escapeHtml(help.recommendation_note) + '</p>'
+        + '</div>';
+    }
+
+    const alter = help.alter || {};
+    html += '<div class="autovac-calc-section">'
+      + '<div class="fw-semibold mb-2">ALTER TABLE autovacuum proposal</div>';
+
+    if (!alter.available && !alter.preview_only) {
+      html += '<p class="small text-muted mb-0">' + escapeHtml(alter.skip_reason || "Not available.") + '</p>';
+    } else {
+      if (alter.preview_only && alter.skip_reason) {
+        html += '<p class="small text-warning mb-2">' + escapeHtml(alter.skip_reason) + '</p>';
+        html += '<p class="small text-muted mb-2">Preview of proposed settings after ANALYZE:</p>';
+      }
+      const params = alter.parameters || {};
+      html += '<dl class="row autovac-calc-params mb-2">'
+        + '<dt class="col-sm-6">autovacuum_analyze_scale_factor</dt><dd class="col-sm-6">' + escapeHtml(params.autovacuum_analyze_scale_factor) + '</dd>'
+        + '<dt class="col-sm-6">autovacuum_analyze_threshold</dt><dd class="col-sm-6">' + escapeHtml(params.autovacuum_analyze_threshold) + '</dd>'
+        + '<dt class="col-sm-6">autovacuum_vacuum_scale_factor</dt><dd class="col-sm-6">' + escapeHtml(params.autovacuum_vacuum_scale_factor) + '</dd>'
+        + '<dt class="col-sm-6">autovacuum_vacuum_threshold</dt><dd class="col-sm-6">' + escapeHtml(params.autovacuum_vacuum_threshold) + '</dd>'
+        + '</dl>';
+      html += '<div class="fw-semibold small mb-1">Rules applied</div>' + renderListItems(alter.adjustments || []);
+      if (alter.vacuum_formula) {
+        html += '<div class="autovac-calc-formula"><strong>Vacuum trigger:</strong> ' + escapeHtml(alter.vacuum_formula) + '</div>';
+      }
+      if (alter.analyze_formula) {
+        html += '<div class="autovac-calc-formula"><strong>Analyze trigger:</strong> ' + escapeHtml(alter.analyze_formula) + '</div>';
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function openCalculationModal(row) {
+    if (!calcModalEl || !calcModalBody) return;
+    if (calcModalTitle) {
+      calcModalTitle.textContent = "Calculation: " + (row.object_name || "table");
+    }
+    calcModalBody.innerHTML = renderCalculationHelp(row.calculation_help || {});
+    if (window.bootstrap && window.bootstrap.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(calcModalEl).show();
+    }
+  }
+
+  function bindCalculationButtons() {
+    document.querySelectorAll(".autovac-calc-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const index = Number(button.dataset.rowIndex);
+        const entry = rowsData[index];
+        if (entry) openCalculationModal(entry);
+      });
+    });
+  }
+
+  function renderCommandsCell(row, index) {
+    const alterHtml = row.alter_available
+      ? '<button type="button" class="btn btn-outline-primary btn-sm autovac-cmd-btn" data-row-index="' + index + '" data-cmd="alter">Alter</button>'
+      : '<span class="small text-muted ms-1" title="' + escapeHtml(row.alter_skip_reason || "") + '">Alter N/A</span>';
+    return '<button type="button" class="btn btn-outline-success btn-sm autovac-cmd-btn" data-row-index="' + index + '" data-cmd="analyze">Analyze</button>'
+      + '<button type="button" class="btn btn-outline-warning btn-sm autovac-cmd-btn" data-row-index="' + index + '" data-cmd="vacuum">Vacuum</button>'
+      + alterHtml;
+  }
+
+  function bindCommandButtons() {
+    document.querySelectorAll(".autovac-cmd-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        openTableCommandModal(button);
+      });
+    });
+  }
+
+  function updateSortIndicators() {
+    sortHeaders.forEach(function (header) {
+      const indicator = header.querySelector(".sort-indicator");
+      const active = header.dataset.sortKey === sortKey;
+      header.classList.toggle("active", active);
+      if (indicator) {
+        indicator.textContent = active ? (sortDirection === "asc" ? "▲" : "▼") : "↕";
+      }
+    });
+  }
+
+  function renderTable() {
+    if (!tableBody) return;
+    const filtered = getFilteredSortedRows();
+    const size = pageSize();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / size));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * size;
+    const end = Math.min(start + size, filtered.length);
+    const pageRows = filtered.slice(start, end);
+
+    if (visibleCount) {
+      visibleCount.textContent = filtered.length + " / " + rowsData.length + " tables";
+    }
+
+    if (!filtered.length) {
+      tableBody.innerHTML = "";
+      emptyFilter?.classList.remove("d-none");
+      if (paginationInfo) paginationInfo.textContent = "0 tables";
+      paginationWrapper?.classList.add("d-none");
+      updateSortIndicators();
+      return;
+    }
+
+    emptyFilter?.classList.add("d-none");
+    tableBody.innerHTML = pageRows.map(function (entry) {
+      const row = entry.row;
+      const index = entry.index;
+      return '<tr class="autovac-data-row">'
+        + '<td><div class="d-flex align-items-start gap-2">'
+        + '<button type="button" class="btn btn-outline-secondary btn-sm autovac-calc-btn flex-shrink-0" '
+        + 'data-row-index="' + index + '" title="Show flagging and ALTER calculation" aria-label="Show calculation details">?</button>'
+        + '<div><div class="fw-semibold">' + escapeHtml(row.object_name || "") + '</div>'
+        + '<div class="small text-muted">' + escapeHtml(row.table_size_pretty || "—") + '</div></div></div></td>'
+        + '<td class="autovac-note">' + renderIssueCell(row) + '</td>'
+        + '<td class="small">' + escapeHtml(formatTimestamp(row.last_analyze)) + '</td>'
+        + '<td class="small">' + escapeHtml(formatTimestamp(row.last_autoanalyze)) + '</td>'
+        + '<td>' + escapeHtml(formatAge(row.stats_age_days)) + '</td>'
+        + '<td class="small">' + escapeHtml(formatTimestamp(row.last_vacuum)) + '</td>'
+        + '<td class="small">' + escapeHtml(formatTimestamp(row.last_autovacuum)) + '</td>'
+        + '<td>' + escapeHtml(formatAge(row.vacuum_age_days)) + '</td>'
+        + '<td>' + escapeHtml(String(row.n_live_tup || 0)) + '</td>'
+        + '<td>' + escapeHtml(String(row.n_dead_tup || 0)) + '</td>'
+        + '<td>' + escapeHtml(String(row.vacuum_urgency ?? "—")) + '</td>'
+        + '<td class="text-end autovac-actions">' + renderCommandsCell(row, index) + '</td>'
+        + '</tr>';
+    }).join("");
+
+    bindCommandButtons();
+    bindCalculationButtons();
+    updateSortIndicators();
+
+    if (paginationInfo) {
+      paginationInfo.textContent = "Showing " + (start + 1) + "-" + end + " of " + filtered.length + " tables";
+    }
+    drawPaginationControls(totalPages);
+  }
+
+  const cmdLabels = {
+    analyze: "ANALYZE",
+    vacuum: "VACUUM",
+    alter: "ALTER TABLE (autovacuum tuning)",
+    alter_system: "ALTER SYSTEM",
+    alter_system_batch: "ALTER SYSTEM (batch) + reload",
+    batch_vacuum: "Batch VACUUM",
+    batch_analyze: "Batch ANALYZE",
+    batch_alter: "Batch ALTER TABLE",
+    batch_all: "Batch VACUUM + ANALYZE + ALTER",
+  };
+
+  function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
+  function splitSqlStatements(sql) {
+    return String(sql || "")
+      .split(";")
+      .map(function (chunk) { return chunk.trim(); })
+      .filter(function (chunk) {
+        if (!chunk) return false;
+        return !chunk.split("\n").every(function (line) {
+          const trimmed = line.trim();
+          return !trimmed || trimmed.startsWith("--");
+        });
+      })
+      .map(function (chunk) { return chunk + ";"; });
+  }
+
+  function normalizeStatement(sql) {
+    const text = String(sql || "").trim();
+    if (!text) return "";
+    return text.endsWith(";") ? text : text + ";";
+  }
+
+  function appendBatchStatements(statements, entries, field, onlyAlterEligible) {
+    entries.forEach(function (entry) {
+      const row = entry.row;
+      if (onlyAlterEligible && !row.alter_available) return;
+      const sql = normalizeStatement(row[field]);
+      if (sql) statements.push(sql);
+    });
+  }
+
+  function openTableBatchModal(kind) {
+    const statements = [];
+    const batchKey = kind === "all" ? "all" : kind;
+    const risks = ((batchData[batchKey] && batchData[batchKey].risks) || []).slice();
+    const filteredEntries = getFilteredRows();
+
+    if (kind === "vacuum" || kind === "all") {
+      appendBatchStatements(statements, filteredEntries, "vacuum_sql", false);
+    }
+    if (kind === "analyze" || kind === "all") {
+      appendBatchStatements(statements, filteredEntries, "analyze_sql", false);
+    }
+    if (kind === "alter" || kind === "all") {
+      appendBatchStatements(statements, filteredEntries, "autovacuum_sql", true);
+    }
+
+    const alterEligibleInView = filteredEntries.filter(function (entry) {
+      return entry.row.alter_available;
+    }).length;
+
+    if ((kind === "alter" || kind === "all") && alterEligibleInView === 0) {
+      window.alert("No ALTER TABLE tuning is available in the current view.");
+      return;
+    }
+
+    if (kind === "all" && alterEligibleInView < filteredEntries.length) {
+      risks.push(
+        "ALTER TABLE is skipped for tables that have never been analyzed; run ANALYZE on them first."
+      );
+    }
+
+    if (filteredEntries.length < rowsData.length) {
+      risks.push("Batch run applies to the currently filtered table set only.");
+    }
+
+    const actionKey = kind === "all" ? "batch_all" : "batch_" + kind;
+    const rationales = {
+      vacuum: "Reclaim dead tuples on all flagged tables.",
+      analyze: "Refresh planner statistics on all flagged tables.",
+      alter: "Apply recommended per-table autovacuum settings on flagged tables with existing statistics.",
+      all: "Full maintenance pass: VACUUM, then ANALYZE, then ALTER TABLE tuning where statistics exist.",
+    };
+
+    if (kind === "alter" && !statements.length) {
+      window.alert("No ALTER TABLE tuning is available: all flagged tables still require ANALYZE.");
+      return;
+    }
+
+    openExecModal({
+      title: "Run all " + (cmdLabels[actionKey] || kind),
+      target: filteredEntries.length + " table(s) in current view",
+      action: cmdLabels[actionKey] || kind,
+      rationale: rationales[kind] || "",
+      risks: risks,
+      sql: statements.join("\n\n"),
+      statements: statements,
+      runLabel: "Run batch (" + statements.length + ")",
+    });
+  }
+
+  function pageSize() {
+    return Number(perPageSelect?.value || 25);
+  }
+
+  function pageButton(label, page, active, disabled) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm " + (active ? "btn-primary" : "btn-outline-primary");
+    button.textContent = label;
+    button.disabled = disabled;
+    if (!disabled) {
+      button.addEventListener("click", function () {
+        currentPage = page;
+        renderTable();
+        document.querySelector(".autovac-table-scroll")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    }
+    return button;
+  }
+
+  function drawPaginationControls(totalPages) {
+    if (!paginationControls || !paginationWrapper) return;
+    paginationControls.innerHTML = "";
+    if (totalPages <= 1) {
+      paginationWrapper.classList.add("d-none");
+      return;
+    }
+    paginationWrapper.classList.remove("d-none");
+    paginationControls.appendChild(pageButton("Previous", currentPage - 1, false, currentPage <= 1));
+    for (let page = 1; page <= totalPages; page += 1) {
+      if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2) {
+        paginationControls.appendChild(pageButton(String(page), page, page === currentPage, false));
+      } else if (page === currentPage - 3 || page === currentPage + 3) {
+        const ellipsis = document.createElement("span");
+        ellipsis.className = "btn btn-sm btn-light disabled";
+        ellipsis.textContent = "…";
+        paginationControls.appendChild(ellipsis);
+      }
+    }
+    paginationControls.appendChild(pageButton("Next", currentPage + 1, false, currentPage >= totalPages));
+  }
+
+  function copyText(text, button) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function () {
+      if (!button) return;
+      const original = button.textContent;
+      button.textContent = "Copied";
+      setTimeout(function () { button.textContent = original; }, 1200);
+    });
+  }
+
+  function renderRiskList(risks) {
+    if (!execRisks) return;
+    execRisks.innerHTML = "";
+    (risks || []).forEach(function (risk) {
+      const item = document.createElement("li");
+      item.textContent = risk;
+      execRisks.appendChild(item);
+    });
+  }
+
+  function resetExecModalState() {
+    if (execConfirm) execConfirm.checked = false;
+    if (execRun) execRun.disabled = true;
+    execResultWrapper?.classList.add("d-none");
+    if (execResult) execResult.textContent = "";
+    if (execTime) execTime.textContent = "Pending...";
+  }
+
+  function openExecModal(config) {
+    pendingExec = {
+      sql: config.sql || "",
+      statements: config.statements || splitSqlStatements(config.sql),
+      label: config.runLabel || "Run now",
+    };
+
+    if (modalTitle) modalTitle.textContent = config.title || "Run maintenance command";
+    if (execTarget) execTarget.textContent = config.target || "—";
+    if (execAction) execAction.textContent = config.action || "—";
+    if (execRationale) execRationale.textContent = config.rationale || "";
+    renderRiskList(config.risks || []);
+    if (execSql) execSql.textContent = config.sql || "";
+    if (execRun) execRun.textContent = pendingExec.label;
+
+    resetExecModalState();
+
+    if (modalEl && window.bootstrap) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  function openTableCommandModal(button) {
+    const rowIndex = Number(button.dataset.rowIndex);
+    const cmd = button.dataset.cmd || "";
+    const row = rowsData[rowIndex] || {};
+    const sqlByCmd = {
+      analyze: row.analyze_sql || "",
+      vacuum: row.vacuum_sql || "",
+      alter: row.autovacuum_sql || "",
+    };
+    const rationaleByCmd = {
+      analyze: "Refresh planner statistics for " + (row.object_name || "this table") + ".",
+      vacuum: "Reclaim dead tuples (" + (row.n_dead_tup || 0) + " dead) on "
+        + (row.object_name || "this table") + ".",
+      alter: row.tuning_rationale || "",
+    };
+    const risksByCmd = {
+      analyze: row.analyze_risks || [],
+      vacuum: row.vacuum_risks || [],
+      alter: row.alter_risks || [],
+    };
+
+    openExecModal({
+      title: "Run " + (cmdLabels[cmd] || cmd),
+      target: row.object_name || "Table",
+      action: cmdLabels[cmd] || cmd,
+      rationale: rationaleByCmd[cmd] || "",
+      risks: risksByCmd[cmd] || [],
+      sql: sqlByCmd[cmd] || "",
+      runLabel: "Run " + (cmdLabels[cmd] || cmd),
+    });
+  }
+
+  function openGlobalCommandModal(index) {
+    const item = globalData[index] || {};
+    const statements = splitSqlStatements(item.sql);
+    const risks = (item.risks || []).slice();
+    if (item.context !== "postmaster") {
+      statements.push("SELECT pg_reload_conf();");
+      risks.push("Reloads PostgreSQL configuration after ALTER SYSTEM.");
+    }
+
+    openExecModal({
+      title: "Run global autovacuum change",
+      target: item.parameter || "Cluster",
+      action: cmdLabels.alter_system,
+      rationale: item.rationale || "",
+      risks: risks,
+      sql: statements.join("\n"),
+      statements: statements,
+      runLabel: "Run ALTER SYSTEM",
+    });
+  }
+
+  function openGlobalBatchModal() {
+    const statements = [];
+    const risks = [];
+    globalData.forEach(function (item) {
+      splitSqlStatements(item.sql).forEach(function (sql) { statements.push(sql); });
+      (item.risks || []).forEach(function (risk) {
+        if (!risks.includes(risk)) risks.push(risk);
+      });
+    });
+    statements.push("SELECT pg_reload_conf();");
+    risks.push("Reloads configuration after all ALTER SYSTEM commands.");
+
+    openExecModal({
+      title: "Run all global autovacuum changes",
+      target: "PostgreSQL cluster",
+      action: cmdLabels.alter_system_batch,
+      rationale: "Apply all recommended global autovacuum parameters, then reload configuration.",
+      risks: risks,
+      sql: statements.join("\n"),
+      statements: statements,
+      runLabel: "Run all + reload",
+    });
+  }
+
+  async function executeStatement(sql) {
+    const response = await fetch("/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql: sql }),
+    });
+
+    let result;
+    try {
+      result = await response.json();
+    } catch (error) {
+      throw new Error("Invalid server response (" + response.status + ").");
+    }
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "Execution failed.");
+    }
+
+    return result.message || "OK";
+  }
+
+  async function executePendingStatements() {
+    const statements = pendingExec.statements.length
+      ? pendingExec.statements
+      : splitSqlStatements(pendingExec.sql);
+
+    if (!statements.length) {
+      throw new Error("No SQL statement to execute.");
+    }
+
+    const originalLabel = execRun?.textContent || "Run now";
+    if (execRun) {
+      execRun.disabled = true;
+      execRun.textContent = "Running...";
+    }
+
+    execResultWrapper?.classList.remove("d-none");
+    if (execResult) execResult.textContent = "Running...";
+    if (execTime) execTime.textContent = "Running...";
+
+    const startedAt = performance.now();
+    const logs = [];
+
+    try {
+      for (let index = 0; index < statements.length; index += 1) {
+        const sql = statements[index];
+        logs.push("[" + (index + 1) + "/" + statements.length + "] " + sql);
+        const message = await executeStatement(sql);
+        logs.push("Success: " + message);
+      }
+
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      if (execTime) execTime.textContent = elapsedMs + " ms";
+      if (execResult) {
+        execResult.innerHTML = '<div class="text-success fw-semibold">Success</div><div class="mt-2">'
+          + escapeHtml(logs.join("\n")) + "</div>";
+      }
+    } catch (error) {
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      if (execTime) execTime.textContent = elapsedMs + " ms";
+      if (execResult) {
+        execResult.innerHTML = '<div class="text-danger fw-semibold">Error</div><div class="mt-2">'
+          + escapeHtml(logs.join("\n")) + (logs.length ? "\n" : "")
+          + escapeHtml(error.message) + "</div>";
+      }
+    } finally {
+      if (execRun) {
+        execRun.textContent = originalLabel;
+        execRun.disabled = !(execConfirm && execConfirm.checked);
+      }
+    }
+  }
+
+  sortHeaders.forEach(function (header) {
+    header.addEventListener("click", function () {
+      const key = header.dataset.sortKey;
+      if (sortKey === key) {
+        sortDirection = sortDirection === "asc" ? "desc" : "asc";
+      } else {
+        sortKey = key;
+        sortDirection = "asc";
+      }
+      currentPage = 1;
+      renderTable();
+    });
+  });
+
+  filterInputs.forEach(function (input) {
+    input.addEventListener("input", function () {
+      currentPage = 1;
+      renderTable();
+    });
+  });
+
+  document.getElementById("autovac-reset-filters")?.addEventListener("click", function () {
+    filterInputs.forEach(function (input) { input.value = ""; });
+    sortKey = "object_name";
+    sortDirection = "asc";
+    currentPage = 1;
+    renderTable();
+  });
+
+  document.querySelectorAll(".autovac-global-run-one").forEach(function (button) {
+    button.addEventListener("click", function () {
+      openGlobalCommandModal(Number(button.dataset.globalIndex));
+    });
+  });
+
+  document.getElementById("autovac-global-run-all")?.addEventListener("click", openGlobalBatchModal);
+
+  document.getElementById("autovac-batch-vacuum")?.addEventListener("click", function () {
+    openTableBatchModal("vacuum");
+  });
+  document.getElementById("autovac-batch-analyze")?.addEventListener("click", function () {
+    openTableBatchModal("analyze");
+  });
+  document.getElementById("autovac-batch-alter")?.addEventListener("click", function () {
+    openTableBatchModal("alter");
+  });
+  document.getElementById("autovac-batch-all")?.addEventListener("click", function () {
+    openTableBatchModal("all");
+  });
+
+  execConfirm?.addEventListener("change", function () {
+    if (execRun) execRun.disabled = !execConfirm.checked;
+  });
+
+  execCopy?.addEventListener("click", function () {
+    copyText(pendingExec.sql || execSql?.textContent || "", execCopy);
+  });
+
+  execRun?.addEventListener("click", function () {
+    if (!execConfirm?.checked) return;
+    executePendingStatements();
+  });
+
+  modalEl?.addEventListener("hidden.bs.modal", resetExecModalState);
+
+  const globalScript = document.getElementById("autovac-global-script");
+  document.getElementById("autovac-global-copy")?.addEventListener("click", function () {
+    copyText(globalScript?.textContent || "", document.getElementById("autovac-global-copy"));
+  });
+  document.querySelectorAll(".autovac-global-copy-one").forEach(function (button) {
+    button.addEventListener("click", function () {
+      copyText(button.dataset.sql || "", button);
+    });
+  });
+
+  perPageSelect?.addEventListener("change", function () {
+    currentPage = 1;
+    renderTable();
+  });
+
+  if (tableBody && rowsData.length) {
+    renderTable();
+  }
+});
+</script>
+{% endblock javascripts %}

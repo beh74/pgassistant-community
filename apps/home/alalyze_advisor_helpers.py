@@ -549,7 +549,7 @@ def parse_index_columns(indexdef: str) -> List[str]:
 # pg_stat_statements context
 # --------------------------------------------------------------------
 
-def load_query_stats(con, queryid: int | str) -> Optional[QueryStats]:
+def load_query_stats(con, queryid: int | str, database_name: str = "") -> Optional[QueryStats]:
     """Load pg_stat_statements counters for the analyzed query ID."""
     sql = """
         SELECT
@@ -570,6 +570,13 @@ def load_query_stats(con, queryid: int | str) -> Optional[QueryStats]:
         WHERE queryid::text = %s
         LIMIT 1
     """
+    if not database_name:
+        with con.cursor() as cur:
+            cur.execute("SELECT current_database()")
+            row = cur.fetchone()
+            database_name = row[0] if row else ""
+
+    sql = database.prepare_pgss_sql(sql, con, database_name)
 
     with con.cursor() as cur:
         cur.execute(sql, (str(queryid),))
