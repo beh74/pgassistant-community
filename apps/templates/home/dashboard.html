@@ -144,6 +144,10 @@
         <span class="dashboard-action-main"><i class="bi bi-trophy"></i> Prioritize queries</span>
         <span class="dashboard-action-meta">ranking</span>
       </a>
+      <a href="/table_autovacuum_tune.html" class="dashboard-action-pill">
+        <span class="dashboard-action-main"><i class="bi bi-sliders2"></i> Autovacuum tuning</span>
+        <span class="dashboard-action-meta">per table</span>
+      </a>
       <a href="/pgtune.html" class="dashboard-action-pill">
         <span class="dashboard-action-main"><i class="bi bi-sliders"></i> Check configuration</span>
         <span class="dashboard-action-meta">pgTune</span>
@@ -166,16 +170,22 @@
     <div class="pg-card pg-card-body dashboard-kpi-card">
       <div class="dashboard-kpi-icon"><i class="bi bi-hdd-rack"></i></div>
       <div>
-        <div class="dashboard-kpi-label">Database size</div>
+        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster size{% else %}Database size{% endif %}</div>
         <h2 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h2>
-        <p class="dashboard-kpi-subtext">Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a></p>
+        <p class="dashboard-kpi-subtext">
+          {% if dbinfo.get('multi_db') %}
+          {{ dbinfo.get('databases', [])|length }} databases on cluster
+          {% else %}
+          Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a>
+          {% endif %}
+        </p>
       </div>
     </div>
 
     <div class="pg-card pg-card-body dashboard-kpi-card">
       <div class="dashboard-kpi-icon"><i class="bi bi-speedometer2"></i></div>
       <div>
-        <div class="dashboard-kpi-label">Hit cache ratio</div>
+        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster hit cache{% else %}Hit cache ratio{% endif %}</div>
         <a href="/cache_table.html" class="text-decoration-none">
           <h2 class="dashboard-kpi-value">{{ dbinfo['cache'] }}%</h2>
         </a>
@@ -198,6 +208,29 @@
       </div>
     </div>
   </div>
+
+  {% if dbinfo.get('multi_db') and dbinfo.get('databases') %}
+  <div class="pg-card mb-4" id="cluster-databases-card">
+    <div class="dashboard-card-header">
+      <span class="dashboard-section-title"><i class="bi bi-collection"></i><span>Cluster databases</span></span>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <label for="cluster-db-per-page" class="small text-muted mb-0">Per page</label>
+        <select id="cluster-db-per-page" class="form-select form-select-sm" style="width: auto;">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+    </div>
+    <div class="pg-card-body dashboard-row-list" id="cluster-databases-list"></div>
+    <div class="pagination-wrapper px-3 pb-3 pt-0">
+      <div id="cluster-db-pagination-info" class="pagination-info"></div>
+      <div id="cluster-db-pagination-controls" class="pagination-controls"></div>
+    </div>
+  </div>
+  <script type="application/json" id="cluster-databases-json">{{ dbinfo.databases | tojson }}</script>
+  {% endif %}
 
   <div class="dashboard-section-grid">
     <div class="dashboard-main-grid">
@@ -466,7 +499,112 @@
     }
 
     loadDevAdvisorSummary();
+    initClusterDatabasesPagination();
   });
+
+  function initClusterDatabasesPagination() {
+    const dataEl = document.getElementById("cluster-databases-json");
+    const listEl = document.getElementById("cluster-databases-list");
+    const perPageSelect = document.getElementById("cluster-db-per-page");
+    const paginationInfo = document.getElementById("cluster-db-pagination-info");
+    const paginationControls = document.getElementById("cluster-db-pagination-controls");
+    if (!dataEl || !listEl || !perPageSelect) {
+      return;
+    }
+
+    const databases = JSON.parse(dataEl.textContent || "[]");
+    let currentPage = 1;
+
+    function escapeHtml(value) {
+      const div = document.createElement("div");
+      div.textContent = value == null ? "" : String(value);
+      return div.innerHTML;
+    }
+
+    function pageSize() {
+      return Number(perPageSelect.value || 10);
+    }
+
+    function pageButton(label, page, active, disabled) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-sm " + (active ? "btn-primary" : "btn-outline-primary");
+      button.textContent = label;
+      button.disabled = disabled;
+      if (!disabled) {
+        button.addEventListener("click", function () {
+          currentPage = page;
+          renderClusterDatabases();
+          document.getElementById("cluster-databases-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      }
+      return button;
+    }
+
+    function renderClusterDatabases() {
+      const size = pageSize();
+      const totalPages = Math.max(1, Math.ceil(databases.length / size));
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const start = (currentPage - 1) * size;
+      const end = Math.min(start + size, databases.length);
+      const pageItems = databases.slice(start, end);
+
+      if (!pageItems.length) {
+        listEl.innerHTML = '<div class="small text-muted">No databases found on this cluster.</div>';
+      } else {
+        listEl.innerHTML = pageItems.map(function (db) {
+          const connectedBadge = db.is_connected
+            ? ' <span class="badge bg-primary-subtle text-primary ms-1">connected</span>'
+            : "";
+          return '<div class="dashboard-row-item">'
+            + '<div class="dashboard-row-icon"><i class="bi bi-database"></i></div>'
+            + '<div class="dashboard-row-main">'
+            + '<div class="dashboard-row-label">' + escapeHtml(db.name) + connectedBadge + '</div>'
+            + '<div class="dashboard-row-note">' + escapeHtml(db.owner) + ' · ' + escapeHtml(db.encoding) + '</div>'
+            + '</div>'
+            + '<div class="dashboard-row-value">' + escapeHtml(db.size_pretty) + '</div>'
+            + '</div>';
+        }).join("");
+      }
+
+      if (paginationInfo) {
+        if (!databases.length) {
+          paginationInfo.textContent = "0 databases";
+        } else {
+          paginationInfo.textContent = "Showing " + (start + 1) + "-" + end + " of " + databases.length + " databases";
+        }
+      }
+
+      if (paginationControls) {
+        paginationControls.innerHTML = "";
+        if (totalPages <= 1) {
+          return;
+        }
+        paginationControls.appendChild(pageButton("Previous", currentPage - 1, false, currentPage <= 1));
+        for (let page = 1; page <= totalPages; page += 1) {
+          if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2) {
+            paginationControls.appendChild(pageButton(String(page), page, page === currentPage, false));
+          } else if (page === currentPage - 3 || page === currentPage + 3) {
+            const ellipsis = document.createElement("span");
+            ellipsis.className = "btn btn-sm btn-light disabled";
+            ellipsis.textContent = "…";
+            paginationControls.appendChild(ellipsis);
+          }
+        }
+        paginationControls.appendChild(pageButton("Next", currentPage + 1, false, currentPage >= totalPages));
+      }
+    }
+
+    perPageSelect.addEventListener("change", function () {
+      currentPage = 1;
+      renderClusterDatabases();
+    });
+
+    renderClusterDatabases();
+  }
 
   function appendTextBlock(container, className, text) {
     if (!text) {

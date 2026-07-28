@@ -369,11 +369,12 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (result.success) {
+        const output = result.output || result.message || "Query executed successfully.";
         if (maintenanceResult) {
           maintenanceResult.innerHTML =
             '<div class="text-success"><strong>Success</strong></div>' +
             '<div class="mt-2">' +
-            escapeHtml(result.message || "Query executed successfully.") +
+            escapeHtml(output) +
             '</div>';
         }
       } else {

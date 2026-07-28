@@ -315,7 +315,8 @@
       const result = await response.json();
 
       if (result.success) {
-        modalResults.innerHTML = `<div class="text-success"><strong>Success</strong></div><div class="mt-2">${escapeHtml(result.message || "Query executed successfully.")}</div>`;
+        const output = result.output || result.message || "Query executed successfully.";
+        modalResults.innerHTML = `<div class="text-success"><strong>Success</strong></div><div class="mt-2">${escapeHtml(output)}</div>`;
       } else {
         modalResults.innerHTML = `<div class="text-danger"><strong>Error</strong></div><div class="mt-2">${escapeHtml(result.error || "Unknown error.")}</div>`;
       }

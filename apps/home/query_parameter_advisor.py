@@ -167,7 +167,7 @@ def _get_postgres_major_version(db_config: Dict[str, Any]) -> int:
         conn.close()
 
 
-def _fetch_pg_stat_statements_rows(conn) -> List[Dict[str, Any]]:
+def _fetch_pg_stat_statements_rows(conn, database_name: str = "") -> List[Dict[str, Any]]:
     """Read the workload snapshot used to aggregate runtime counters."""
     sql = """
         SELECT
@@ -195,6 +195,7 @@ def _fetch_pg_stat_statements_rows(conn) -> List[Dict[str, Any]]:
           AND lower(query) NOT LIKE '/* launched by pgassistant */%'
         ORDER BY total_exec_time DESC
     """
+    sql = database.prepare_pgss_sql(sql, conn, database_name)
     with conn.cursor() as cur:
         cur.execute(sql)
         columns = [desc[0] for desc in cur.description]
@@ -533,6 +534,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
     if conn is None:
         raise RuntimeError(status or "Unable to connect to database.")
 
+    db_name = database.get_resolved_database_name(db_config)
     plan_metrics = _empty_plan_metrics()
     planned_rows = []
     queries_planned = 0
@@ -540,7 +542,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
     queries_skipped_internal = 0
 
     try:
-        pgss_rows = _fetch_pg_stat_statements_rows(conn)
+        pgss_rows = _fetch_pg_stat_statements_rows(conn, db_name)
         statement_metrics = _aggregate_statement_metrics(pgss_rows)
 
         for row in pgss_rows:

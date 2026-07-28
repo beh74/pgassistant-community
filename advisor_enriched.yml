@@ -2470,6 +2470,317 @@ recommendations:
           schema_name,
           table_name;        
 
+  - id: table_autovacuum_maintenance_flagged
+    label: Table autovacuum maintenance flagged
+    source: pgassistant
+    team: OPS
+    category_id: MAINTENANCE
+    object_type: TABLE
+    outcome_id: OPERABILITY
+    advisor_group: AUTOVACUUM_HEALTH
+    enabled_by_default: false
+    manual_review_required: true
+    confidence: 85
+    impact: 75
+    effort: 25
+    risk_level: MEDIUM
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: false
+    can_auto_apply: false
+    tags:
+      - pgassistant
+      - autovacuum
+      - analyze
+      - vacuum
+      - maintenance
+    why_it_matters: >
+      Flags user tables that require ANALYZE when statistics are missing or older than
+      the configured threshold, and VACUUM only when dead tuple pressure is significant
+      relative to table size. Manual ANALYZE counts the same as autovacuum analyze.
+    pgassistant_parameters:
+      stale_days:
+        default: 7
+        description: Maximum age in days since last manual or auto analyze.
+      min_table_size_bytes:
+        default: 1048576
+        description: Ignore tables smaller than this size in bytes.
+      dead_tuple_min_absolute:
+        default: 10000
+        description: Minimum dead tuples before vacuum pressure is considered.
+      dead_tuple_min_ratio:
+        default: 0.05
+        description: Minimum dead/live ratio before vacuum pressure is considered.
+    fix_strategy: >
+      Refresh statistics with ANALYZE when last analyze or autoanalyze is older than
+      stale_days. Run VACUUM only when dead tuples are material versus table size; an old
+      vacuum timestamp alone is not enough if dead tuple pressure is low.
+    result_mapping:
+      object_id: object_id
+      schema_name: schema_name
+      table_name: table_name
+      object_name: object_name
+      recommendation_note: recommendation_note
+      recommendation_level: pga_recommendation_level
+    sql: |
+        WITH params AS (
+            SELECT
+                {{stale_days}}::int AS stale_days,
+                {{min_table_size_bytes}}::bigint AS min_table_size_bytes
+        ),
+        base AS (
+            SELECT
+                s.schemaname,
+                s.relname,
+                s.relid,
+                s.n_live_tup,
+                s.n_dead_tup,
+                s.n_mod_since_analyze,
+                s.last_analyze,
+                s.last_autoanalyze,
+                s.last_vacuum,
+                s.last_autovacuum,
+                pg_total_relation_size(s.relid) AS total_size_bytes,
+                pg_relation_size(s.relid) AS table_size_bytes,
+                GREATEST(s.last_analyze, s.last_autoanalyze) AS last_any_analyze,
+                GREATEST(s.last_vacuum, s.last_autovacuum) AS last_any_vacuum
+            FROM pg_stat_user_tables AS s
+            CROSS JOIN params AS p
+            WHERE pg_relation_size(s.relid) >= p.min_table_size_bytes
+        ),
+        enriched AS (
+            SELECT
+                b.*,
+                COALESCE(
+                    b.n_mod_since_analyze::numeric / NULLIF(b.n_live_tup, 0),
+                    0
+                ) AS modified_since_analyze_ratio,
+                COALESCE(
+                    b.n_dead_tup::numeric / NULLIF(b.n_live_tup + b.n_dead_tup, 0),
+                    0
+                ) AS dead_tuple_ratio,
+                (b.last_any_analyze IS NULL) AS never_analyzed,
+                (
+                    b.last_any_analyze IS NOT NULL
+                    AND b.last_any_analyze < now() - ((SELECT stale_days FROM params) || ' days')::interval
+                ) AS stale_analyze,
+                (b.last_any_vacuum IS NULL) AS never_vacuumed,
+                (
+                    b.last_any_vacuum IS NOT NULL
+                    AND b.last_any_vacuum < now() - ((SELECT stale_days FROM params) || ' days')::interval
+                ) AS stale_vacuum,
+                (
+                    b.n_dead_tup >= 10000
+                    AND COALESCE(
+                        b.n_dead_tup::numeric / NULLIF(b.n_live_tup, 0),
+                        0
+                    ) >= 0.05
+                )
+                OR b.n_dead_tup >= 100000
+                OR (
+                    b.table_size_bytes >= 1024 * 1024 * 1024
+                    AND COALESCE(
+                        b.n_dead_tup::numeric / NULLIF(b.n_live_tup, 0),
+                        0
+                    ) >= 0.20
+                ) AS needs_vacuum_pressure,
+                CASE
+                    WHEN b.last_any_analyze IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (now() - b.last_any_analyze)) / 86400.0
+                END AS stats_age_days,
+                CASE
+                    WHEN b.last_any_vacuum IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (now() - b.last_any_vacuum)) / 86400.0
+                END AS vacuum_age_days
+            FROM base AS b
+        ),
+        flagged AS (
+            SELECT
+                e.*,
+                (e.never_vacuumed AND e.needs_vacuum_pressure) AS vacuum_issue_never,
+                (e.stale_vacuum AND e.needs_vacuum_pressure) AS vacuum_issue_stale
+            FROM enriched AS e
+            WHERE
+                e.never_analyzed
+                OR e.stale_analyze
+                OR (e.never_vacuumed AND e.needs_vacuum_pressure)
+                OR (e.stale_vacuum AND e.needs_vacuum_pressure)
+        ),
+        scored AS (
+            SELECT
+                relid AS object_id,
+                schemaname AS schema_name,
+                relname AS table_name,
+                schemaname || '.' || relname AS object_name,
+                total_size_bytes,
+                pg_size_pretty(total_size_bytes) AS total_size_pretty,
+                table_size_bytes,
+                pg_size_pretty(table_size_bytes) AS table_size_pretty,
+                n_live_tup,
+                n_dead_tup,
+                n_mod_since_analyze,
+                ROUND(modified_since_analyze_ratio * 100, 2) AS modified_since_analyze_pct,
+                ROUND(dead_tuple_ratio * 100, 2) AS dead_tuple_pct,
+                needs_vacuum_pressure,
+                last_analyze,
+                last_autoanalyze,
+                last_vacuum,
+                last_autovacuum,
+                last_any_analyze,
+                last_any_vacuum,
+                ROUND(stats_age_days, 1) AS stats_age_days,
+                ROUND(vacuum_age_days, 1) AS vacuum_age_days,
+                modified_since_analyze_ratio,
+                never_analyzed,
+                stale_analyze,
+                vacuum_issue_never AS never_vacuumed,
+                vacuum_issue_stale AS stale_vacuum,
+                ARRAY_REMOVE(
+                    ARRAY[
+                        CASE WHEN never_analyzed THEN 'never_analyzed' END,
+                        CASE WHEN stale_analyze THEN 'stale_analyze' END,
+                        CASE WHEN vacuum_issue_never THEN 'never_vacuumed' END,
+                        CASE WHEN vacuum_issue_stale THEN 'stale_vacuum' END
+                    ],
+                    NULL
+                ) AS issue_types,
+                CASE
+                    WHEN never_analyzed THEN 'HIGH'
+                    WHEN never_vacuumed AND n_dead_tup >= 100000 THEN 'HIGH'
+                    WHEN stale_analyze
+                         AND modified_since_analyze_ratio > 0.20 THEN 'HIGH'
+                    WHEN stale_vacuum
+                         AND n_dead_tup >= GREATEST(10000, n_live_tup * 0.05) THEN 'HIGH'
+                    WHEN stale_analyze OR never_vacuumed OR stale_vacuum THEN 'MEDIUM'
+                    ELSE 'LOW'
+                END AS pga_recommendation_level,
+                trim(both ' ' FROM concat_ws(
+                    ' ',
+                    CASE
+                        WHEN never_analyzed
+                        THEN 'No manual or auto analyze recorded on this table.'
+                        WHEN stale_analyze
+                        THEN 'Last analyze or autoanalyze is older than the configured threshold.'
+                        ELSE NULL
+                    END,
+                    CASE
+                        WHEN vacuum_issue_never
+                        THEN 'Vacuum/autovacuum never ran and dead tuple pressure is significant.'
+                        WHEN vacuum_issue_stale
+                        THEN 'Last vacuum/autovacuum is old and dead tuple pressure is significant.'
+                        ELSE NULL
+                    END
+                )) AS recommendation_note
+            FROM flagged
+        )
+        SELECT *
+        FROM scored
+        WHERE pga_recommendation_level IN ('HIGH', 'MEDIUM', 'LOW')
+        ORDER BY
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 3
+                WHEN 'MEDIUM' THEN 2
+                ELSE 1
+            END DESC,
+            table_size_bytes DESC,
+            schema_name,
+            table_name;
+
+  - id: table_autovacuum_cluster_load
+    label: Cluster autovacuum load snapshot
+    source: pgassistant
+    team: OPS
+    category_id: MAINTENANCE
+    object_type: DATABASE
+    outcome_id: OPERABILITY
+    advisor_group: AUTOVACUUM_HEALTH
+    enabled_by_default: false
+    manual_review_required: true
+    confidence: 90
+    impact: 70
+    effort: 10
+    risk_level: LOW
+    action_type: REVIEW_ONLY
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: false
+    can_auto_apply: false
+    tags:
+      - pgassistant
+      - autovacuum
+      - cluster
+      - maintenance
+    why_it_matters: >
+      Aggregates cluster-wide dead tuple pressure, autovacuum worker activity, and
+      current autovacuum-related settings for global tuning proposals.
+    result_mapping:
+      user_table_count: user_table_count
+      total_dead_tuples: total_dead_tuples
+      active_autovacuum_workers: active_autovacuum_workers
+    sql: |
+        WITH table_stats AS (
+            SELECT
+                COUNT(*)::bigint AS user_table_count,
+                COALESCE(SUM(n_dead_tup), 0)::bigint AS total_dead_tuples,
+                COALESCE(SUM(n_live_tup), 0)::bigint AS total_live_tuples,
+                COUNT(*) FILTER (
+                    WHERE n_dead_tup >= 10000
+                      AND n_dead_tup::numeric / NULLIF(n_live_tup, 0) >= 0.05
+                )::bigint AS high_dead_pressure_tables,
+                COUNT(*) FILTER (
+                    WHERE GREATEST(last_vacuum, last_autovacuum) IS NULL
+                )::bigint AS never_vacuumed_tables,
+                COUNT(*) FILTER (
+                    WHERE GREATEST(last_analyze, last_autoanalyze) IS NULL
+                )::bigint AS never_analyzed_tables
+            FROM pg_stat_user_tables
+        ),
+        worker_stats AS (
+            SELECT COUNT(*)::int AS active_autovacuum_workers
+            FROM pg_stat_activity
+            WHERE backend_type = 'autovacuum worker'
+        ),
+        settings AS (
+            SELECT jsonb_object_agg(
+                name,
+                jsonb_build_object(
+                    'setting', setting,
+                    'unit', unit,
+                    'context', context,
+                    'boot_val', boot_val
+                )
+            ) AS values
+            FROM pg_settings
+            WHERE name IN (
+                'autovacuum',
+                'autovacuum_max_workers',
+                'autovacuum_naptime',
+                'autovacuum_vacuum_scale_factor',
+                'autovacuum_vacuum_threshold',
+                'autovacuum_analyze_scale_factor',
+                'autovacuum_analyze_threshold',
+                'autovacuum_vacuum_cost_delay',
+                'autovacuum_vacuum_cost_limit',
+                'log_autovacuum_min_duration',
+                'max_worker_processes'
+            )
+        )
+        SELECT
+            ts.user_table_count,
+            ts.total_dead_tuples,
+            ts.total_live_tuples,
+            ts.high_dead_pressure_tables,
+            ts.never_vacuumed_tables,
+            ts.never_analyzed_tables,
+            ws.active_autovacuum_workers,
+            s.values AS autovacuum_settings
+        FROM table_stats AS ts
+        CROSS JOIN worker_stats AS ws
+        CROSS JOIN settings AS s;
+
   - id: long_running_transactions
     label: Abnormally long-running transaction
     source: maintenance_checks

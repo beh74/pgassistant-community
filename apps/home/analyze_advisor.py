@@ -51,7 +51,10 @@ def analyze_plan_for_safe_indexes(
             group_by_findings=group_by_findings,
         )
 
-        query_stats = helpers.load_query_stats(con, queryid) if queryid is not None else None
+        db_name = database.get_resolved_database_name(db_config)
+        query_stats = (
+            helpers.load_query_stats(con, queryid, db_name) if queryid is not None else None
+        )
 
         recommendations: List[helpers.Recommendation] = []
 

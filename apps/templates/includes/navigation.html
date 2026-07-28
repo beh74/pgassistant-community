@@ -1,9 +1,16 @@
 <style>
-  .pga-topnav {
+  .pga-topnav-stack {
     position: sticky;
     top: 0;
     z-index: 1010;
-    margin: .75rem 1rem 1rem;
+    margin-bottom: .85rem;
+  }
+
+  .pga-topnav {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    margin: .75rem 1rem 0;
     padding: .7rem .85rem;
     border: 1px solid rgba(148, 163, 184, .24);
     border-radius: 1.35rem;
@@ -12,6 +19,13 @@
     box-shadow: 0 18px 42px rgba(15, 23, 42, .08);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
+  }
+
+  .pga-topnav-stack .pga-mobile-db-bar {
+    margin: 0 1rem;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: 1px solid rgba(56, 189, 248, .18);
   }
 
   .pga-topnav-inner {
@@ -68,57 +82,6 @@
 
   .pga-topnav-search .form-control:focus {
     box-shadow: none;
-  }
-
-  .pga-db-context {
-    display: inline-flex;
-    align-items: center;
-    gap: .65rem;
-    min-width: 0;
-    max-width: 46vw;
-    padding: .45rem .7rem .45rem .5rem;
-    border: 1px solid rgba(20, 184, 166, .22);
-    border-radius: 999px;
-    background: linear-gradient(135deg, rgba(236, 253, 245, .95), rgba(240, 249, 255, .85));
-    color: #0f172a;
-  }
-
-  .pga-db-context-icon {
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #14b8a6, #38bdf8);
-    color: #fff;
-    box-shadow: 0 8px 18px rgba(20, 184, 166, .26);
-  }
-
-  .pga-db-context-text {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    line-height: 1.05;
-  }
-
-  .pga-db-context-label {
-    font-size: .66rem;
-    font-weight: 800;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: #0f766e;
-  }
-
-  .pga-db-context-value {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: .84rem;
-    font-weight: 800;
-    color: #0f172a;
   }
 
   .pga-topnav-menu-btn {
@@ -200,9 +163,18 @@
   }
 
   @media (max-width: 991.98px) {
+    .pga-topnav-stack {
+      margin-bottom: .75rem;
+    }
+
     .pga-topnav {
-      margin: .5rem .75rem .85rem;
-      border-radius: 1.1rem;
+      margin: .5rem .75rem 0;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .pga-topnav-stack .pga-mobile-db-bar {
+      margin: 0 .75rem;
     }
 
     .pga-topnav-search {
@@ -213,15 +185,16 @@
     .pga-topnav-left {
       flex: 1 1 auto;
     }
-
-    .pga-db-context {
-      display: none;
-    }
   }
 
   @media (max-width: 575.98px) {
     .pga-topnav {
       padding: .55rem;
+      margin: .5rem .5rem 0;
+    }
+
+    .pga-topnav-stack .pga-mobile-db-bar {
+      margin: 0 .5rem;
     }
 
     .pga-topnav-search .form-control {
@@ -231,6 +204,7 @@
   }
 </style>
 
+<div class="pga-topnav-stack">
 <nav class="navbar navbar-top navbar-expand navbar-dashboard pga-topnav" aria-label="Top navigation">
   <div class="container-fluid px-0">
     <div class="pga-topnav-inner" id="navbarSupportedContent">
@@ -254,20 +228,6 @@
       </div>
 
       <div class="pga-topnav-right">
-        {% if session['db_host'] %}
-          <div class="pga-db-context d-none d-lg-inline-flex" title="{{ session['db_host'] }} : {{ session['db_name'] }}">
-            <span class="pga-db-context-icon" aria-hidden="true">
-              <i class="bi bi-database"></i>
-            </span>
-            <span class="pga-db-context-text">
-              <span class="pga-db-context-label">Connected database</span>
-              <span class="pga-db-context-value">
-                {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
-              </span>
-            </span>
-          </div>
-        {% endif %}
-
         <div class="nav-item dropdown">
           <a
             class="nav-link dropdown-toggle pga-topnav-menu-btn"
@@ -317,3 +277,8 @@
     </div>
   </div>
 </nav>
+
+{% with panel_layout='mobile' %}
+{% include "includes/db_connection_panel.html" %}
+{% endwith %}
+</div>

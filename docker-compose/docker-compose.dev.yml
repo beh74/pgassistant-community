@@ -1,0 +1,48 @@
+# Local development: builds from the repo and mounts source code.
+# Use this instead of docker-compose.yml when testing local changes.
+#
+#   cd docker-compose
+#   docker compose -f docker-compose.dev.yml up --build -d
+#
+# App: http://localhost:8080  (Connection page → Multi-database mode checkbox)
+
+services:
+  pgassistant:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: pgassistant-local:dev
+    container_name: pgassistant
+    restart: unless-stopped
+    ports:
+      - "8080:5005"
+    environment:
+      DEBUG: "True"
+    volumes:
+      - ../apps:/home/pgassistant/apps
+      - ../tests:/home/pgassistant/tests
+      - ../advisor_enriched.yml:/home/pgassistant/advisor_enriched.yml
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: pgassistant-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgassistant_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgassistant_pgdata:

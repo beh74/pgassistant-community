@@ -67,36 +67,79 @@ def _add_default_uri_param(dsn: str, param_name: str, param_value: str) -> str:
     return urlunparse(parsed._replace(query=new_query))
 
 
+
+
+def is_multi_db(db_config) -> bool:
+    value = db_config.get("multi_db")
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def normalize_db_config(db_config) -> dict:
+    """Return a plain dict from Flask session or mapping objects."""
+    if db_config is None:
+        return {}
+    if hasattr(db_config, "items"):
+        return {key: db_config.get(key) for key in db_config}
+    return dict(db_config)
+
+
+def get_resolved_database_name(db_config) -> str:
+    """Database name after multi-db active_db resolution."""
+    cfg = resolve_db_config(normalize_db_config(db_config))
+    return (cfg.get("db_name") or "").strip()
+
+
+def _quote_sql_literal(value: str) -> str:
+    return "'" + (value or "").replace("'", "''") + "'"
+
+
+def resolve_db_config(db_config):
+    """Return a connection config, honoring active_db in multi-database mode."""
+    if db_config is None:
+        return db_config
+    cfg = normalize_db_config(db_config)
+    if not is_multi_db(cfg):
+        return cfg
+    active_db = (cfg.get("active_db") or cfg.get("db_name") or "").strip()
+    if not active_db:
+        return cfg
+    cfg["db_name"] = active_db
+    uri = (cfg.get("db_uri") or "").strip()
+    if uri:
+        cfg["db_uri"] = _uri_with_database(uri, active_db)
+    return cfg
+
+
+def _uri_with_database(uri: str, database_name: str) -> str:
+    database_name = (database_name or "").strip()
+    uri = (uri or "").strip()
+    if not uri or not database_name:
+        return uri
+    if not re.match(r"^postgres(ql)?://", uri, flags=re.IGNORECASE):
+        return uri
+    parsed = urlparse(uri)
+    query_params = parse_qs(parsed.query, keep_blank_values=True)
+    query_params.pop("dbname", None)
+    new_query = urlencode(query_params, doseq=True)
+    return urlunparse(parsed._replace(path=f"/{database_name}", query=new_query))
+
+
 def connectdb(db_config):
-    """
-    Establishes a connection to a PostgreSQL database using psycopg2.
-
-    Priority:
-    - If db_uri is provided, use it as the PostgreSQL connection string.
-    - If db_uri does not define connect_timeout, use connect_timeout=5.
-    - If db_uri does not define application_name, use application_name=pgAssistant.
-    - Otherwise, fall back to explicit connection fields.
-
-    Important:
-    - Do not rewrite the URI, because libpq options such as
-      options=-c%20search_path%3Dapp%2Cpublic are sensitive to URL encoding.
-    """
+    """Establishes a connection to a PostgreSQL database using psycopg2."""
+    db_config = resolve_db_config(normalize_db_config(db_config))
     try:
         db_uri = (db_config.get("db_uri") or "").strip()
 
         if db_uri:
             parsed_dsn = parse_dsn(db_uri)
-
             connect_kwargs = {}
-
             if "connect_timeout" not in parsed_dsn:
                 connect_kwargs["connect_timeout"] = 5
-
             if "application_name" not in parsed_dsn:
                 connect_kwargs["application_name"] = "pgAssistant"
-
             con = psycopg2.connect(db_uri, **connect_kwargs)
-
         else:
             con = psycopg2.connect(
                 database=db_config["db_name"],
@@ -109,11 +152,177 @@ def connectdb(db_config):
             )
 
         con.autocommit = True
-
     except psycopg2.Error as err:
         return None, format(err).rstrip()
 
     return con, "OK"
+
+
+def connectdb_to(db_config, database_name: str):
+    """Connect to a specific database on the same cluster."""
+    database_name = (database_name or "").strip()
+    if not database_name:
+        return connectdb(db_config)
+
+    cfg = dict(db_config)
+    cfg.pop("active_db", None)
+    uri = (cfg.get("db_uri") or "").strip()
+
+    if uri:
+        cfg["db_uri"] = _uri_with_database(uri, database_name)
+        cfg["db_name"] = database_name
+        return connectdb(cfg)
+
+    cfg["db_name"] = database_name
+    cfg.pop("db_uri", None)
+    return connectdb(cfg)
+
+
+def list_cluster_databases(db_config, con=None):
+    """List non-template databases with sizes (psql \\l+ equivalent)."""
+    close_connection = False
+    if con is None:
+        con, message = connectdb(db_config)
+        if not con:
+            return [], message
+        close_connection = True
+
+    cursor = None
+    try:
+        cursor = con.cursor()
+        cursor.execute(
+            """
+            SELECT
+                d.datname,
+                pg_catalog.pg_get_userbyid(d.datdba) AS owner,
+                pg_catalog.pg_encoding_to_char(d.encoding) AS encoding,
+                pg_catalog.pg_database_size(d.datname) AS size_bytes,
+                pg_catalog.pg_size_pretty(pg_catalog.pg_database_size(d.datname)) AS size_pretty,
+                (d.datname = current_database()) AS is_connected
+            FROM pg_catalog.pg_database d
+            WHERE NOT d.datistemplate
+            ORDER BY pg_catalog.pg_database_size(d.datname) DESC, d.datname ASC
+            """
+        )
+        rows = cursor.fetchall()
+        databases = [
+            {
+                "name": str(row[0]),
+                "owner": str(row[1] or ""),
+                "encoding": str(row[2] or ""),
+                "size_bytes": int(row[3] or 0),
+                "size_pretty": str(row[4] or "?"),
+                "is_connected": bool(row[5]),
+            }
+            for row in rows
+        ]
+        return databases, "OK"
+    except Exception as exc:
+        return [], str(exc)
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if close_connection and con is not None:
+            con.close()
+
+
+def _format_cluster_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    units = ["KB", "MB", "GB", "TB", "PB"]
+    value = float(size_bytes)
+    for unit in units:
+        value /= 1024.0
+        if value < 1024.0:
+            return f"{value:.1f} {unit}"
+    return f"{value:.1f} PB"
+
+
+def get_db_info_cluster(db_config):
+    info = {"multi_db": True, "error": None}
+    con, message = connectdb(db_config)
+    if not con:
+        info["error"] = message
+        return info
+
+    try:
+        version, _ = db_query(con, "db_version")
+        info["version"] = version[0]["server_version"]
+
+        databases, db_message = list_cluster_databases(db_config, con=con)
+        if not databases and db_message != "OK":
+            info["error"] = db_message
+            return info
+
+        info["databases"] = databases
+        total_bytes = sum(db["size_bytes"] for db in databases)
+        info["size"] = _format_cluster_size(total_bytes)
+        info["size_bytes"] = total_bytes
+
+        cache_rows = json.loads(
+            db_fetch_json(
+                con,
+                """
+                SELECT
+                    ROUND(
+                        100.0 * SUM(blks_hit) / NULLIF(SUM(blks_hit) + SUM(blks_read), 0),
+                        2
+                    ) AS ratio
+                FROM pg_stat_database
+                WHERE datname NOT IN ('template0', 'template1')
+                """,
+            )
+        )
+        info["cache"] = float(cache_rows[0].get("ratio") or 0) if cache_rows else 0
+
+        try:
+            uptime, _ = db_query(con, "reporting_pguptime")
+            info["uptime"] = uptime[0]["uptime_pretty"]
+        except Exception:
+            info["uptime"] = "?"
+
+        try:
+            shared_buffers, _ = db_query(con, "shared_buffers_setting")
+            info["shared_buffers"] = shared_buffers[0]["current_setting"]
+        except Exception:
+            info["shared_buffers"] = "?"
+
+        info["profile"], _ = db_query(con, "reporting_db_profile")
+
+        connexions, _ = db_query(con, "database_count_connexions")
+        info["connexions"] = connexions[0]["nb"]
+
+        max_connexions, _ = db_query(con, "database_max_connexions")
+        info["max_connexions"] = max_connexions[0]["setting"]
+
+        database_top_clients, _ = db_query(con, "database_top_clients")
+        info["top_clients"] = database_top_clients
+
+        largest_tables = []
+        for db in databases[:20]:
+            db_con, db_status = connectdb_to(db_config, db["name"])
+            if not db_con:
+                continue
+            try:
+                rows, _ = db_query(db_con, "table_size_top_5")
+                for row in rows:
+                    item = dict(row)
+                    item["database"] = db["name"]
+                    largest_tables.append(item)
+            finally:
+                db_con.close()
+
+        largest_tables.sort(
+            key=lambda row: row.get("total_size_bytes") or row.get("size_bytes") or 0,
+            reverse=True,
+        )
+        info["table_size"] = largest_tables[:5]
+    finally:
+        con.close()
+
+    return info
+
+
 def db_exec(conn, sql):
     """
     Executes a SQL statement that does not return a result (e.g., INSERT, UPDATE).
@@ -126,25 +335,61 @@ def db_exec(conn, sql):
     cursor = conn.cursor()
     cursor.execute(sql)
 
+def format_sql_execution_output(cursor, notices: list[str] | None = None) -> str:
+    """Build a human-readable command output from result rows and PG notices."""
+    parts: list[str] = []
+
+    if cursor is not None and cursor.description:
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        if columns:
+            parts.append(" | ".join(str(column) for column in columns))
+            parts.append("-|-".join("-" * max(len(str(column)), 1) for column in columns))
+        for row in rows:
+            parts.append(" | ".join("" if value is None else str(value) for value in row))
+
+    for notice in notices or []:
+        cleaned = str(notice or "").strip()
+        if cleaned:
+            parts.append(cleaned)
+
+    if cursor is not None and cursor.rowcount >= 0 and not cursor.description:
+        parts.append(f"Rows affected: {cursor.rowcount}")
+
+    return "\n".join(parts).strip()
+
+
 def db_exec_recommandation(conn, sql):
     """
-    Execute a non-SELECT SQL clause on the given PostgreSQL connection.
-    
-    :param conn: The active psycopg2 connection object.
-    :param sql: The SQL clause to execute.
-    :return: A success message or error message.
+    Execute a SQL clause on the given PostgreSQL connection.
+
+    Returns success metadata plus any server notices (for example VACUUM VERBOSE)
+    or result rows (for example SELECT pg_reload_conf()).
     """
     sql = '/* launched by pgAssistant */ ' + sql
+    cursor = None
     try:
         conn.set_session(autocommit=True)
+        if hasattr(conn, "notices"):
+            conn.notices.clear()
+
         cursor = conn.cursor()
         cursor.execute(sql)
-        conn.commit()  
-        return {"success": True, "message": f"SQL executed successfully: {sql}"}
+
+        notices = list(getattr(conn, "notices", []) or [])
+        output = format_sql_execution_output(cursor, notices)
+        message = output or "Command completed successfully."
+
+        return {
+            "success": True,
+            "message": message,
+            "output": output,
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
     finally:
-        cursor.close()
+        if cursor is not None:
+            cursor.close()
 
 def get_json_cursor(conn):
     """
@@ -199,41 +444,143 @@ def db_fetch_json(conn,sql):
     response = execute_and_fetch(cursor, sql)
     return json.dumps(response, default = defaultconverter)
 
+
+_PGSS_DB_FILTER_TAIL = (
+    "dbid = (SELECT oid FROM pg_database WHERE datname = {db_literal})"
+)
+
+
+def pg_stat_statements_has_dbid(con) -> bool:
+    """Return True when pg_stat_statements exposes cluster-wide dbid (PG 14+)."""
+    cursor = None
+    try:
+        cursor = con.cursor()
+        cursor.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_class AS c
+                JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+                JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid
+                WHERE c.relname = 'pg_stat_statements'
+                  AND c.relkind IN ('v', 'm')
+                  AND NOT a.attisdropped
+                  AND a.attnum > 0
+                  AND a.attname = 'dbid'
+            )
+            """
+        )
+        row = cursor.fetchone()
+        return bool(row[0]) if row else False
+    except Exception:
+        return False
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+
+def apply_pgss_database_filter(sql: str, database_name: str) -> str:
+    """Restrict pg_stat_statements rows to one database."""
+    if not sql or not database_name or re.search(r"\bdbid\b", sql, flags=re.IGNORECASE):
+        return sql
+    if "pg_stat_statements" not in sql.lower():
+        return sql
+
+    db_literal = _quote_sql_literal(database_name.strip())
+    clause = " AND " + _PGSS_DB_FILTER_TAIL.format(db_literal=db_literal) + " "
+    for pattern in (r"\bORDER\s+BY\b", r"\bLIMIT\b"):
+        match = re.search(pattern, sql, flags=re.IGNORECASE)
+        if match:
+            return sql[: match.start()] + clause + sql[match.start() :]
+
+    trimmed = sql.rstrip().rstrip(";")
+    if re.search(r"\bWHERE\b", trimmed, flags=re.IGNORECASE):
+        return trimmed + clause + ";"
+    return trimmed + f" WHERE {_PGSS_DB_FILTER_TAIL.format(db_literal=db_literal)};"
+
+
+def prepare_pgss_sql(sql: str, con, database_name: str) -> str:
+    """Apply a database filter to pg_stat_statements SQL when dbid is available."""
+    if not database_name:
+        return sql
+    if pg_stat_statements_has_dbid(con):
+        return apply_pgss_database_filter(sql, database_name)
+    return sql
+
+
+def inject_pgss_current_db_filter(sql: str) -> str:
+    """Backward-compatible alias using current_database()."""
+    db_literal = "current_database()"
+    if not sql or re.search(r"\bdbid\b", sql, flags=re.IGNORECASE):
+        return sql
+    if "pg_stat_statements" not in sql.lower():
+        return sql
+
+    clause = f" AND dbid = (SELECT oid FROM pg_database WHERE datname = {db_literal}) "
+    match = re.search(r"\bORDER\s+BY\b", sql, flags=re.IGNORECASE)
+    if match:
+        return sql[: match.start()] + clause + sql[match.start() :]
+
+    trimmed = sql.rstrip().rstrip(";")
+    if re.search(r"\bWHERE\b", trimmed, flags=re.IGNORECASE):
+        return trimmed + clause + ";"
+    return trimmed + f" WHERE dbid = (SELECT oid FROM pg_database WHERE datname = {db_literal});"
+
+
+def _db_query_pgss(cnx, query_id, db_config, db_name=None):
+    """Run a catalog query, scoping pg_stat_statements to the active database."""
+    get_queries()
+    database_name = get_resolved_database_name(db_config)
+
+    for query in PGA_QUERIES["sql"]:
+        if query["id"] != query_id:
+            continue
+        sql = query["sql"]
+        if db_name:
+            sql = sql.replace("$1", db_name)
+        sql = prepare_pgss_sql(sql, cnx, database_name)
+        if query["type"] == "select" or query["type"] == "param_query":
+            return json.loads(db_fetch_json(cnx, sql)), query
+        db_exec(cnx, sql)
+        return [], query
+    return [], None
+
+
 def get_top_queries(db_config):
     """
     Retrieves the top queries executed in the database.
-    """    
+    """
     rows = []
-    con, message = connectdb(db_config)
+    cfg = normalize_db_config(db_config)
+    con, message = connectdb(cfg)
     if con:
        try:
-            #print("DB VERSION =", db_config.get('version'))
-            if db_config.get('version')==18:
-               rows,description=db_query(con,'top_queries_18')
+            if cfg.get('version')==18:
+               rows, description = _db_query_pgss(con, 'top_queries_18', cfg)
             else:
-               rows,description=db_query(con,'top_queries')
+               rows, description = _db_query_pgss(con, 'top_queries', cfg)
        except:
-           rows=[] 
-       con.close()  
+           rows=[]
+       con.close()
     return rows
 
 
 def get_rank_queries(db_config):
     """
     Retrieves the ranked queries from the database.
-    """    
-    rows = [] 
-    con, message = connectdb(db_config)
+    """
+    rows = []
+    cfg = normalize_db_config(db_config)
+    con, message = connectdb(cfg)
     if con:
        try:
-            #print("DB VERSION =", db_config.get('version'))
-            if db_config.get('version')==18:
-               rows,description=db_query(con,'top_ranking_18')
+            if cfg.get('version')==18:
+               rows, description = _db_query_pgss(con, 'top_ranking_18', cfg)
             else:
-               rows,description=db_query(con,'top_ranking')
+               rows, description = _db_query_pgss(con, 'top_ranking', cfg)
        except:
-           rows=[] 
-       con.close()  
+           rows=[]
+       con.close()
     return rows
 
 def exec_cmd(db_config,query_id):
@@ -245,13 +592,19 @@ def exec_cmd(db_config,query_id):
        db_query(con,query_id)
        con.close()
 
-def generic_select(db_config,query_id):
-    rows = []
+def generic_select(db_config, query_id):
     con, message = connectdb(db_config)
-    if con:
-       rows,description=db_query(con,query_id)
-       con.close()
-       return rows, description
+    if not con:
+        return [], {"connection_error": message or "Unable to connect to database."}
+    try:
+        result = db_query(con, query_id)
+        if not result:
+            return [], None
+        return result
+    except Exception as exc:
+        return [], {"connection_error": str(exc)}
+    finally:
+        con.close()
 
 def generic_select_with_sql(db_config,sql):
     rows = []
@@ -328,6 +681,9 @@ def ensure_pg_stat_statements(con):
 
 
 def get_db_info(db_config,con=None):
+    if is_multi_db(db_config):
+        return get_db_info_cluster(db_config)
+
     info = {}
 
     if not con:
@@ -401,10 +757,13 @@ def get_query_by_id(query_id):
 def get_pgstat_query_by_id(db_config, query_id):
     query = get_query_by_id('pgstat_get_sqlquery_by_id')
     sql=query['sql'].replace ('$1', query_id)
-    con, _ = connectdb(db_config)
+    cfg = normalize_db_config(db_config)
+    db_name = get_resolved_database_name(cfg)
+    con, _ = connectdb(cfg)
     sql_text=''
     try:
         if con:
+            sql = prepare_pgss_sql(sql, con, db_name)
             sql_rows=json.loads(db_fetch_json(con,sql))
             if sql_rows:
                 sql_text=sql_rows[0].get('query') or ''
@@ -438,6 +797,8 @@ def db_query(cnx, query_id, db_name=None):
                 return json.loads(db_fetch_json(cnx,sql)),query
             else:
                 db_exec(cnx,sql)
+                return [], query
+    return [], None
 
 def get_query_by_id_reporing(query_id):
     get_queries()

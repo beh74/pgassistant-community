@@ -16,6 +16,7 @@ from . import database
 from . import llm
 from . import pgstat_helper
 from .routes_helpers import (
+    apply_active_db_from_request,
     get_segment,
     handle_cache_table_get,
     handle_database_analyze_llm_get,
@@ -35,9 +36,13 @@ from .routes_helpers import (
     handle_reset_pg_stat,
     handle_reset_pg_statistics,
     handle_search_post,
+    handle_table_autovacuum_tune_get,
+    handle_table_autovacuum_tune_post,
     handle_table_rfc_get,
     handle_topqueries_get,
     handle_topstatistics_get,
+    is_db_connected,
+    multi_db_template_context,
 )
 
 config.init_or_load_env()
@@ -47,6 +52,22 @@ from . import route_api  # noqa: F401,E402
 from . import route_analyze  # noqa: F401,E402
 from . import route_llm_tables  # noqa: F401,E402
 from . import route_reports  # noqa: F401,E402
+
+
+@blueprint.before_request
+def _apply_multi_db_filter():
+    apply_active_db_from_request()
+
+
+@blueprint.context_processor
+def _inject_multi_db_context():
+    if not is_db_connected(session):
+        return {
+            "multi_db_filter": False,
+            "cluster_databases": [],
+            "active_db": "",
+        }
+    return multi_db_template_context(session)
 
 
 @blueprint.route('/index')
@@ -142,6 +163,10 @@ def route_template(template: str):
             return handle_database_analyze_llm_get(template, segment)
         elif segment == "database_analyze_llm.html" and request.method == 'POST':
             return handle_database_analyze_llm_post(template, segment)
+        elif segment == "table_autovacuum_tune.html" and request.method == 'GET':
+            return handle_table_autovacuum_tune_get(template, segment)
+        elif segment == "table_autovacuum_tune.html" and request.method == 'POST':
+            return handle_table_autovacuum_tune_post(template, segment)
         elif segment == "cache_table.html" and request.method == 'GET':
             return handle_cache_table_get(template, segment)
         elif segment == "llm.html" and request.method == 'GET':

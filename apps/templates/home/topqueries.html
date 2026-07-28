@@ -20,6 +20,7 @@
       <h1 class="pg-title">Query activity</h1>
       <p class="pg-subtitle">
         Inspect the most active statements captured by pg_stat_statements, then drill down into detailed metrics or launch query analysis.
+        {% if multi_db_filter %}<span class="d-block mt-1">Database filter: <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
 

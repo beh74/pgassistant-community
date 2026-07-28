@@ -1,5 +1,13 @@
 # Change Log
 
+## [3.5.0] - 2026-07-28
+
+## Improvements
+
+- Multi database mode : added a bouton to list and analyse all databases in your postgres instance
+
+- Autovacuum tuning : Analyse all tables and autovacuum parameters, executing analyse, vacuum and alter table
+
 ## [3.4.5] - 2026-07-26
 
 ## Bug fixes

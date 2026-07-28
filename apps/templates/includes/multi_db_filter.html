@@ -1,0 +1,30 @@
+{% if multi_db_filter and cluster_databases %}
+{% set filter_layout = filter_layout|default('inline') %}
+<div class="pga-multi-db-filter pga-multi-db-filter--{{ filter_layout }}">
+  {% if filter_layout == 'sidebar' %}
+  <label class="pga-sidebar-db-label" for="pga-sidebar-db-select">Database</label>
+  {% elif filter_layout == 'mobile' %}
+  <label class="pga-mobile-db-select-label" for="pga-mobile-db-select">Database</label>
+  {% else %}
+  <span class="small text-muted">Database</span>
+  {% endif %}
+  <form method="GET" action="{{ request.path }}" class="pga-multi-db-form mb-0">
+    {% for key, value in request.args.items() %}
+      {% if key != 'db' %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+    <select
+      class="form-select form-select-sm pga-multi-db-select{% if filter_layout == 'mobile' %} pga-multi-db-select--mobile{% endif %}"
+      id="{% if filter_layout == 'sidebar' %}pga-sidebar-db-select{% elif filter_layout == 'mobile' %}pga-mobile-db-select{% else %}pga-topnav-db-select{% endif %}"
+      name="db"
+      aria-label="Filter by database"
+      onchange="this.form.submit()"
+    >
+      {% for db_name in cluster_databases %}
+      <option value="{{ db_name }}" {% if db_name == active_db %}selected{% endif %}>{{ db_name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+{% endif %}

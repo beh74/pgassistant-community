@@ -141,6 +141,7 @@
       <h1 class="pg-title">Index Advisor</h1>
       <p class="pg-subtitle">
         Runs PostgreSQL generic plans for the top ranked queries, then checks whether safe index recommendations are available.
+        {% if multi_db_filter %}<span class="d-block mt-1">Database filter: <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
 
@@ -358,7 +359,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function loadAdvisor() {
     try {
-      const response = await fetch("/api/v1/query_index_advisor", {
+      const advisorUrl = {% if multi_db_filter and active_db %}
+        "/api/v1/query_index_advisor?db={{ active_db | urlencode }}"
+      {% else %}
+        "/api/v1/query_index_advisor"
+      {% endif %};
+      const response = await fetch(advisorUrl, {
         method: "GET",
         headers: { "Accept": "application/json" }
       });
