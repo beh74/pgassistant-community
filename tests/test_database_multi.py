@@ -1,10 +1,14 @@
 import unittest
 
+from werkzeug.datastructures import ImmutableMultiDict
+
 from apps.home.database import (
     _uri_with_database,
     apply_pgss_database_filter,
     inject_pgss_current_db_filter,
+    resolve_db_config,
 )
+from apps.home.routes_helpers import _db_config_from_form
 
 
 class DatabaseMultiDbTests(unittest.TestCase):
@@ -47,6 +51,35 @@ class DatabaseMultiDbTests(unittest.TestCase):
     def test_inject_pgss_current_db_filter_skips_when_dbid_present(self):
         sql = "SELECT query FROM pg_stat_statements WHERE dbid = 123 ORDER BY 1"
         self.assertEqual(sql, inject_pgss_current_db_filter(sql))
+
+    def test_db_config_from_form_ignores_stale_active_db(self):
+        session_obj = {
+            "db_host": "old-host",
+            "db_port": "5432",
+            "db_name": "postgres",
+            "db_user": "postgres",
+            "db_password": "secret",
+            "multi_db": True,
+            "active_db": "legacy_app",
+            "cluster_databases": ["legacy_app", "legacy_other"],
+        }
+        form = ImmutableMultiDict(
+            [
+                ("db_host", "new-host"),
+                ("db_port", "5433"),
+                ("db_name", "appdb"),
+                ("db_user", "app"),
+                ("db_password", "newsecret"),
+                ("multi_db", "on"),
+            ]
+        )
+        merged = _db_config_from_form(form, session_obj)
+        self.assertNotIn("active_db", merged)
+        self.assertNotIn("cluster_databases", merged)
+        self.assertEqual(merged["db_host"], "new-host")
+        self.assertEqual(merged["db_name"], "appdb")
+        resolved = resolve_db_config(merged)
+        self.assertEqual(resolved["db_name"], "appdb")
 
 
 if __name__ == "__main__":

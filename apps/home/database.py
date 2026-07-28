@@ -335,25 +335,61 @@ def db_exec(conn, sql):
     cursor = conn.cursor()
     cursor.execute(sql)
 
+def format_sql_execution_output(cursor, notices: list[str] | None = None) -> str:
+    """Build a human-readable command output from result rows and PG notices."""
+    parts: list[str] = []
+
+    if cursor is not None and cursor.description:
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        if columns:
+            parts.append(" | ".join(str(column) for column in columns))
+            parts.append("-|-".join("-" * max(len(str(column)), 1) for column in columns))
+        for row in rows:
+            parts.append(" | ".join("" if value is None else str(value) for value in row))
+
+    for notice in notices or []:
+        cleaned = str(notice or "").strip()
+        if cleaned:
+            parts.append(cleaned)
+
+    if cursor is not None and cursor.rowcount >= 0 and not cursor.description:
+        parts.append(f"Rows affected: {cursor.rowcount}")
+
+    return "\n".join(parts).strip()
+
+
 def db_exec_recommandation(conn, sql):
     """
-    Execute a non-SELECT SQL clause on the given PostgreSQL connection.
-    
-    :param conn: The active psycopg2 connection object.
-    :param sql: The SQL clause to execute.
-    :return: A success message or error message.
+    Execute a SQL clause on the given PostgreSQL connection.
+
+    Returns success metadata plus any server notices (for example VACUUM VERBOSE)
+    or result rows (for example SELECT pg_reload_conf()).
     """
     sql = '/* launched by pgAssistant */ ' + sql
+    cursor = None
     try:
         conn.set_session(autocommit=True)
+        if hasattr(conn, "notices"):
+            conn.notices.clear()
+
         cursor = conn.cursor()
         cursor.execute(sql)
-        conn.commit()  
-        return {"success": True, "message": f"SQL executed successfully: {sql}"}
+
+        notices = list(getattr(conn, "notices", []) or [])
+        output = format_sql_execution_output(cursor, notices)
+        message = output or "Command completed successfully."
+
+        return {
+            "success": True,
+            "message": message,
+            "output": output,
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
     finally:
-        cursor.close()
+        if cursor is not None:
+            cursor.close()
 
 def get_json_cursor(conn):
     """

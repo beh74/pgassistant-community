@@ -89,7 +89,7 @@ def build_analyze_sql(schema_name: str, table_name: str) -> str:
 
 
 def build_vacuum_sql(schema_name: str, table_name: str) -> str:
-    return f"VACUUM {_quote_ident(schema_name)}.{_quote_ident(table_name)};"
+    return f"VACUUM VERBOSE {_quote_ident(schema_name)}.{_quote_ident(table_name)};"
 
 
 def compute_autovacuum_tuning(
@@ -460,21 +460,31 @@ def build_criteria_help(stale_days: int = DEFAULT_STALE_DAYS) -> dict[str, Any]:
 
 
 def build_restore_script(analyze_sql: str, vacuum_sql: str, autovacuum_sql: str = "") -> str:
-    lines = [
-        "-- 1) Reclaim dead tuples (manual vacuum if autovacuum is lagging)",
-        vacuum_sql,
-        "",
-        "-- 2) Refresh planner statistics",
-        analyze_sql,
-    ]
+    lines: list[str] = []
+    step = 1
     if autovacuum_sql:
         lines.extend(
             [
-                "",
-                "-- 3) Tune per-table autovacuum thresholds",
+                f"-- {step}) Tune per-table autovacuum thresholds",
                 autovacuum_sql,
+                "",
             ]
         )
+        step += 1
+    lines.extend(
+        [
+            f"-- {step}) Refresh planner statistics",
+            analyze_sql,
+            "",
+        ]
+    )
+    step += 1
+    lines.extend(
+        [
+            f"-- {step}) Reclaim dead tuples (manual vacuum if autovacuum is lagging)",
+            vacuum_sql,
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -552,18 +562,18 @@ def get_batch_execution_risks(action: str, table_count: int = 0) -> list[str]:
     table_count = max(0, int(table_count or 0))
     risks: list[str] = []
 
-    if action in {"vacuum", "all"}:
-        risks.extend(get_execution_risks("vacuum"))
-    if action in {"analyze", "all"}:
-        risks.extend(get_execution_risks("analyze"))
     if action in {"alter", "all"}:
         risks.extend(get_execution_risks("alter_table"))
+    if action in {"analyze", "all"}:
+        risks.extend(get_execution_risks("analyze"))
+    if action in {"vacuum", "all"}:
+        risks.extend(get_execution_risks("vacuum"))
 
     labels = {
         "vacuum": "VACUUM",
         "analyze": "ANALYZE",
         "alter": "ALTER TABLE",
-        "all": "VACUUM, ANALYZE and ALTER TABLE",
+        "all": "ALTER TABLE, ANALYZE and VACUUM",
     }
     risks.append(
         f"Batch run: executes {labels.get(action, action)} sequentially on "
@@ -571,7 +581,7 @@ def get_batch_execution_risks(action: str, table_count: int = 0) -> list[str]:
     )
     risks.append("Total runtime and I/O can be significant; prefer a maintenance window.")
     if action == "all":
-        risks.append("Order is VACUUM → ANALYZE → ALTER TABLE for each flagged table group.")
+        risks.append("Order is ALTER TABLE → ANALYZE → VACUUM for each flagged table group.")
     if action == "alter":
         risks.append("ALTER TABLE changes persist until RESET or manual override.")
 

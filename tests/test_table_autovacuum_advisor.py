@@ -34,7 +34,10 @@ class TableAutovacuumAdvisorTests(unittest.TestCase):
         self.assertEqual(build_analyze_sql("public", "orders"), 'ANALYZE "public"."orders";')
 
     def test_build_vacuum_sql(self):
-        self.assertEqual(build_vacuum_sql("public", "orders"), 'VACUUM "public"."orders";')
+        self.assertEqual(
+            build_vacuum_sql("public", "orders"),
+            'VACUUM VERBOSE "public"."orders";',
+        )
 
     def test_build_autovacuum_tuning_sql_large_table(self):
         sql = build_autovacuum_tuning_sql(
@@ -145,9 +148,9 @@ class TableAutovacuumAdvisorTests(unittest.TestCase):
         self.assertIn("risks", actions["vacuum"])
 
     def test_build_restore_script_without_alter(self):
-        sql = build_restore_script('ANALYZE "public"."t";', 'VACUUM "public"."t";', "")
+        sql = build_restore_script('ANALYZE "public"."t";', 'VACUUM VERBOSE "public"."t";', "")
         self.assertNotIn("Tune per-table", sql)
-        self.assertIn("ANALYZE", sql)
+        self.assertLess(sql.index("ANALYZE"), sql.index("VACUUM"))
 
     def test_build_criteria_help_includes_vacuum_pressure(self):
         help_doc = build_criteria_help(7)

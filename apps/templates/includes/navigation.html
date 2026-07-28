@@ -70,57 +70,6 @@
     box-shadow: none;
   }
 
-  .pga-db-context {
-    display: inline-flex;
-    align-items: center;
-    gap: .65rem;
-    min-width: 0;
-    max-width: 46vw;
-    padding: .45rem .7rem .45rem .5rem;
-    border: 1px solid rgba(20, 184, 166, .22);
-    border-radius: 999px;
-    background: linear-gradient(135deg, rgba(236, 253, 245, .95), rgba(240, 249, 255, .85));
-    color: #0f172a;
-  }
-
-  .pga-db-context-icon {
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #14b8a6, #38bdf8);
-    color: #fff;
-    box-shadow: 0 8px 18px rgba(20, 184, 166, .26);
-  }
-
-  .pga-db-context-text {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    line-height: 1.05;
-  }
-
-  .pga-db-context-label {
-    font-size: .66rem;
-    font-weight: 800;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: #0f766e;
-  }
-
-  .pga-db-context-value {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: .84rem;
-    font-weight: 800;
-    color: #0f172a;
-  }
-
   .pga-topnav-menu-btn {
     width: 42px;
     height: 42px;
@@ -213,10 +162,6 @@
     .pga-topnav-left {
       flex: 1 1 auto;
     }
-
-    .pga-db-context {
-      display: none;
-    }
   }
 
   @media (max-width: 575.98px) {
@@ -254,33 +199,6 @@
       </div>
 
       <div class="pga-topnav-right">
-        {% if session.get('db_host') and session.get('db_connected') %}
-          {% if multi_db_filter and cluster_databases %}
-          <div class="pga-db-context d-none d-lg-inline-flex">
-            <span class="pga-db-context-icon" aria-hidden="true">
-              <i class="bi bi-collection"></i>
-            </span>
-            <span class="pga-db-context-text">
-              <span class="pga-db-context-label">Cluster</span>
-              <span class="pga-db-context-value">{{ session['db_host'] }}</span>
-            </span>
-          </div>
-          {% include "includes/multi_db_filter.html" %}
-          {% else %}
-          <div class="pga-db-context d-none d-lg-inline-flex" title="{{ session['db_host'] }} : {{ session['db_name'] }}">
-            <span class="pga-db-context-icon" aria-hidden="true">
-              <i class="bi bi-database"></i>
-            </span>
-            <span class="pga-db-context-text">
-              <span class="pga-db-context-label">Connected database</span>
-              <span class="pga-db-context-value">
-                {{ session['db_host'] }} : <strong>{{ session['db_name'] }}</strong>
-              </span>
-            </span>
-          </div>
-          {% endif %}
-        {% endif %}
-
         <div class="nav-item dropdown">
           <a
             class="nav-link dropdown-toggle pga-topnav-menu-btn"

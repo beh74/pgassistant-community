@@ -1,0 +1,24 @@
+{% if session.get('db_host') and session.get('db_connected') %}
+<li class="nav-item pga-sidebar-db-wrap">
+  <div class="pga-sidebar-db-panel">
+    {% if multi_db_filter and cluster_databases %}
+    <div class="pga-sidebar-db-meta">
+      <span class="pga-sidebar-db-label">Cluster</span>
+      <span class="pga-sidebar-db-value" title="{{ session['db_host'] }}">{{ session['db_host'] }}</span>
+    </div>
+    {% with layout='sidebar' %}
+    {% include "includes/multi_db_filter.html" %}
+    {% endwith %}
+    {% else %}
+    <div class="pga-sidebar-db-meta">
+      <span class="pga-sidebar-db-label">Host</span>
+      <span class="pga-sidebar-db-value" title="{{ session['db_host'] }}">{{ session['db_host'] }}</span>
+    </div>
+    <div class="pga-sidebar-db-meta">
+      <span class="pga-sidebar-db-label">Database</span>
+      <span class="pga-sidebar-db-static" title="{{ session['db_name'] }}">{{ session['db_name'] }}</span>
+    </div>
+    {% endif %}
+  </div>
+</li>
+{% endif %}

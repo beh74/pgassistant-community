@@ -100,6 +100,8 @@
         </a>
       </li>
 
+      {% include "includes/sidebar_db_context.html" %}
+
       {# ------------------- Top links (only if connected) ------------------- #}
       {% if session['db_host'] %}
       <li class="sidebar-section-label section-monitor">Monitor</li>

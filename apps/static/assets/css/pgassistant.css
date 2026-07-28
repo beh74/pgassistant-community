@@ -2138,6 +2138,35 @@ body {
   padding: 1rem;
 }
 
+.connect-option-help {
+  border-top: 1px solid var(--pga-border-soft, #e8eef5);
+}
+
+.connect-option-help-title {
+  color: var(--pga-text, #0f172a);
+  font-size: .84rem;
+  font-weight: 850;
+  margin-bottom: .55rem;
+}
+
+.connect-option-help-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #475569;
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
+.connect-option-help-list li + li {
+  margin-top: .45rem;
+}
+
+.connect-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
 .form-label,
 .label-with-help {
   color: #475569;
@@ -3772,6 +3801,98 @@ body {
 
   #sidebarMenu #app-title:hover {
     transform: none;
+  }
+
+  #sidebarMenu .pga-sidebar-db-wrap {
+    margin: .35rem 0 .85rem;
+    padding: 0 .15rem;
+  }
+
+  #sidebarMenu .pga-sidebar-db-panel {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    padding: .75rem .85rem;
+    border: 1px solid var(--pga-sidebar-border);
+    border-radius: .85rem;
+    background: rgba(255, 255, 255, .04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+  }
+
+  #sidebarMenu .pga-sidebar-db-meta {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    min-width: 0;
+  }
+
+  #sidebarMenu .pga-sidebar-db-label {
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--pga-sidebar-muted);
+  }
+
+  #sidebarMenu .pga-sidebar-db-value {
+    color: var(--pga-sidebar-text);
+    font-size: .82rem;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #sidebarMenu .pga-sidebar-db-value strong {
+    color: #fff;
+    font-weight: 800;
+  }
+
+  #sidebarMenu .pga-sidebar-db-static {
+    display: block;
+    width: 100%;
+    min-height: 34px;
+    padding: .375rem .65rem;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: .65rem;
+    background: rgba(15, 23, 42, .35);
+    color: var(--pga-sidebar-text);
+    font-size: .84rem;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #sidebarMenu .pga-multi-db-filter--sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    width: 100%;
+  }
+
+  #sidebarMenu .pga-multi-db-filter--sidebar .pga-multi-db-form {
+    width: 100%;
+  }
+
+  #sidebarMenu .pga-multi-db-select {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: .65rem;
+    background: rgba(15, 23, 42, .35);
+    color: var(--pga-sidebar-text);
+    font-size: .84rem;
+    font-weight: 700;
+  }
+
+  #sidebarMenu .pga-multi-db-select:focus {
+    border-color: rgba(56, 189, 248, .55);
+    box-shadow: 0 0 0 .15rem rgba(56, 189, 248, .15);
+    background: rgba(15, 23, 42, .5);
+    color: #fff;
   }
 
   #sidebarMenu .btn-upgrade-pro {

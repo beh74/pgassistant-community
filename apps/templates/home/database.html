@@ -135,15 +135,47 @@
             </div>
           </div>
 
-          <div class="connect-actions">
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="multi_db" name="multi_db"
-                     {% if (connection_form.multi_db if connection_form is defined else session.get('multi_db')) %}checked{% endif %}>
-              <label class="form-check-label" for="multi_db">
-                Multi-database mode
-              </label>
-              <div class="form-text">Aggregate cluster stats on the dashboard and enable a database filter on schema pages.</div>
+          <div class="mb-4 mt-4">
+            <div class="connect-section-title">Connection options</div>
+            <div class="connect-subtle-box">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="multi_db" name="multi_db"
+                       {% if (connection_form.multi_db if connection_form is defined else session.get('multi_db')) %}checked{% endif %}>
+                <label class="form-check-label fw-semibold" for="multi_db">
+                  Multi-database mode
+                </label>
+                <div class="form-text mt-1">
+                  Explore the whole PostgreSQL cluster from a single connection instead of one database only.
+                  Connect to any database on the instance (usually <code>postgres</code>); pgAssistant lists all
+                  non-template databases on that server.
+                </div>
+              </div>
+
+              <div class="connect-option-help mt-3 pt-3">
+                <div class="connect-option-help-title">Where to find it after connecting</div>
+                <ul class="connect-option-help-list mb-2">
+                  <li>
+                    <strong>Dashboard</strong> — cluster-wide KPIs and a <em>Cluster databases</em> list with size,
+                    owner, and the currently connected database.
+                  </li>
+                  <li>
+                    <strong>Left sidebar</strong> — under <em>PG Assistant</em>, the cluster host and a
+                    <em>Database</em> dropdown to switch the active database without reconnecting.
+                  </li>
+                  <li>
+                    <strong>Schema and tuning pages</strong> — scoped to the selected database on query activity,
+                    top queries, query/index advisors, and table autovacuum tuning
+                    (<code>pg_stat_statements</code> filter).
+                  </li>
+                </ul>
+                <div class="form-text mb-0">
+                  Leave this unchecked for the classic single-database workflow (one database name, no cluster filter).
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div class="connect-actions">
             <button id="connect" class="btn btn-primary" type="submit">
               Connect
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" class="ms-1" fill="currentColor" viewBox="0 0 20 20">

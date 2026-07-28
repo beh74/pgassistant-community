@@ -106,12 +106,25 @@ def require_db_connection():
     return None
 
 
+_CONNECTION_KEYS = (
+    "db_uri",
+    "db_host",
+    "db_port",
+    "db_name",
+    "db_user",
+    "db_password",
+)
+
+
 def _db_config_from_form(form, session_obj):
-    merged = dict(session_obj)
-    for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password"):
+    """Build a fresh connection config from the form, without stale multi-db session state."""
+    merged = {
+        key: session_obj[key]
+        for key in _CONNECTION_KEYS
+        if session_obj.get(key)
+    }
+    for key in _CONNECTION_KEYS:
         if key not in form:
-            if key != "db_uri" and session_obj.get(key):
-                merged[key] = session_obj[key]
             continue
         val = form.get(key, "")
         if key == "db_uri":
@@ -120,9 +133,16 @@ def _db_config_from_form(form, session_obj):
                 merged["db_uri"] = uri
             else:
                 merged.pop("db_uri", None)
+        elif key == "db_password":
+            if str(val or "").strip():
+                merged["db_password"] = val
         elif str(val or "").strip():
-            merged[key] = val
+            merged[key] = val.strip() if isinstance(val, str) else val
+        else:
+            merged.pop(key, None)
     merged["multi_db"] = form.get("multi_db") == "on"
+    merged.pop("active_db", None)
+    merged.pop("cluster_databases", None)
     return merged
 
 

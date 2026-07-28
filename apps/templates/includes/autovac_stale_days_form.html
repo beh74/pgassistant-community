@@ -1,0 +1,21 @@
+<div class="card border-0 shadow-sm mb-3 autovac-stale-form-card">
+  <div class="card-body py-3">
+    <form method="POST" action="/table_autovacuum_tune.html" class="row g-2 g-lg-3 align-items-end">
+      {% if multi_db_filter %}<input type="hidden" name="db" value="{{ active_db }}">{% endif %}
+      <div class="col-12 col-md-4 col-lg-3">
+        <label for="stale_days" class="form-label mb-1">Stale statistics threshold (days)</label>
+        <input class="form-control form-control-sm" id="stale_days" name="stale_days" type="number" min="1" max="365"
+               value="{{ stale_days }}">
+      </div>
+      <div class="col-12 col-md-auto">
+        <button type="submit" class="btn btn-primary btn-sm">Analyze tables</button>
+      </div>
+      <div class="col-12">
+        <div class="form-text mb-0 small">
+          Default: 7 days. ANALYZE is flagged when manual or auto statistics are missing or older than this.
+          VACUUM is flagged only when dead tuple pressure is significant, not from an old vacuum date alone.
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
