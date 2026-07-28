@@ -185,8 +185,63 @@
     position: sticky;
     left: 0;
     z-index: 1;
-    min-width: 280px;
+    min-width: 240px;
+    max-width: 320px;
+    white-space: normal;
+    vertical-align: top;
     box-shadow: 1px 0 0 var(--pga-border-soft, #edf2f7);
+  }
+
+  .autovac-table-cell {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    min-width: 0;
+  }
+
+  .autovac-table-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5rem;
+  }
+
+  .autovac-table-name {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .autovac-table-name .fw-semibold {
+    font-size: .86rem;
+    line-height: 1.3;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .autovac-table-name .small.text-muted {
+    font-size: .76rem;
+    margin-top: .15rem;
+  }
+
+  .autovac-table .autovac-col-table .autovac-calc-btn {
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+    line-height: 1;
+    font-size: .72rem;
+    font-weight: 800;
+    border-radius: 999px;
+    border-color: #cbd5e1;
+    color: #475569;
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .autovac-table .autovac-col-table .autovac-calc-btn:hover {
+    color: var(--pga-primary, #2f6f9f);
+    border-color: #93c5fd;
+    background: #eff6ff;
   }
 
   .autovac-table thead tr.autovac-colgroup-row .autovac-col-table {
@@ -221,8 +276,14 @@
   }
 
   .autovac-table .autovac-col-issue {
-    min-width: 210px;
-    max-width: 280px;
+    min-width: 220px;
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .autovac-col-issue .small.text-muted {
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
   .autovac-table .autovac-note {
@@ -320,61 +381,41 @@
     padding: .35em .55em;
   }
 
-  .autovac-row-toolbar {
-    display: flex;
-    align-items: center;
-    gap: .45rem;
-    flex-wrap: wrap;
-  }
-
-  .autovac-row-toolbar .autovac-calc-btn {
-    width: 1.65rem;
-    height: 1.65rem;
-    padding: 0;
-    line-height: 1;
-    font-size: .72rem;
-    font-weight: 800;
-    border-radius: 999px;
-    border-color: #cbd5e1;
-    color: #475569;
-    background: #fff;
-  }
-
-  .autovac-row-toolbar .autovac-calc-btn:hover {
-    color: var(--pga-primary, #2f6f9f);
-    border-color: #93c5fd;
-    background: #eff6ff;
-  }
-
   .autovac-row-actions {
-    display: inline-flex;
-    flex-wrap: nowrap;
-    gap: .25rem;
-    padding: .15rem;
-    border-radius: 999px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    align-items: center;
   }
 
   .autovac-row-actions .btn {
     white-space: nowrap;
-    border-radius: 999px !important;
+    border-radius: .45rem !important;
     font-size: .68rem;
     font-weight: 700;
-    padding: .2rem .55rem;
+    padding: .22rem .5rem;
     line-height: 1.2;
   }
 
-  .autovac-table-name {
-    min-width: 0;
-  }
-
-  .autovac-table-name .fw-semibold {
-    font-size: .86rem;
-    line-height: 1.25;
+  .autovac-row-actions .small.text-muted {
+    font-size: .68rem;
   }
 
   .autovac-actions .btn { white-space: nowrap; }
+
+  @media (max-width: 1199.98px) {
+    .autovac-table .autovac-col-table {
+      position: static;
+      box-shadow: none;
+      max-width: none;
+    }
+
+    .autovac-table thead tr.autovac-colgroup-row .autovac-col-table,
+    .autovac-table thead tr#autovac-header-row .autovac-col-table,
+    .autovac-table thead tr.autovac-filter-row .autovac-col-table {
+      z-index: 2;
+    }
+  }
 
   .autovac-global-table .autovac-table thead th { top: 0; }
   .autovac-global-table .autovac-table tbody td:first-child code {
@@ -1112,6 +1153,18 @@ document.addEventListener("DOMContentLoaded", function () {
       + "</div>";
   }
 
+  function renderTableCell(row, index) {
+    return '<div class="autovac-table-cell">'
+      + '<div class="autovac-table-head">'
+      + '<div class="autovac-table-name"><div class="fw-semibold">' + escapeHtml(row.object_name || "") + '</div>'
+      + '<div class="small text-muted">' + escapeHtml(row.table_size_pretty || "—") + '</div></div>'
+      + '<button type="button" class="btn btn-outline-secondary btn-sm autovac-calc-btn" '
+      + 'data-row-index="' + index + '" title="Show flagging and ALTER calculation" aria-label="Show calculation details">?</button>'
+      + '</div>'
+      + renderCommandsCell(row, index)
+      + '</div>';
+  }
+
   function bindCommandButtons() {
     document.querySelectorAll(".autovac-cmd-btn").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -1163,12 +1216,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const neverAnalyzed = issueTypes.includes("never_analyzed");
       const neverVacuumed = issueTypes.includes("never_vacuumed");
       return '<tr class="autovac-data-row">'
-        + '<td class="autovac-col-table"><div class="autovac-row-toolbar">'
-        + '<button type="button" class="btn btn-outline-secondary btn-sm autovac-calc-btn flex-shrink-0" '
-        + 'data-row-index="' + index + '" title="Show flagging and ALTER calculation" aria-label="Show calculation details">?</button>'
-        + renderCommandsCell(row, index)
-        + '<div class="autovac-table-name"><div class="fw-semibold">' + escapeHtml(row.object_name || "") + '</div>'
-        + '<div class="small text-muted">' + escapeHtml(row.table_size_pretty || "—") + '</div></div></div></td>'
+        + '<td class="autovac-col-table">' + renderTableCell(row, index) + '</td>'
         + '<td class="autovac-note autovac-col-issue">' + renderIssueCell(row) + '</td>'
         + '<td>' + renderTimestampCell(row.last_analyze) + '</td>'
         + '<td>' + renderTimestampCell(row.last_autoanalyze) + '</td>'

@@ -1,0 +1,115 @@
+{% set panel_layout = panel_layout|default('sidebar') %}
+{% if session.get('db_host') and session.get('db_connected') %}
+{% if panel_layout == 'mobile' %}
+<div class="pga-mobile-db-bar d-lg-none" aria-label="Database connection">
+  <div class="pga-mobile-db-bar-top">
+    <div class="pga-mobile-db-status">
+      <span class="pga-conn-dot" aria-hidden="true"></span>
+      <span class="pga-mobile-db-status-text">Connected</span>
+      {% if session.get('version') %}
+      <span class="pga-mobile-db-pg">PG {{ session['version'] }}</span>
+      {% endif %}
+    </div>
+    <a href="/database.html" class="pga-mobile-db-settings-btn" title="Connection settings" aria-label="Connection settings">
+      <i class="bi bi-sliders" aria-hidden="true"></i>
+    </a>
+  </div>
+
+  <div class="pga-mobile-db-grid">
+    <div class="pga-mobile-db-chip" title="{{ session['db_host'] }}{% if session.get('db_port') %}:{{ session['db_port'] }}{% endif %}">
+      <i class="bi bi-hdd-network" aria-hidden="true"></i>
+      <span class="pga-mobile-db-chip-text">{{ session['db_host'] }}{% if session.get('db_port') %}:{{ session['db_port'] }}{% endif %}</span>
+    </div>
+    {% if session.get('db_user') %}
+    <div class="pga-mobile-db-chip" title="{{ session['db_user'] }}">
+      <i class="bi bi-person" aria-hidden="true"></i>
+      <span class="pga-mobile-db-chip-text">{{ session['db_user'] }}</span>
+    </div>
+    {% endif %}
+    {% if multi_db_filter and cluster_databases %}
+    <span class="pga-mobile-db-chip pga-mobile-db-chip-mode">
+      <i class="bi bi-layers" aria-hidden="true"></i>
+      Multi-db
+    </span>
+    {% endif %}
+  </div>
+
+  {% if multi_db_filter and cluster_databases %}
+  {% with filter_layout='mobile' %}
+  {% include "includes/multi_db_filter.html" %}
+  {% endwith %}
+  {% else %}
+  <div class="pga-mobile-db-name" title="{{ session['db_name'] }}">
+    <i class="bi bi-database" aria-hidden="true"></i>
+    <span>{{ session['db_name'] }}</span>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<li class="nav-item pga-sidebar-db-wrap d-none d-lg-block">
+  <div class="pga-sidebar-db-panel">
+    <div class="pga-sidebar-db-head">
+      <div class="pga-sidebar-db-status" title="Active PostgreSQL connection">
+        <span class="pga-conn-dot" aria-hidden="true"></span>
+        <span class="pga-sidebar-db-status-text">Connected</span>
+      </div>
+      {% if session.get('version') %}
+      <span class="pga-sidebar-db-pg-badge">PG {{ session['version'] }}</span>
+      {% endif %}
+    </div>
+
+    <div class="pga-sidebar-db-body">
+      <div class="pga-sidebar-db-meta">
+        <span class="pga-sidebar-db-label">
+          <i class="bi bi-hdd-network" aria-hidden="true"></i>
+          {% if multi_db_filter and cluster_databases %}Cluster{% else %}Host{% endif %}
+        </span>
+        <span class="pga-sidebar-db-value"
+              title="{{ session['db_host'] }}{% if session.get('db_port') %}:{{ session['db_port'] }}{% endif %}">
+          {{ session['db_host'] }}{% if session.get('db_port') %}:{{ session['db_port'] }}{% endif %}
+        </span>
+      </div>
+
+      {% if session.get('db_user') %}
+      <div class="pga-sidebar-db-meta">
+        <span class="pga-sidebar-db-label">
+          <i class="bi bi-person" aria-hidden="true"></i>
+          User
+        </span>
+        <span class="pga-sidebar-db-value" title="{{ session['db_user'] }}">{{ session['db_user'] }}</span>
+      </div>
+      {% endif %}
+
+      {% if multi_db_filter and cluster_databases %}
+      {% with filter_layout='sidebar' %}
+      {% include "includes/multi_db_filter.html" %}
+      {% endwith %}
+      {% else %}
+      <div class="pga-sidebar-db-meta">
+        <span class="pga-sidebar-db-label">
+          <i class="bi bi-database" aria-hidden="true"></i>
+          Database
+        </span>
+        <span class="pga-sidebar-db-static" title="{{ session['db_name'] }}">{{ session['db_name'] }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if multi_db_filter and cluster_databases %}
+    <div class="pga-sidebar-db-foot">
+      <span class="pga-sidebar-db-mode-badge">
+        <i class="bi bi-layers" aria-hidden="true"></i>
+        Multi-database
+      </span>
+      <span class="pga-sidebar-db-count">{{ cluster_databases|length }} DB</span>
+    </div>
+    {% endif %}
+
+    <a href="/database.html" class="pga-sidebar-db-settings">
+      <i class="bi bi-sliders" aria-hidden="true"></i>
+      Connection settings
+    </a>
+  </div>
+</li>
+{% endif %}
+{% endif %}

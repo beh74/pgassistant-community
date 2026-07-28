@@ -2,13 +2,28 @@
     background-color: inherit;
 }
 
+:root {
+    --pga-sidebar-width: 280px;
+}
+
 #sidebarMenu {
-    max-width: 300px;
+    width: var(--pga-sidebar-width);
+    max-width: var(--pga-sidebar-width);
 }
 
 @media (min-width: 992px) {
     .content, footer {
-        margin-left: 300px;
+        margin-left: var(--pga-sidebar-width) !important;
+    }
+}
+
+@media (max-width: 991.98px) {
+    #sidebarMenu.pga-sidebar {
+        z-index: 1050;
+    }
+
+    .content, footer {
+        margin-left: 0 !important;
     }
 }
 
