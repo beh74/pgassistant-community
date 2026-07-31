@@ -219,6 +219,17 @@ class TableAutovacuumAdvisorTests(unittest.TestCase):
         cluster_sql = get_rule_sql(catalog, "table_autovacuum_cluster_load")
         self.assertIn("active_autovacuum_workers", cluster_sql)
 
+    def test_long_running_transactions_are_limited_to_connected_database(self):
+        yaml_path = Path(__file__).resolve().parents[1] / "advisor_enriched.yml"
+        catalog = load_recommendation_catalog(str(yaml_path))
+        rule = next(
+            definition
+            for definition in catalog
+            if definition.get("id") == "long_running_transactions"
+        )
+
+        self.assertIn("a.datname = current_database()", rule["sql"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,10 +8,20 @@ from apps.home.database import (
     inject_pgss_current_db_filter,
     resolve_db_config,
 )
-from apps.home.routes_helpers import _db_config_from_form
+from apps.home.routes_helpers import _db_config_from_form, get_cluster_database_names
 
 
 class DatabaseMultiDbTests(unittest.TestCase):
+    def test_cached_cluster_database_names_are_sorted_alphabetically(self):
+        session_obj = {
+            "cluster_databases": ["zeta", "Alpha", "beta", "analytics"],
+        }
+
+        self.assertEqual(
+            get_cluster_database_names(session_obj),
+            ["Alpha", "analytics", "beta", "zeta"],
+        )
+
     def test_uri_with_database_replaces_existing_db(self):
         uri = "postgresql://user:pass@localhost:5432/postgres?connect_timeout=5"
         updated = _uri_with_database(uri, "northwind")
@@ -41,6 +51,21 @@ class DatabaseMultiDbTests(unittest.TestCase):
         filtered = apply_pgss_database_filter(sql, "appdb")
         self.assertIn("where queryid=123", filtered.lower())
         self.assertIn("datname = 'appdb'", filtered)
+
+    def test_apply_pgss_database_filter_handles_cte_with_outer_cross_join(self):
+        sql = (
+            "WITH head AS ("
+            "SELECT query FROM pg_stat_statements WHERE calls > 0"
+            "), agg AS (SELECT count(*) AS total FROM head) "
+            "SELECT total FROM agg CROSS JOIN (SELECT 1) AS totals "
+            "ORDER BY total DESC"
+        )
+
+        filtered = apply_pgss_database_filter(sql, "appdb")
+
+        self.assertIn("FROM (SELECT * FROM pg_stat_statements WHERE dbid", filtered)
+        self.assertNotIn("CROSS JOIN (SELECT 1) AS totals  AND", filtered)
+        self.assertIn("ORDER BY total DESC", filtered)
 
     def test_uri_with_database_removes_dbname_query_param(self):
         uri = "postgresql://user:pass@localhost:5432/postgres?dbname=postgres&connect_timeout=5"

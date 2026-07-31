@@ -12,6 +12,17 @@ def get_rank_top_10_queries (session):
     return ranked_queries[:10]
 
 
+def get_rank_top_10_queries_status(session):
+    """Return ranked queries plus pg_stat_statements availability details."""
+    rows, warning = database.get_rank_queries_status(session)
+    ranked_queries = ranking.rank_queries(rows)[:10]
+    return {
+        "ranked_queries": ranked_queries,
+        "pg_stat_statements_available": warning is None,
+        "pg_stat_statements_warning": warning,
+    }
+
+
 def get_top_10_global_advisor_recommendations(session, yaml_path="advisor_enriched.yml"):
     """Fetches the top 10 global advisor recommendations from the database and ranks them using the global_advisor module."""
 

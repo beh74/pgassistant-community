@@ -35,10 +35,10 @@ def get_active_db(session_obj) -> str:
 def get_cluster_database_names(session_obj) -> list[str]:
     cached = session_obj.get("cluster_databases")
     if cached:
-        return list(cached)
+        return sorted(cached, key=str.casefold)
 
     databases, _ = database.list_cluster_databases(session_obj)
-    names = [db["name"] for db in databases]
+    names = sorted((db["name"] for db in databases), key=str.casefold)
     if names:
         session_obj["cluster_databases"] = names
         session_obj.modified = True

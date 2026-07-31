@@ -54,6 +54,63 @@ class _Connection:
 
 
 class EnsurePgStatStatementsTest(unittest.TestCase):
+    def test_monitoring_config_keeps_original_database_in_multi_db_mode(self):
+        config = {
+            "db_name": "postgres",
+            "active_db": "application",
+            "multi_db": True,
+            "db_uri": "postgresql://user:secret@localhost/postgres",
+        }
+
+        monitoring = database.get_monitoring_db_config(config)
+
+        self.assertEqual(monitoring["db_name"], "postgres")
+        self.assertNotIn("active_db", monitoring)
+        self.assertFalse(monitoring["multi_db"])
+        self.assertEqual(
+            monitoring["db_uri"],
+            "postgresql://user:secret@localhost/postgres",
+        )
+
+    def test_pgss_relation_uses_extension_schema(self):
+        connection = _Connection([("monitoring", True, True, True)])
+
+        relation, error = database.get_pg_stat_statements_relation(connection)
+
+        self.assertEqual(relation, '"monitoring"."pg_stat_statements"')
+        self.assertIsNone(error)
+        self.assertTrue(connection.cursor_instance.closed)
+
+    def test_pgss_relation_reports_missing_extension(self):
+        connection = _Connection([None])
+
+        relation, error = database.get_pg_stat_statements_relation(connection)
+
+        self.assertIsNone(relation)
+        self.assertIn("not installed", error)
+
+    def test_pgss_relation_reports_missing_permissions(self):
+        connection = _Connection([("monitoring", True, False, False)])
+
+        relation, error = database.get_pg_stat_statements_relation(connection)
+
+        self.assertIsNone(relation)
+        self.assertIn("cannot read", error)
+
+    def test_pgss_sql_qualifies_only_unqualified_relation(self):
+        sql = (
+            "SELECT * FROM pg_stat_statements "
+            "UNION ALL SELECT * FROM monitoring.pg_stat_statements"
+        )
+
+        qualified = database.qualify_pg_stat_statements_sql(
+            sql,
+            '"monitoring"."pg_stat_statements"',
+        )
+
+        self.assertIn('FROM "monitoring"."pg_stat_statements"', qualified)
+        self.assertIn("FROM monitoring.pg_stat_statements", qualified)
+
     def test_installed_extension_does_not_execute_create_extension(self):
         connection = _Connection([(True,)])
 

@@ -34,7 +34,7 @@ COPY --chown=pgassistant:pgassistant . /home/pgassistant/
 RUN rm -rf media
 
 # Expose application port
-EXPOSE 5085
+EXPOSE 5005
 
 # Define entry point for the application
 ENTRYPOINT ["gunicorn", "--config", "gunicorn-cfg.py", "run:app"]

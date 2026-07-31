@@ -1,5 +1,20 @@
 # Change Log
 
+
+## [3.5.1] - 2026-07-31
+
+## Bug fixes
+
+- Fix Multidatabase: Make the dropdown sorted by dbname #19
+- Fix mermaid size limit : Maximum text size in diagram exceeded #18
+- Fix global advisor / Abnormally long-running transaction : Multidatabase: Abnormally long-running transaction not limited to selected database #20
+- Fix Multidatabase dashboard: read pg_stat_statements from the monitoring database and show a warning when unavailable #17
+- Fix Dockerfile exposed port: align EXPOSE with the Gunicorn and Docker Compose port 5005
+
+## Improvements
+
+- Database connection form: organize general settings and connection options into separate tabs
+
 ## [3.5.0] - 2026-07-28
 
 ## Improvements

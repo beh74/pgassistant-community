@@ -91,6 +91,22 @@ def get_resolved_database_name(db_config) -> str:
     return (cfg.get("db_name") or "").strip()
 
 
+def get_monitoring_db_config(db_config) -> dict:
+    """Return the database used to read cluster-wide monitoring extensions.
+
+    In multi-database mode ``db_name`` is the original connection database and
+    ``active_db`` is the database selected in the UI.  Extensions such as
+    pg_stat_statements only need to be exposed by the original connection
+    database because their rows can be filtered by the selected database OID.
+    """
+    cfg = normalize_db_config(db_config)
+    if not is_multi_db(cfg):
+        return cfg
+    cfg.pop("active_db", None)
+    cfg["multi_db"] = False
+    return cfg
+
+
 def _quote_sql_literal(value: str) -> str:
     return "'" + (value or "").replace("'", "''") + "'"
 
@@ -239,7 +255,13 @@ def _format_cluster_size(size_bytes: int) -> str:
 
 
 def get_db_info_cluster(db_config):
-    info = {"multi_db": True, "error": None}
+    info = {
+        "multi_db": True,
+        "error": None,
+        "profile": [],
+        "pg_stat_statements_available": False,
+        "pg_stat_statements_warning": None,
+    }
     con, message = connectdb(db_config)
     if not con:
         info["error"] = message
@@ -287,7 +309,26 @@ def get_db_info_cluster(db_config):
         except Exception:
             info["shared_buffers"] = "?"
 
-        info["profile"], _ = db_query(con, "reporting_db_profile")
+        monitoring_con, monitoring_message = connectdb(
+            get_monitoring_db_config(db_config)
+        )
+        if not monitoring_con:
+            info["pg_stat_statements_warning"] = (
+                "Unable to connect to the monitoring database: "
+                + (monitoring_message or "unknown connection error")
+            )
+        else:
+            try:
+                info["profile"], _ = _db_query_pgss(
+                    monitoring_con,
+                    "reporting_db_profile",
+                    db_config,
+                )
+                info["pg_stat_statements_available"] = True
+            except Exception as exc:
+                info["pg_stat_statements_warning"] = str(exc)
+            finally:
+                monitoring_con.close()
 
         connexions, _ = db_query(con, "database_count_connexions")
         info["connexions"] = connexions[0]["nb"]
@@ -479,6 +520,65 @@ def pg_stat_statements_has_dbid(con) -> bool:
             cursor.close()
 
 
+def get_pg_stat_statements_relation(con) -> Tuple[Optional[str], Optional[str]]:
+    """Return the schema-qualified pg_stat_statements view when it is usable."""
+    cursor = None
+    try:
+        cursor = con.cursor()
+        cursor.execute(
+            """
+            SELECT
+                n.nspname,
+                c.oid IS NOT NULL AS relation_exists,
+                pg_catalog.has_schema_privilege(n.oid, 'USAGE') AS schema_usage,
+                CASE
+                    WHEN c.oid IS NULL THEN false
+                    ELSE pg_catalog.has_table_privilege(c.oid, 'SELECT')
+                END AS can_select
+            FROM pg_catalog.pg_extension AS e
+            JOIN pg_catalog.pg_namespace AS n ON n.oid = e.extnamespace
+            LEFT JOIN pg_catalog.pg_class AS c
+              ON c.relnamespace = n.oid
+             AND c.relname = 'pg_stat_statements'
+             AND c.relkind IN ('v', 'm')
+            WHERE e.extname = 'pg_stat_statements'
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None, "pg_stat_statements is not installed in the monitoring database."
+
+        schema_name, relation_exists, schema_usage, can_select = row
+        if not relation_exists:
+            return None, "The pg_stat_statements extension is installed but its view was not found."
+        if not schema_usage or not can_select:
+            return None, (
+                "The connected role cannot read pg_stat_statements. "
+                "Grant USAGE on its schema and SELECT on its view."
+            )
+
+        quoted_schema = '"' + str(schema_name).replace('"', '""') + '"'
+        return f'{quoted_schema}."pg_stat_statements"', None
+    except Exception as exc:
+        return None, f"Unable to inspect pg_stat_statements: {exc}"
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+
+def qualify_pg_stat_statements_sql(sql: str, qualified_relation: str) -> str:
+    """Replace unqualified pg_stat_statements references with a safe relation."""
+    if not sql or not qualified_relation:
+        return sql
+    return re.sub(
+        r"(?<![\w.\"])(pg_stat_statements)\b",
+        qualified_relation,
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+
 def apply_pgss_database_filter(sql: str, database_name: str) -> str:
     """Restrict pg_stat_statements rows to one database."""
     if not sql or not database_name or re.search(r"\bdbid\b", sql, flags=re.IGNORECASE):
@@ -487,20 +587,43 @@ def apply_pgss_database_filter(sql: str, database_name: str) -> str:
         return sql
 
     db_literal = _quote_sql_literal(database_name.strip())
-    clause = " AND " + _PGSS_DB_FILTER_TAIL.format(db_literal=db_literal) + " "
-    for pattern in (r"\bORDER\s+BY\b", r"\bLIMIT\b"):
-        match = re.search(pattern, sql, flags=re.IGNORECASE)
-        if match:
-            return sql[: match.start()] + clause + sql[match.start() :]
+    filter_expression = _PGSS_DB_FILTER_TAIL.format(db_literal=db_literal)
+    relation_pattern = (
+        r'(?P<prefix>\bFROM\s+)'
+        r'(?P<relation>(?:"(?:[^"]|"")+"\.)?"?pg_stat_statements"?)'
+        r'(?![\w.])'
+    )
 
-    trimmed = sql.rstrip().rstrip(";")
-    if re.search(r"\bWHERE\b", trimmed, flags=re.IGNORECASE):
-        return trimmed + clause + ";"
-    return trimmed + f" WHERE {_PGSS_DB_FILTER_TAIL.format(db_literal=db_literal)};"
+    # Filter the extension view before the surrounding query is evaluated.
+    # This works for simple statements and CTE-heavy queries without guessing
+    # which WHERE/ORDER BY belongs to the outermost SELECT.
+    return re.sub(
+        relation_pattern,
+        lambda match: (
+            match.group("prefix")
+            + "(SELECT * FROM "
+            + match.group("relation")
+            + " WHERE "
+            + filter_expression
+            + ") AS pgss_filtered"
+        ),
+        sql,
+        count=1,
+        flags=re.IGNORECASE,
+    )
 
 
-def prepare_pgss_sql(sql: str, con, database_name: str) -> str:
+def prepare_pgss_sql(
+    sql: str,
+    con,
+    database_name: str,
+    qualified_relation: Optional[str] = None,
+) -> str:
     """Apply a database filter to pg_stat_statements SQL when dbid is available."""
+    if qualified_relation is None:
+        qualified_relation, _ = get_pg_stat_statements_relation(con)
+    if qualified_relation:
+        sql = qualify_pg_stat_statements_sql(sql, qualified_relation)
     if not database_name:
         return sql
     if pg_stat_statements_has_dbid(con):
@@ -538,7 +661,16 @@ def _db_query_pgss(cnx, query_id, db_config, db_name=None):
         sql = query["sql"]
         if db_name:
             sql = sql.replace("$1", db_name)
-        sql = prepare_pgss_sql(sql, cnx, database_name)
+        qualified_relation, relation_error = get_pg_stat_statements_relation(cnx)
+        if not qualified_relation:
+            raise RuntimeError(relation_error or "pg_stat_statements is unavailable.")
+        sql = qualify_pg_stat_statements_sql(sql, qualified_relation)
+        sql = prepare_pgss_sql(
+            sql,
+            cnx,
+            database_name,
+            qualified_relation=qualified_relation,
+        )
         if query["type"] == "select" or query["type"] == "param_query":
             return json.loads(db_fetch_json(cnx, sql)), query
         db_exec(cnx, sql)
@@ -552,7 +684,7 @@ def get_top_queries(db_config):
     """
     rows = []
     cfg = normalize_db_config(db_config)
-    con, message = connectdb(cfg)
+    con, message = connectdb(get_monitoring_db_config(cfg))
     if con:
        try:
             if cfg.get('version')==18:
@@ -569,19 +701,27 @@ def get_rank_queries(db_config):
     """
     Retrieves the ranked queries from the database.
     """
+    rows, _ = get_rank_queries_status(db_config)
+    return rows
+
+
+def get_rank_queries_status(db_config):
+    """Return ranked query rows and an optional pg_stat_statements warning."""
     rows = []
     cfg = normalize_db_config(db_config)
-    con, message = connectdb(cfg)
-    if con:
-       try:
-            if cfg.get('version')==18:
-               rows, description = _db_query_pgss(con, 'top_ranking_18', cfg)
-            else:
-               rows, description = _db_query_pgss(con, 'top_ranking', cfg)
-       except:
-           rows=[]
-       con.close()
-    return rows
+    con, message = connectdb(get_monitoring_db_config(cfg))
+    if not con:
+        return rows, message or "Unable to connect to the monitoring database."
+    try:
+        if cfg.get('version') == 18:
+            rows, _ = _db_query_pgss(con, 'top_ranking_18', cfg)
+        else:
+            rows, _ = _db_query_pgss(con, 'top_ranking', cfg)
+        return rows, None
+    except Exception as exc:
+        return [], str(exc)
+    finally:
+        con.close()
 
 def exec_cmd(db_config,query_id):
     """
@@ -684,7 +824,11 @@ def get_db_info(db_config,con=None):
     if is_multi_db(db_config):
         return get_db_info_cluster(db_config)
 
-    info = {}
+    info = {
+        "profile": [],
+        "pg_stat_statements_available": False,
+        "pg_stat_statements_warning": None,
+    }
 
     if not con:
         con, message = connectdb(db_config)
@@ -693,8 +837,7 @@ def get_db_info(db_config,con=None):
         if db_config:
             pgss_available, pgss_error = ensure_pg_stat_statements(con)
             if not pgss_available:
-                info["error"] = pgss_error
-                return info
+                info["pg_stat_statements_warning"] = pgss_error
 
             version, _= db_query(con,'db_version')
             info['version']=version[0]['server_version']
@@ -725,7 +868,16 @@ def get_db_info(db_config,con=None):
             table_size, _= db_query(con,'table_size_top_5')
             info["table_size"]=table_size
 
-            info['profile'], _= db_query(con,'reporting_db_profile')
+            if pgss_available:
+                try:
+                    info['profile'], _ = _db_query_pgss(
+                        con,
+                        'reporting_db_profile',
+                        db_config,
+                    )
+                    info["pg_stat_statements_available"] = True
+                except Exception as exc:
+                    info["pg_stat_statements_warning"] = str(exc)
 
             connexions, _= db_query(con,'database_count_connexions')
             info['connexions']=connexions[0]['nb']
@@ -755,19 +907,22 @@ def get_query_by_id(query_id):
     return None
 
 def get_pgstat_query_by_id(db_config, query_id):
-    query = get_query_by_id('pgstat_get_sqlquery_by_id')
-    sql=query['sql'].replace ('$1', query_id)
     cfg = normalize_db_config(db_config)
-    db_name = get_resolved_database_name(cfg)
-    con, _ = connectdb(cfg)
-    sql_text=''
+    con, _ = connectdb(get_monitoring_db_config(cfg))
     try:
-        if con:
-            sql = prepare_pgss_sql(sql, con, db_name)
-            sql_rows=json.loads(db_fetch_json(con,sql))
-            if sql_rows:
-                sql_text=sql_rows[0].get('query') or ''
-        return sql_text
+        if not con:
+            return ''
+        sql_rows, _ = _db_query_pgss(
+            con,
+            'pgstat_get_sqlquery_by_id',
+            cfg,
+            db_name=str(query_id),
+        )
+        if not sql_rows:
+            return ''
+        return sql_rows[0].get('query') or ''
+    except Exception:
+        return ''
     finally:
         if con:
             con.close()

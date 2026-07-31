@@ -272,6 +272,7 @@
           </div>
         </div>
         <div class="schema-mermaid-shell">
+          <div class="alert alert-warning d-none" id="schemaMermaidError" role="alert"></div>
           <div class="schema-mermaid-canvas" id="schemaMermaidCanvas">
             <div id="schemaMermaidGraph"></div>
           </div>
@@ -325,6 +326,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const errorMessage = document.getElementById("schemaErrorMessage");
   const content = document.getElementById("schemaContent");
   const mermaidSource = document.getElementById("mermaidSource");
+  const mermaidError = document.getElementById("schemaMermaidError");
   const canvas = document.getElementById("schemaMermaidCanvas");
   const graph = document.getElementById("schemaMermaidGraph");
   const promptInput = document.getElementById("llmPromptInput");
@@ -473,6 +475,10 @@ document.addEventListener("DOMContentLoaded", function () {
   window.renderSchemaMermaid = async function () {
     if (!window.mermaidApiReady || !graph || !mermaidSource) return;
     graph.innerHTML = "";
+    if (mermaidError) {
+      mermaidError.classList.add("d-none");
+      mermaidError.textContent = "";
+    }
     mermaidNaturalSize = { width: 0, height: 0 };
     if (canvas) {
       canvas.style.width = "";
@@ -482,9 +488,20 @@ document.addEventListener("DOMContentLoaded", function () {
     pre.className = "mermaid";
     pre.textContent = mermaidSource.textContent || "erDiagram";
     graph.appendChild(pre);
-    await window.mermaidApi.run({ querySelector: "#schemaMermaidGraph .mermaid" });
-    captureMermaidNaturalSize();
-    updateMermaidZoom(mermaidZoom);
+    try {
+      await window.mermaidApi.run({ querySelector: "#schemaMermaidGraph .mermaid" });
+      captureMermaidNaturalSize();
+      updateMermaidZoom(mermaidZoom);
+    } catch (err) {
+      graph.innerHTML = "";
+      if (mermaidError) {
+        mermaidError.textContent = "The relationship diagram could not be rendered: "
+          + (err.message || "unknown Mermaid error")
+          + ". The schema digest and Mermaid source remain available.";
+        mermaidError.classList.remove("d-none");
+      }
+      console.error("Unable to render database schema Mermaid diagram", err);
+    }
   };
 
   loadSchemaDigest();
@@ -493,7 +510,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 <script type="module">
   import mermaid from '{{ config.ASSETS_ROOT }}/js/mermaid.esm.min.mjs';
-  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose',
+    maxTextSize: 1000000,
+    maxEdges: 2000
+  });
   window.mermaidApi = mermaid;
   window.mermaidApiReady = true;
   if (window.renderSchemaMermaid) {

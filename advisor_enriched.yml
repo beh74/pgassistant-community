@@ -2909,6 +2909,7 @@ recommendations:
             AND a.pid <> pg_backend_pid()
             AND a.xact_start IS NOT NULL
             AND a.datname IS NOT NULL
+            AND a.datname = current_database()
             AND a.usename IS NOT NULL
             AND now() - a.xact_start >= p.warning_after
         )

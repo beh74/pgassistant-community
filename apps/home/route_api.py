@@ -124,8 +124,8 @@ def api_rank_top_10_queries():
         if not data or "db_config" not in data:
             return jsonify({"error": "Missing 'db_config' in request body"}), 400
         db_config = data["db_config"]
-        ranked_queries = api_helper.get_rank_top_10_queries(db_config)
-        return jsonify({"ranked_queries": ranked_queries})
+        result = api_helper.get_rank_top_10_queries_status(db_config)
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
