@@ -490,10 +490,12 @@ recommendations:
             || format('%I.%I', ui.schema_name, ui.index_name)
             || '. Both indexes use the same key columns, operator classes, '
             || 'collations, options, expressions, and predicate. The redundant '
-            || 'index has recorded no scans during the current statistics window, '
-            || 'which started at '
+            || 'index recorded '
+            || ni.idx_scan::text
+            || ' scans during the current statistics window, which started at '
             || ds.observation_started_at::text
-            || '.'
+            || '. Its observed usage does not change the structural coverage '
+            || 'provided by the unique index.'
             AS recommendation_note,
             'DROP INDEX CONCURRENTLY IF EXISTS '
             || format('%I.%I', ni.schema_name, ni.index_name)
@@ -514,7 +516,6 @@ recommendations:
         WHERE ni.indisunique = false
           AND ni.indisprimary = false
           AND ui.indisunique = true
-          AND ni.idx_scan = 0
         ORDER BY
             ni.schema_name,
             ni.table_name,
@@ -722,6 +723,250 @@ recommendations:
       recommendation_note: recommendation_note
       stats_reset: stats_reset
       statistics_age_hours: statistics_age_hours
+
+  - id: partially_duplicate_low_usage_indexes
+    label: Partially duplicate low-usage index
+    source: index_checks
+    team: DEV
+    category_id: INDEX
+    object_type: INDEX
+    outcome_id: STORAGE
+    advisor_group: INDEX_CLEANUP
+    risk_level: MEDIUM
+    action_type: DROP_INDEX
+    action_safety: MANUAL_REVIEW_RECOMMENDED
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: true
+    can_auto_apply: false
+    tags:
+      - overlapping-index
+      - low-usage-index
+      - write-overhead
+      - requires-review
+    why_it_matters: >
+      A wider index whose leading key columns are already covered by another
+      index may provide little additional value when its extra-key lookup
+      pattern is rarely used, while still adding storage and write overhead.
+    fix_strategy: >
+      Review the statistics window and confirm that queries do not depend on
+      the additional key columns, ordering, or index-only access before dropping
+      the wider index. A short statistics window requires extra caution.
+    expected_benefit: >
+      Reduced storage and write amplification when the wider index provides
+      sufficient coverage for the narrower index's workload.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 75
+    impact: 60
+    effort: 25
+
+    sql: |
+      WITH params AS (
+          SELECT
+              1.0::numeric AS max_scans_per_day
+      ),
+      database_stats AS (
+          SELECT
+              COALESCE(
+                  stats_reset,
+                  pg_postmaster_start_time()
+              ) AS observation_started_at
+          FROM pg_stat_database
+          WHERE datname = current_database()
+      ),
+      table_activity AS (
+          SELECT
+              st.relid,
+              (
+                  COALESCE(st.seq_scan, 0)::numeric
+                  + COALESCE(SUM(si.idx_scan), 0)::numeric
+              )::bigint AS table_scan_count
+          FROM pg_stat_user_tables AS st
+          LEFT JOIN pg_stat_user_indexes AS si
+            ON si.relid = st.relid
+          GROUP BY st.relid, st.seq_scan
+      ),
+      indexes AS (
+          SELECT
+              ix.indexrelid,
+              ix.indrelid,
+              ix.indnkeyatts,
+              ix.indnatts,
+              ix.indisprimary,
+              ix.indisunique,
+              ix.indisexclusion,
+              ARRAY(
+                  SELECT ix.indkey[position]
+                  FROM generate_series(
+                      0,
+                      ix.indnkeyatts - 1
+                  ) AS positions(position)
+              ) AS key_attnums,
+              ARRAY(
+                  SELECT ix.indclass[position]
+                  FROM generate_series(
+                      0,
+                      ix.indnkeyatts - 1
+                  ) AS positions(position)
+              ) AS key_opclasses,
+              ARRAY(
+                  SELECT ix.indcollation[position]
+                  FROM generate_series(
+                      0,
+                      ix.indnkeyatts - 1
+                  ) AS positions(position)
+              ) AS key_collations,
+              ARRAY(
+                  SELECT ix.indoption[position]
+                  FROM generate_series(
+                      0,
+                      ix.indnkeyatts - 1
+                  ) AS positions(position)
+              ) AS key_options,
+              ix.indpred,
+              idx.relam,
+              ns.nspname AS schema_name,
+              tbl.relname AS table_name,
+              tbl.oid AS table_id,
+              idx.relname AS index_name,
+              idx.oid AS object_id,
+              COALESCE(stat.idx_scan, 0) AS idx_scan,
+              pg_relation_size(idx.oid) AS index_size_bytes,
+              pg_get_indexdef(idx.oid) AS index_definition,
+              ta.table_scan_count,
+              ds.observation_started_at,
+              EXTRACT(
+                  EPOCH FROM (now() - ds.observation_started_at)
+              ) / 86400.0 AS statistics_age_days
+          FROM pg_index AS ix
+          JOIN pg_class AS idx
+            ON idx.oid = ix.indexrelid
+          JOIN pg_class AS tbl
+            ON tbl.oid = ix.indrelid
+          JOIN pg_namespace AS ns
+            ON ns.oid = tbl.relnamespace
+          LEFT JOIN pg_stat_user_indexes AS stat
+            ON stat.indexrelid = ix.indexrelid
+          JOIN table_activity AS ta
+            ON ta.relid = ix.indrelid
+          CROSS JOIN database_stats AS ds
+          WHERE ns.nspname NOT IN (
+                  'pg_catalog',
+                  'information_schema',
+                  'pg_toast'
+              )
+            AND ns.nspname !~ '^pg_temp_'
+            AND ns.nspname !~ '^pg_toast_temp_'
+            AND ix.indisvalid
+            AND ix.indisready
+            AND ix.indexprs IS NULL
+      ),
+      overlapping_indexes AS (
+          SELECT
+              candidate.*,
+              prefix_index.index_name AS prefix_index_name,
+              prefix_index.idx_scan AS prefix_index_idx_scan,
+              prefix_index.index_definition AS prefix_index_definition,
+              prefix_index.indnkeyatts AS prefix_key_count
+          FROM indexes AS candidate
+          JOIN LATERAL (
+              SELECT narrower.*
+              FROM indexes AS narrower
+              WHERE narrower.indrelid = candidate.indrelid
+                AND narrower.indexrelid <> candidate.indexrelid
+                AND narrower.relam = candidate.relam
+                AND narrower.indnkeyatts < candidate.indnkeyatts
+                AND candidate.key_attnums[1:narrower.indnkeyatts]
+                    = narrower.key_attnums
+                AND candidate.key_opclasses[1:narrower.indnkeyatts]
+                    = narrower.key_opclasses
+                AND candidate.key_collations[1:narrower.indnkeyatts]
+                    = narrower.key_collations
+                AND candidate.key_options[1:narrower.indnkeyatts]
+                    = narrower.key_options
+                AND COALESCE(candidate.indpred::text, '')
+                    = COALESCE(narrower.indpred::text, '')
+              ORDER BY
+                  narrower.indnkeyatts DESC,
+                  narrower.idx_scan DESC,
+                  narrower.indexrelid
+              LIMIT 1
+          ) AS prefix_index ON true
+          WHERE NOT candidate.indisprimary
+            AND NOT candidate.indisunique
+            AND NOT candidate.indisexclusion
+            AND candidate.indnatts = candidate.indnkeyatts
+            AND NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint AS c
+                WHERE c.conindid = candidate.indexrelid
+            )
+      )
+      SELECT
+          oi.object_id,
+          oi.schema_name || '.' || oi.index_name AS object_name,
+          oi.schema_name,
+          oi.table_name,
+          oi.table_id,
+          oi.index_name,
+          oi.prefix_index_name,
+          oi.idx_scan,
+          oi.prefix_index_idx_scan,
+          oi.index_size_bytes,
+          oi.index_definition,
+          oi.prefix_index_definition,
+          oi.table_scan_count,
+          oi.observation_started_at AS stats_reset,
+          ROUND(oi.statistics_age_days, 1) AS statistics_age_days,
+          ROUND(
+              oi.idx_scan / GREATEST(oi.statistics_age_days, 1),
+              2
+          )
+              AS scans_per_day,
+          p.max_scans_per_day,
+          'Index '
+          || format('%I.%I', oi.schema_name, oi.index_name)
+          || ' extends the key columns of existing index '
+          || format('%I.%I', oi.schema_name, oi.prefix_index_name)
+          || ', but averaged only '
+          || ROUND(
+              oi.idx_scan / GREATEST(oi.statistics_age_days, 1),
+              2
+          )::text
+          || ' scans per day over '
+          || ROUND(oi.statistics_age_days, 1)::text
+          || ' days. Check whether its additional key columns, ordering, or '
+          || 'index-only access are needed before removal.'
+          AS recommendation_note,
+          'DROP INDEX CONCURRENTLY IF EXISTS '
+          || format('%I.%I', oi.schema_name, oi.index_name)
+          || ';' AS improvement_sql
+      FROM overlapping_indexes AS oi
+      CROSS JOIN params AS p
+      WHERE oi.idx_scan / GREATEST(oi.statistics_age_days, 1)
+            <= p.max_scans_per_day
+      ORDER BY
+          oi.index_size_bytes DESC,
+          oi.schema_name,
+          oi.table_name,
+          oi.index_name;
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      table_id: table_id
+      schema_name: schema_name
+      table_name: table_name
+      index_name: index_name
+      improvement_sql: improvement_sql
+      recommendation_note: recommendation_note
+      stats_reset: stats_reset
+      statistics_age_days: statistics_age_days
+      scans_per_day: scans_per_day
+      table_scan_count: table_scan_count
 
   - id: unused_non_constraint_indexes
     label: Unused index not supporting constraints

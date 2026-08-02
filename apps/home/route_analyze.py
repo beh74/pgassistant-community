@@ -37,6 +37,7 @@ def analyze_query(querid):
             except (TypeError, ValueError):
                 pg_major_version = 0
             generic_plan_available = pg_major_version >= 16
+            active_database = database.get_resolved_database_name(session)
 
             # Clear any previous analyze-derived table list when opening a new query page (optional but recommended)
             prev_qid = session.get("analyze_querid")
@@ -145,7 +146,7 @@ def analyze_query(querid):
                         db_config=session,
                         sql_query=sql_query_analyze,
                         rows=rows,
-                        database=session['db_name'],
+                        database=active_database,
                         host=session["db_host"],
                         user=session["db_user"],
                         port=session["db_port"],
@@ -180,7 +181,7 @@ def analyze_query(querid):
 
                     sql_text = ddl.generate_tables_ddl(
                         tables=tables,
-                        database=session['db_name'],
+                        database=active_database,
                         host=session["db_host"],
                         user=session["db_user"],
                         port=session["db_port"],

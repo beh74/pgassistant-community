@@ -1,6 +1,18 @@
 # Change Log
 
 
+## [3.5.2] - 2026-08-02
+
+## Bug fixes
+
+- Fix Multidatabase DDL tools: use the selected active database for query analysis, LLM table helpers, DDL generation, and Tetris
+- Fix duplicate index detection: report a redundant non-unique index covered by a unique index even when the redundant index has recorded scans
+
+## Improvements
+
+- Add a partially duplicate low-usage index advisor to identify wider indexes whose leading columns are already covered by a narrower index
+
+
 ## [3.5.1] - 2026-07-31
 
 ## Bug fixes

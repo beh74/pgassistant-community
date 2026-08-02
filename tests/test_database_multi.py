@@ -5,6 +5,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 from apps.home.database import (
     _uri_with_database,
     apply_pgss_database_filter,
+    get_resolved_database_name,
     inject_pgss_current_db_filter,
     resolve_db_config,
 )
@@ -12,6 +13,24 @@ from apps.home.routes_helpers import _db_config_from_form, get_cluster_database_
 
 
 class DatabaseMultiDbTests(unittest.TestCase):
+    def test_resolved_database_name_uses_active_database_in_multi_db_mode(self):
+        config = {
+            "db_name": "postgres",
+            "active_db": "application",
+            "multi_db": True,
+        }
+
+        self.assertEqual(get_resolved_database_name(config), "application")
+
+    def test_resolved_database_name_keeps_database_in_single_db_mode(self):
+        config = {
+            "db_name": "postgres",
+            "active_db": "ignored",
+            "multi_db": False,
+        }
+
+        self.assertEqual(get_resolved_database_name(config), "postgres")
+
     def test_cached_cluster_database_names_are_sorted_alphabetically(self):
         session_obj = {
             "cluster_databases": ["zeta", "Alpha", "beta", "analytics"],

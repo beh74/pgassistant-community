@@ -17,7 +17,7 @@ from . import tetris
 def llm_primary_key(schema: str, tablename:str):
     tables = []
     tables.append (f"{schema}.{tablename}")
-    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+    ddl_str = ddl.generate_tables_ddl(tables=tables, database=database.get_resolved_database_name(session), host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.generate_primary_key_prompt(table_name=f"{schema}.{tablename}",ddl=ddl_str)
     if request.method == 'GET':
         return render_template('home/primary_key_llm.html', segment='primary_key_llm.html', sql_text=ddl.sql_to_html(ddl_str), table_name=f"{schema}.{tablename}", llm_prompt=llm_prompt, title=f"Find a primary key for {schema}.{tablename}")
@@ -34,7 +34,7 @@ def llm_primary_key(schema: str, tablename:str):
 def llm_table(schema: str, tablename:str):
     tables = []
     tables.append (f"{schema}.{tablename}")
-    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+    ddl_str = ddl.generate_tables_ddl(tables=tables, database=database.get_resolved_database_name(session), host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_table_format(ddl=ddl_str)
     if request.method == 'GET':
         mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
@@ -52,7 +52,7 @@ def llm_table(schema: str, tablename:str):
 def llm_table_guidelines(schema: str, tablename:str):
     tables = []
     tables.append (f"{schema}.{tablename}")
-    ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+    ddl_str = ddl.generate_tables_ddl(tables=tables, database=database.get_resolved_database_name(session), host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
     llm_prompt = llm.analyze_with_sql_quide(ddl=ddl_str, guidelines=config.get_config_value("LLM_SQL_GUIDELINES"))
     if request.method == 'GET':
         mermaid_graph=graph_table.generate_mermaid_table_dependencies_erdiagram(session, f"{schema}.{tablename}")
@@ -71,7 +71,7 @@ def tetris_table(schema: str, tablename:str):
     try:
         tables = []
         tables.append (f"{schema}.{tablename}")
-        ddl_str = ddl.generate_tables_ddl(tables=tables, database=session['db_name'], host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
+        ddl_str = ddl.generate_tables_ddl(tables=tables, database=database.get_resolved_database_name(session), host=session["db_host"], user=session["db_user"],port=session["db_port"],password=session["db_password"])
         
         tetris_sql = database.get_query_by_id('tetris_play')
         tetris_sql = tetris_sql['sql'].replace('$1', schema).replace('$2', tablename)
