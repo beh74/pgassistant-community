@@ -527,8 +527,7 @@
     <div>
       <h1 class="h4 mb-1">Table autovacuum tuning</h1>
       <p class="text-muted mb-0">
-        Per-table and global autovacuum recommendations from <code>advisor_enriched.yml</code>
-        (<code>table_autovacuum_maintenance_flagged</code>, <code>table_autovacuum_cluster_load</code>).
+        Per-table and global autovacuum recommendations.
         {% if multi_db_filter %}<span class="ms-1">· Database <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
@@ -767,7 +766,7 @@
 {% if advisor_result and advisor_result.ok and advisor_result.tables %}
 <script type="application/json" id="autovac-rows-json">{{ advisor_result.tables | tojson }}</script>
 <script type="application/json" id="autovac-batch-json">{{ advisor_result.batch_actions | tojson }}</script>
-<script type="application/json" id="autovac-config-json">{"stale_days": {{ stale_days | default(7) }} }</script>
+<script type="application/json" id="autovac-config-json">{"stale_days": {{ stale_days | default(30) }} }</script>
 {% endif %}
 
 {% if advisor_result and advisor_result.ok and advisor_result.global_tuning and advisor_result.global_tuning.recommendations %}
@@ -848,7 +847,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const globalData = globalDataEl ? JSON.parse(globalDataEl.textContent || "[]") : [];
   const batchData = batchDataEl ? JSON.parse(batchDataEl.textContent || "{}") : {};
   const autovacConfig = configDataEl ? JSON.parse(configDataEl.textContent || "{}") : {};
-  const staleDaysThreshold = Number(autovacConfig.stale_days || 7);
+  const staleDaysThreshold = Number(autovacConfig.stale_days || 30);
   const tableBody = document.getElementById("autovac-table-body");
   const emptyFilter = document.getElementById("autovac-empty-filter");
   const visibleCount = document.getElementById("autovac-visible-count");

@@ -12,7 +12,7 @@ from .global_advisor import load_recommendation_catalog
 MAINTENANCE_FLAGGED_RULE_ID = "table_autovacuum_maintenance_flagged"
 CLUSTER_LOAD_RULE_ID = "table_autovacuum_cluster_load"
 VACUUM_URGENCY_RULE_ID = "autovacuum_dead_tuple_vacuum_urgency"
-DEFAULT_STALE_DAYS = 7
+DEFAULT_STALE_DAYS = 30
 DEFAULT_MIN_TABLE_BYTES = 1024 * 1024
 DEAD_TUPLE_MIN_ABSOLUTE = 10_000
 DEAD_TUPLE_MIN_RATIO = 0.05

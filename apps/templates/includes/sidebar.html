@@ -27,6 +27,7 @@
 {# ------------------- Active state helpers ------------------- #}
 {% set is_dashboard = current_path == '/dashboard.html' or 'dashboard' in segment %}
 {% set is_global_advisor = current_path == '/global/advisor' or 'global_advisor' in segment %}
+{% set is_executive_plan = current_path == '/executive-plan.html' or 'executive_plan' in segment %}
 {% set is_tables_cards = current_path == '/tables_cards.html' or 'tables_cards' in segment %}
 {% set is_db_design = current_path == '/database_analyze_llm.html' or segment == 'database_analyze_llm.html' %}
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
@@ -104,7 +105,7 @@
 
       {# ------------------- Top links (only if connected) ------------------- #}
       {% if session['db_host'] %}
-      <li class="sidebar-section-label section-monitor">Monitor</li>
+      <li class="sidebar-section-label section-monitor">Insights &amp; Planning</li>
       <li class="nav-item nav-monitor {% if is_dashboard %}active{% endif %}">
         <a href="/dashboard.html" class="nav-link" {% if is_dashboard %}aria-current="page"{% endif %}>
           <div class="sidebar-icon me-2 icon-20">
@@ -133,6 +134,15 @@
             </svg>
           </div>
           <div class="sidebar-text">Global Advisor</div>
+        </a>
+      </li>
+
+      <li class="nav-item nav-monitor {% if is_executive_plan %}active{% endif %}">
+        <a href="/executive-plan.html" class="nav-link" {% if is_executive_plan %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <i class="bi bi-diagram-3-fill"></i>
+          </div>
+          <div class="sidebar-text">Executive Plan</div>
         </a>
       </li>
 

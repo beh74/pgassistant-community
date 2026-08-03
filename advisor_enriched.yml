@@ -2747,7 +2747,7 @@ recommendations:
       relative to table size. Manual ANALYZE counts the same as autovacuum analyze.
     pgassistant_parameters:
       stale_days:
-        default: 7
+        default: 30
         description: Maximum age in days since last manual or auto analyze.
       min_table_size_bytes:
         default: 1048576

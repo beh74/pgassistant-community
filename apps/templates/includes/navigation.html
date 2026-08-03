@@ -162,6 +162,31 @@
     border-color: rgba(148, 163, 184, .18);
   }
 
+  .pga-about-icon {
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    color: #fff;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+    box-shadow: 0 14px 28px rgba(79, 70, 229, .2);
+  }
+
+  .pga-about-version {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    color: #4338ca;
+    background: rgba(79, 70, 229, .1);
+    font-size: .8rem;
+    font-weight: 800;
+  }
+
   @media (max-width: 991.98px) {
     .pga-topnav-stack {
       margin-bottom: .75rem;
@@ -270,6 +295,18 @@
               <span class="pga-dropdown-icon"><i class="bi bi-sliders"></i></span>
               PG Tune
             </a>
+
+            <div role="separator" class="dropdown-divider"></div>
+
+            <button
+              class="dropdown-item"
+              type="button"
+              data-bs-toggle="modal"
+              data-bs-target="#pga-about-modal"
+            >
+              <span class="pga-dropdown-icon"><i class="bi bi-info-circle"></i></span>
+              About pgAssistant
+            </button>
           </div>
         </div>
       </div>
@@ -281,4 +318,51 @@
 {% with panel_layout='mobile' %}
 {% include "includes/db_connection_panel.html" %}
 {% endwith %}
+</div>
+
+<div class="modal fade" id="pga-about-modal" tabindex="-1" aria-labelledby="pga-about-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body px-4 px-sm-5 pb-5 text-center">
+        <div class="pga-about-icon mb-3" aria-hidden="true">
+          <i class="bi bi-database-check"></i>
+        </div>
+        <h2 class="h4 mb-2" id="pga-about-title">pgAssistant Community</h2>
+        <div class="pga-about-version mb-3">
+          <i class="bi bi-tag"></i>
+          Version {{ config.PGASSISTANT_VERSION }}
+        </div>
+        <p class="text-muted mb-4">
+          Open-source PostgreSQL analysis and optimization assistant.
+          Diagnose your databases, prioritize improvements, and generate actionable recommendations.
+        </p>
+        <div class="d-grid gap-2">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/beh74/pgassistant-community"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <i class="bi bi-star-fill me-2"></i>
+            Star pgAssistant on GitHub
+          </a>
+          <a
+            class="btn btn-outline-secondary"
+            href="https://beh74.github.io/pgassistant-blog/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <i class="bi bi-book me-2"></i>
+            Read the documentation
+          </a>
+        </div>
+        <p class="small text-muted mt-3 mb-0">
+          Your star helps other PostgreSQL users discover the project.
+        </p>
+      </div>
+    </div>
+  </div>
 </div>

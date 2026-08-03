@@ -1,0 +1,174 @@
+version: 1
+
+defaults:
+  phase: 90
+  phase_name: Manual review
+  workstream: REVIEW
+  team: DEV_OPS
+  priority: MEDIUM
+  group_by: [database, workstream, object_name]
+
+phases:
+  0:
+    name: Immediate risk containment
+    rationale: Resolve conditions that can threaten availability or data maintenance first.
+  10:
+    name: Restore reliable observations
+    rationale: Refresh missing or stale statistics before making workload-dependent decisions.
+  15:
+    name: Plan platform maintenance
+    rationale: Schedule PostgreSQL lifecycle updates with backups, compatibility checks, and rollback preparation.
+  20:
+    name: Correct schema design
+    rationale: Structural changes can invalidate later query and index recommendations.
+  30:
+    name: Improve SQL workload
+    rationale: Correct query behavior before finalizing the indexing strategy.
+  40:
+    name: Consolidate indexes
+    rationale: Apply and validate the index strategy after schema and query changes.
+  50:
+    name: Stabilize autovacuum
+    rationale: Tune table and cluster maintenance after the primary workload changes.
+  60:
+    name: Tune PostgreSQL parameters
+    rationale: Size instance parameters against the improved workload baseline.
+  70:
+    name: Validate and observe
+    rationale: Measure results and rerun the advisors before closing the plan.
+  90:
+    name: Manual review
+    rationale: Review recommendations that do not yet have a dedicated planning rule.
+
+rules:
+  - id: autovacuum_critical
+    match:
+      source: autovacuum
+      urgency: critical
+    classify:
+      phase: 0
+      workstream: VACUUM_EMERGENCY
+      team: OPS
+      priority: CRITICAL
+      group_by: [database, workstream]
+      task_title: Resolve critical vacuum backlog
+
+  - id: refresh_statistics
+    match:
+      source: autovacuum
+      action_type: ANALYZE
+    classify:
+      phase: 10
+      workstream: STATISTICS_REFRESH
+      team: OPS
+      priority: HIGH
+      group_by: [database, workstream]
+      task_title: Refresh planner statistics
+
+  - id: enable_autovacuum
+    match:
+      source: global_advisor
+      object_name: autovacuum
+    classify:
+      phase: 0
+      workstream: VACUUM_EMERGENCY
+      team: OPS
+      priority: CRITICAL
+      group_by: [database, workstream]
+      task_title: Enable autovacuum immediately
+
+  - id: postgresql_release_upgrade
+    match:
+      source: global_advisor
+      advisor_id: PostgreSQL release upgrade
+    classify:
+      phase: 15
+      workstream: PLATFORM_MAINTENANCE
+      team: OPS
+      group_by: [database, workstream]
+      task_title: Plan the PostgreSQL release update
+
+  - id: global_design
+    match:
+      source: global_advisor
+      category_id: DESIGN
+    classify:
+      phase: 20
+      workstream: SCHEMA_DESIGN
+      team: DEV
+      group_by: [database, workstream]
+      task_title: Correct schema design issues
+
+  - id: index_opportunities
+    match:
+      source: index_advisor
+    classify:
+      phase: 40
+      workstream: INDEX_STRATEGY
+      team: DEV_OPS
+      group_by: [database, workstream]
+      task_title: Consolidate index recommendations by table
+
+  - id: global_indexes
+    match:
+      source: global_advisor
+      category_id: INDEX
+    classify:
+      phase: 40
+      workstream: INDEX_STRATEGY
+      team: DEV_OPS
+      group_by: [database, workstream]
+      task_title: Consolidate index recommendations by table
+
+  - id: table_autovacuum
+    match:
+      source: autovacuum
+      scope: table
+    classify:
+      phase: 50
+      workstream: TABLE_AUTOVACUUM
+      team: OPS
+      group_by: [database, workstream]
+      max_items: 20
+      task_title: Tune autovacuum for affected tables
+
+  - id: global_autovacuum
+    match:
+      source: autovacuum
+      scope: cluster
+    classify:
+      phase: 50
+      workstream: AUTOVACUUM_CONFIGURATION
+      team: OPS
+      group_by: [database, workstream]
+      task_title: Tune global autovacuum settings
+
+  - id: parameter_tuning
+    match:
+      source: parameter_advisor
+    classify:
+      phase: 60
+      workstream: INSTANCE_CONFIGURATION
+      team: OPS
+      group_by: [database, workstream]
+      task_title: Review workload-related PostgreSQL parameters
+
+  - id: global_configuration
+    match:
+      source: global_advisor
+      category_id: CONFIGURATION
+    classify:
+      phase: 60
+      workstream: INSTANCE_CONFIGURATION
+      team: OPS
+      group_by: [database, workstream]
+      task_title: Review PostgreSQL configuration
+
+  - id: global_fallback
+    match:
+      source: global_advisor
+    classify:
+      phase: 30
+      workstream: DATABASE_IMPROVEMENTS
+      group_by: [database, team, workstream]
+      task_title: Implement {team} database recommendations

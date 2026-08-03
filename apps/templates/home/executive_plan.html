@@ -1,0 +1,385 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Executive Plan{% endblock %}
+
+{% block stylesheets %}
+<style>
+  .executive-plan-hero { margin-bottom: 1rem; }
+  .executive-phase,
+  .executive-task {
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06));
+  }
+  .executive-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 340px;
+    margin-top: 1.25rem;
+    padding: 2rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06));
+  }
+  .executive-loading-icon {
+    width: 4rem;
+    height: 4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    border-radius: 1.2rem;
+    color: #fff;
+    background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+    font-size: 1.6rem;
+    box-shadow: 0 16px 30px rgba(79, 70, 229, .2);
+  }
+  .executive-phase { margin-top: 1rem; overflow: hidden; }
+  .executive-phase-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    background: #f8fafc;
+    cursor: pointer;
+    list-style: none;
+  }
+  .executive-phase-header::-webkit-details-marker { display: none; }
+  .executive-phase[open] .executive-phase-header { border-bottom: 1px solid #e2e8f0; }
+  .executive-phase-number {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2rem; height: 2rem; padding: 0 .5rem; margin-right: .5rem;
+    border-radius: 999px; color: #fff; background: #4f46e5; font-weight: 900;
+  }
+  .executive-task { margin: .85rem; box-shadow: none; }
+  .executive-phase-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: #4f46e5;
+    background: #eef2ff;
+    transition: transform .2s ease, background .2s ease;
+  }
+  .executive-phase[open] .executive-phase-toggle {
+    transform: rotate(180deg);
+    background: #e0e7ff;
+  }
+  .executive-phase-actions { display: flex; align-items: center; gap: .55rem; flex: 0 0 auto; }
+  .executive-task-header { padding: 1rem; }
+  .executive-task-body { padding: 0 1rem 1rem; border-top: 1px solid #e2e8f0; }
+  .executive-badge { display: inline-block; margin: .15rem .25rem .15rem 0; padding: .25rem .55rem; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: .72rem; font-weight: 850; }
+  .executive-source-badge { background: #ecfeff; color: #0e7490; }
+  .executive-index-task { border-left: 4px solid #4f46e5; }
+  .executive-design-task { border-left: 4px solid #0891b2; }
+  .executive-table-label { color: #64748b; font-size: .7rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+  .executive-table-name { display: flex; align-items: center; gap: .45rem; margin-top: .15rem; font-size: 1rem; font-weight: 850; color: #172554; }
+  .executive-scope-group { margin-top: 1rem; padding: 0 1rem 1rem; border: 1px solid #dbe4ef; border-radius: .8rem; background: #f8fafc; }
+  .executive-scope-header { margin: 0 -1rem; padding: .75rem 1rem; border-bottom: 1px solid #dbe4ef; border-radius: .8rem .8rem 0 0; background: #f0fdfa; }
+  .executive-recommendation { padding: 1rem 0; border-bottom: 1px solid #e2e8f0; }
+  .executive-recommendation:last-child { padding-bottom: 0; border-bottom: 0; }
+  .executive-recommendation-number { display: inline-flex; align-items: center; justify-content: center; min-width: 1.55rem; height: 1.55rem; margin-right: .4rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: .7rem; font-weight: 900; }
+  .executive-sql { padding: .75rem; border-radius: .65rem; background: #111827; color: #e5e7eb; white-space: pre-wrap; font-size: .78rem; }
+
+  @media (max-width: 575.98px) {
+    .executive-phase-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .executive-phase-actions {
+      width: 100%;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .executive-phase-actions .executive-copy-sql {
+      margin-right: auto;
+    }
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="pg-page executive-plan-page">
+  <div class="pg-page-header">
+    <div>
+      <div class="pg-eyebrow">Insights &amp; Planning</div>
+      <h1 class="pg-title">Executive Plan</h1>
+      <p class="pg-subtitle">
+        Consolidated and ordered implementation plan built from Global Advisor, Index Advisor,
+        Parameter Advisor, and Autovacuum Tuning.
+        {% if multi_db_filter %}<span class="d-block mt-1">Database: <strong>{{ active_db }}</strong></span>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <section class="pg-hero executive-plan-hero">
+    <div>
+      <div class="pg-hero-title">Implementation roadmap</div>
+      <p class="pg-hero-text">
+        Turn advisor findings into ordered work packages. Start with platform and reliability prerequisites,
+        then address schema, indexes, maintenance, and configuration in a controlled sequence.
+      </p>
+    </div>
+  </section>
+
+  <div id="executive-plan-results" data-loading="{% if plan %}false{% else %}true{% endif %}">
+  {% if not plan %}
+    <div class="executive-loading" role="status" aria-live="polite">
+      <div class="executive-loading-icon"><i class="bi bi-arrow-repeat spinner-border" aria-hidden="true"></i></div>
+      <h2 class="h4">Building your Executive Plan</h2>
+      <p class="text-muted mb-2" id="executive-loading-message">
+        Running Global Advisor, Index Advisor, Parameter Advisor, and Autovacuum Tuning…
+      </p>
+      <p class="small text-muted mb-0">This analysis may take a few minutes. Please keep this page open.</p>
+    </div>
+  {% else %}
+  {% if plan.errors %}
+    <div class="alert alert-warning">
+      Some advisors could not be evaluated. The available recommendations were still planned.
+      <ul class="mb-0 mt-2">
+        {% for error in plan.errors %}<li><strong>{{ error.source }}</strong>: {{ error.error }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="pg-summary-grid">
+    <div class="pg-summary-card is-info">
+      <span class="pg-summary-label d-inline-flex align-items-center gap-1">
+        Work packages
+        <i
+          class="bi bi-question-circle summary-help-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="A work package is an implementation task that groups related advisor recommendations by objective, affected objects, responsible team, and execution phase."
+          aria-label="A work package is an implementation task that groups related advisor recommendations by objective, affected objects, responsible team, and execution phase."
+        ></i>
+        <span class="pg-summary-value">{{ plan.summary.tasks }}</span>
+      </span>
+    </div>
+    <div class="pg-summary-card is-violet">
+      <span class="pg-summary-label">Recommendations <span class="pg-summary-value">{{ plan.summary.recommendations_after_deduplication }}</span></span>
+    </div>
+    <div class="pg-summary-card is-high">
+      <span class="pg-summary-label">DEV tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV }}</span></span>
+    </div>
+    <div class="pg-summary-card is-info">
+      <span class="pg-summary-label">OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.OPS }}</span></span>
+    </div>
+    <div class="pg-summary-card is-violet">
+      <span class="pg-summary-label">DEV/OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV_OPS }}</span></span>
+    </div>
+  </div>
+
+  {% if not plan.phases %}
+    <div class="alert alert-success">No actionable recommendation was found by the advisors.</div>
+  {% endif %}
+
+  {% for phase in plan.phases %}
+    <details class="executive-phase">
+      <summary class="executive-phase-header">
+        <div>
+          <h2 class="h5 mb-1"><span class="executive-phase-number">{{ loop.index }}</span>{{ phase.name }}</h2>
+          <p class="small text-muted mb-0">{{ phase.rationale }}</p>
+        </div>
+        <div class="executive-phase-actions">
+          <span class="executive-badge">{{ phase.team|replace('_', '/') }}</span>
+          {% if phase.requires_maintenance_window %}
+            <span class="executive-badge" title="Plan a maintenance window for this chapter">
+              <i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Maintenance window
+            </span>
+          {% endif %}
+          {% if phase.requires_restart %}
+            <span class="executive-badge" title="A database restart is expected for this chapter">
+              <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Database restart
+            </span>
+          {% endif %}
+          {% if phase.sql_count %}
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary executive-copy-sql"
+              data-copy-target="executive-phase-sql-{{ phase.number }}"
+            >
+              <i class="bi bi-clipboard me-1" aria-hidden="true"></i>
+              <span>Copy all SQL commands</span>
+            </button>
+          {% endif %}
+          <span
+            class="executive-phase-toggle"
+            title="Click to show or hide recommendations and SQL commands"
+            aria-label="Click to show or hide recommendations and SQL commands"
+          ><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+        </div>
+      </summary>
+
+      {% if phase.sql_count %}
+        <pre id="executive-phase-sql-{{ phase.number }}" class="d-none" aria-hidden="true">{% for task in phase.tasks %}{% for advice in task.recommendations if advice.sql %}{{ advice.sql }}
+
+{% endfor %}{% endfor %}</pre>
+      {% endif %}
+
+      {% for task in phase.tasks %}
+        <article class="executive-task{% if task.workstream == 'INDEX_STRATEGY' %} executive-index-task{% elif task.workstream == 'SCHEMA_DESIGN' %} executive-design-task{% endif %}">
+          <div class="executive-task-header">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+              <div>
+                <strong>{{ task.title }}</strong>
+                <div class="small text-muted mt-1">
+                  {{ task.recommendation_count }} recommendation(s) · {{ task.sql_count }} SQL command(s) · score {{ task.score }}
+                </div>
+              </div>
+              <div>
+                <span class="executive-badge">{{ task.team|replace('_', '/') }}</span>
+                <span class="executive-badge">{{ task.priority }}</span>
+                {% if task.requires_restart %}<span class="executive-badge">Restart</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="executive-task-body">
+            <div class="d-flex flex-wrap align-items-center gap-1 small text-muted my-3">
+              <span class="me-1">Sources:</span>
+              {% for source in task.sources %}
+                <span class="executive-badge executive-source-badge">
+                  {% if source == 'global_advisor' %}Global Advisor
+                  {% elif source == 'index_advisor' %}Index Advisor
+                  {% elif source == 'parameter_advisor' %}Parameter Advisor
+                  {% elif source == 'autovacuum' %}Autovacuum Tuning
+                  {% else %}{{ source|replace('_', ' ')|title }}{% endif %}
+                </span>
+              {% endfor %}
+              {% if task.query_ids %}<span class="ms-1">Queries: {{ task.query_ids|join(', ') }}</span>{% endif %}
+            </div>
+            {% if task.workstream == 'SCHEMA_DESIGN' or task.workstream == 'INDEX_STRATEGY' %}
+              {% for group in task.recommendation_groups %}
+                <section class="executive-scope-group">
+                  <div class="executive-scope-header">
+                    <div class="executive-table-label">Table</div>
+                    <div class="executive-table-name"><i class="bi bi-table" aria-hidden="true"></i>{{ group.scope_name }}</div>
+                  </div>
+                  {% for advice in group.recommendations %}
+                    <div class="executive-recommendation">
+                      <h3 class="h6 mb-1"><span class="executive-recommendation-number">{{ loop.index }}</span>{{ advice.title }}</h3>
+                      {% if advice.description %}<p class="small text-muted">{{ advice.description }}</p>{% endif %}
+                      {% if advice.evidence %}<ul class="small">{% for evidence in advice.evidence %}<li>{{ evidence }}</li>{% endfor %}</ul>{% endif %}
+                      {% if advice.sql %}<pre class="executive-sql"><code>{{ advice.sql }}</code></pre>{% endif %}
+                    </div>
+                  {% endfor %}
+                </section>
+              {% endfor %}
+            {% else %}
+              {% for advice in task.recommendations %}
+                <div class="executive-recommendation">
+                  <h3 class="h6 mb-1">
+                    {% if task.workstream == 'INDEX_STRATEGY' %}<span class="executive-recommendation-number">{{ loop.index }}</span>{% endif %}
+                    {{ advice.title }}
+                  </h3>
+                  {% if advice.description %}<p class="small text-muted">{{ advice.description }}</p>{% endif %}
+                  {% if advice.evidence %}<ul class="small">{% for evidence in advice.evidence %}<li>{{ evidence }}</li>{% endfor %}</ul>{% endif %}
+                  {% if advice.sql %}<pre class="executive-sql"><code>{{ advice.sql }}</code></pre>{% endif %}
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </details>
+  {% endfor %}
+  {% endif %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+function initializeExecutivePlanActions(root) {
+  if (window.bootstrap) {
+    root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+      bootstrap.Tooltip.getOrCreateInstance(element);
+    });
+  }
+
+  root.querySelectorAll(".executive-copy-sql").forEach(function (button) {
+    button.addEventListener("click", async function (event) {
+      event.stopPropagation();
+      const target = document.getElementById(button.dataset.copyTarget);
+      const label = button.querySelector("span");
+      if (!target || !label) return;
+
+      try {
+        await navigator.clipboard.writeText(target.textContent.trim());
+        const originalLabel = label.textContent;
+        label.textContent = "SQL commands copied";
+        button.classList.remove("btn-outline-primary");
+        button.classList.add("btn-success");
+        window.setTimeout(function () {
+          label.textContent = originalLabel;
+          button.classList.remove("btn-success");
+          button.classList.add("btn-outline-primary");
+        }, 1800);
+      } catch (error) {
+        label.textContent = "Unable to copy SQL commands";
+      }
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const results = document.getElementById("executive-plan-results");
+  if (!results) return;
+
+  if (results.dataset.loading !== "true") {
+    initializeExecutivePlanActions(results);
+    return;
+  }
+
+  const messages = [
+    "Running the four database advisors…",
+    "Consolidating related recommendations…",
+    "Removing duplicate implementation actions…",
+    "Assigning DEV and OPS responsibilities…",
+    "Ordering tasks and implementation phases…"
+  ];
+  const message = document.getElementById("executive-loading-message");
+  let messageIndex = 0;
+  const messageTimer = window.setInterval(function () {
+    messageIndex = (messageIndex + 1) % messages.length;
+    if (message) message.textContent = messages[messageIndex];
+  }, 3500);
+
+  const runUrl = new URL(window.location.href);
+  runUrl.searchParams.set("run", "1");
+
+  fetch(runUrl.toString(), {headers: {"X-Requested-With": "XMLHttpRequest"}})
+    .then(function (response) {
+      if (!response.ok) throw new Error("Executive Plan generation failed.");
+      return response.text();
+    })
+    .then(function (html) {
+      const documentResult = new DOMParser().parseFromString(html, "text/html");
+      const generatedResults = documentResult.getElementById("executive-plan-results");
+      if (!generatedResults || generatedResults.dataset.loading === "true") {
+        throw new Error("Executive Plan results were not returned.");
+      }
+      window.clearInterval(messageTimer);
+      results.replaceWith(generatedResults);
+      initializeExecutivePlanActions(generatedResults);
+    })
+    .catch(function (error) {
+      window.clearInterval(messageTimer);
+      results.innerHTML = `
+        <div class="alert alert-danger mt-4" role="alert">
+          <strong>Unable to build the Executive Plan.</strong>
+          ${error.message || "Unknown error"}
+          <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="window.location.reload()">Retry</button>
+        </div>`;
+    });
+});
+</script>
+{% endblock javascripts %}

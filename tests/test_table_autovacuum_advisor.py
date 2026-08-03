@@ -26,7 +26,7 @@ from pathlib import Path
 
 class TableAutovacuumAdvisorTests(unittest.TestCase):
     def test_normalize_stale_days(self):
-        self.assertEqual(normalize_stale_days(None), 7)
+        self.assertEqual(normalize_stale_days(None), 30)
         self.assertEqual(normalize_stale_days("14"), 14)
         self.assertEqual(normalize_stale_days(999), 365)
 
@@ -155,6 +155,7 @@ class TableAutovacuumAdvisorTests(unittest.TestCase):
     def test_build_criteria_help_includes_vacuum_pressure(self):
         help_doc = build_criteria_help(7)
         self.assertEqual(help_doc["stale_days"], 7)
+        self.assertEqual(build_criteria_help()["stale_days"], 30)
         vacuum_section = next(s for s in help_doc["sections"] if s["id"] == "vacuum")
         joined = " ".join(vacuum_section["points"])
         self.assertIn("needs_vacuum_pressure", joined)

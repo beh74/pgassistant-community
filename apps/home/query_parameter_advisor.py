@@ -195,7 +195,15 @@ def _fetch_pg_stat_statements_rows(conn, database_name: str = "") -> List[Dict[s
           AND lower(query) NOT LIKE '/* launched by pgassistant */%'
         ORDER BY total_exec_time DESC
     """
-    sql = database.prepare_pgss_sql(sql, conn, database_name)
+    qualified_relation, relation_error = database.get_pg_stat_statements_relation(conn)
+    if not qualified_relation:
+        raise RuntimeError(relation_error or "pg_stat_statements is unavailable.")
+    sql = database.prepare_pgss_sql(
+        sql,
+        conn,
+        database_name,
+        qualified_relation=qualified_relation,
+    )
     with conn.cursor() as cur:
         cur.execute(sql)
         columns = [desc[0] for desc in cur.description]
@@ -530,9 +538,20 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
         result["message"] = "Generic plans require PostgreSQL 16 or newer."
         return result
 
-    conn, status = database.connectdb(db_config)
-    if conn is None:
+    plan_conn, status = database.connectdb(db_config)
+    if plan_conn is None:
         raise RuntimeError(status or "Unable to connect to database.")
+
+    stats_conn = plan_conn
+    if database.is_multi_db(db_config):
+        stats_conn, stats_status = database.connectdb(
+            database.get_monitoring_db_config(db_config)
+        )
+        if stats_conn is None:
+            plan_conn.close()
+            raise RuntimeError(
+                stats_status or "Unable to connect to the monitoring database."
+            )
 
     db_name = database.get_resolved_database_name(db_config)
     plan_metrics = _empty_plan_metrics()
@@ -542,7 +561,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
     queries_skipped_internal = 0
 
     try:
-        pgss_rows = _fetch_pg_stat_statements_rows(conn, db_name)
+        pgss_rows = _fetch_pg_stat_statements_rows(stats_conn, db_name)
         statement_metrics = _aggregate_statement_metrics(pgss_rows)
 
         for row in pgss_rows:
@@ -559,7 +578,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
             }
 
             try:
-                plan_json = _generic_plan_for_query(conn, query)
+                plan_json = _generic_plan_for_query(plan_conn, query)
                 if _plan_uses_internal_schema(plan_json):
                     queries_skipped_internal += 1
                     continue
@@ -596,4 +615,6 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
         })
         return result
     finally:
-        conn.close()
+        if stats_conn is not plan_conn:
+            stats_conn.close()
+        plan_conn.close()

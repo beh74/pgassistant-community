@@ -465,7 +465,7 @@ def handle_table_autovacuum_tune_get(template: str, segment: str):
         return redirect_response
 
     stale_days = table_autovacuum_advisor.normalize_stale_days(
-        request.args.get("stale_days") or session.get("autovacuum_stale_days")
+        request.args.get("stale_days")
     )
     result = table_autovacuum_advisor.run_table_autovacuum_advisor(
         session,

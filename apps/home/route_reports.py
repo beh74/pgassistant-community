@@ -4,12 +4,38 @@
 import traceback
 
 from apps.home import blueprint
-from flask import jsonify, render_template, session
+from flask import jsonify, redirect, render_template, request, session
 
 from . import database
+from . import executive_plan
 from . import global_advisor
 from . import llm
 from . import reporting
+
+
+@blueprint.route('/executive-plan.html', methods=['GET'])
+def executive_plan_route():
+    if not session.get("db_connected"):
+        return redirect("/database.html")
+
+    if request.args.get("run") != "1":
+        return render_template(
+            "home/executive_plan.html",
+            segment="executive_plan.html",
+            plan=None,
+        )
+
+    try:
+        plan = executive_plan.build_executive_plan(session)
+        return render_template(
+            "home/executive_plan.html",
+            segment="executive_plan.html",
+            plan=plan,
+        )
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=exc, traceback_text=tb), 500
 
 @blueprint.route("/dba_report", methods=["GET"])
 def dba_database_report():

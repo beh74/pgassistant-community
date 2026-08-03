@@ -1,5 +1,15 @@
 # Change Log
 
+## [3.6.0] - 2026-08-03
+
+## Improvements
+
+- Add Executive plan : Consolidated and ordered implementation plan built from Global Advisor, Index Advisor, Parameter Advisor, and Autovacuum Tuning.
+- Autovacuum tuning : change default from 7 days to 30 days 
+
+## Bug fixes
+
+- Fix Parameter Advisor in multi-database mode: read `pg_stat_statements` from the monitoring database, filter statistics for the selected database, and generate query plans on that selected database.
 
 ## [3.5.2] - 2026-08-02
 
@@ -11,7 +21,8 @@
 ## Improvements
 
 - Add a partially duplicate low-usage index advisor to identify wider indexes whose leading columns are already covered by a narrower index
-
+- Add Executive Plan to consolidate, group, assign, and order recommendations from Global, Index, Parameter, and Autovacuum advisors
+- Add an About dialog with the pgAssistant version, project information, documentation, and a GitHub link.
 
 ## [3.5.1] - 2026-07-31
 

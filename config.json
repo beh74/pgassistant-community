@@ -1,0 +1,8 @@
+{
+    "LOCAL_LLM_URI": "",
+    "OPENAI_API_KEY": "",
+    "OPENAI_API_MODEL": "",
+    "LLM_SQL_GUIDELINES": "",
+    "LLM_TABLE_RFC_PROMPT_TEMPLATE": "",
+    "LLM_TABLE_NAMING_PROMPT_TEMPLATE": ""
+}

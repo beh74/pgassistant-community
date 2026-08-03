@@ -8,6 +8,8 @@ from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from importlib import import_module
 
+from .version import __version__
+
 
 
 db = SQLAlchemy()
@@ -51,6 +53,7 @@ from apps.authentication.oauth import github_blueprint
 def create_app(config):
     app = Flask(__name__)
     app.config.from_object(config)
+    app.config["PGASSISTANT_VERSION"] = __version__
     register_extensions(app)
 
     app.register_blueprint(github_blueprint, url_prefix="/index")
