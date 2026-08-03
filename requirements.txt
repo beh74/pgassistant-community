@@ -26,3 +26,4 @@ sqlparse
 sqlglot
 #hvac
 pyyaml
+reportlab

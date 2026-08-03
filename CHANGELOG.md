@@ -1,5 +1,15 @@
 # Change Log
 
+## [3.6.1] - 2026-08-04
+
+## Improvements
+
+- Add Executive Plan PDF reporting with DEV and/or OPS audience filtering, pgAssistant branding, ordered work packages, advisor source badges, maintenance information, and executable SQL commands.
+
+## Bug fixes
+
+- Fix first-start LLM configuration: initialize empty persisted settings from non-empty environment variables instead of overwriting the container configuration with blank values.
+
 ## [3.6.0] - 2026-08-03
 
 ## Improvements

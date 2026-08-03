@@ -87,7 +87,26 @@
   .executive-recommendation { padding: 1rem 0; border-bottom: 1px solid #e2e8f0; }
   .executive-recommendation:last-child { padding-bottom: 0; border-bottom: 0; }
   .executive-recommendation-number { display: inline-flex; align-items: center; justify-content: center; min-width: 1.55rem; height: 1.55rem; margin-right: .4rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: .7rem; font-weight: 900; }
-  .executive-sql { padding: .75rem; border-radius: .65rem; background: #111827; color: #e5e7eb; white-space: pre-wrap; font-size: .78rem; }
+  #executive-plan-pane pre.executive-sql {
+    max-width: 100%;
+    margin: .65rem 0 0;
+    padding: .85rem 1rem;
+    overflow-x: auto;
+    border-radius: .65rem;
+    background: #111827;
+    color: #e5e7eb;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-size: .78rem;
+    line-height: 1.5;
+  }
+  .executive-report-card { padding: 1.4rem; border: 1px solid var(--ga-border, #dbe4ef); border-radius: 1rem; background: #fff; box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06)); }
+  .executive-team-choice { display: block; height: 100%; cursor: pointer; }
+  .executive-team-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .executive-team-choice-body { display: flex; align-items: flex-start; gap: .8rem; height: 100%; padding: 1rem; border: 2px solid #dbe4ef; border-radius: .85rem; background: #f8fafc; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+  .executive-team-choice input:checked + .executive-team-choice-body { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 3px rgba(79, 70, 229, .1); }
+  .executive-team-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; flex: 0 0 auto; border-radius: .7rem; background: #4f46e5; color: #fff; }
 
   @media (max-width: 575.98px) {
     .executive-phase-header {
@@ -130,6 +149,19 @@
     </div>
   </section>
 
+  <nav class="mb-4" aria-label="Executive Plan views">
+    <div class="nav nav-tabs tune-nav-tabs" id="executive-plan-tabs" role="tablist">
+      <button class="nav-link active" id="executive-plan-tab" data-bs-toggle="tab" data-bs-target="#executive-plan-pane" type="button" role="tab" aria-controls="executive-plan-pane" aria-selected="true">
+        <i class="bi bi-list-check me-1" aria-hidden="true"></i>Executive Plan
+      </button>
+      <button class="nav-link" id="executive-report-tab" data-bs-toggle="tab" data-bs-target="#executive-report-pane" type="button" role="tab" aria-controls="executive-report-pane" aria-selected="false">
+        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Report
+      </button>
+    </div>
+  </nav>
+
+  <div class="tab-content" id="executive-plan-tab-content">
+  <div class="tab-pane fade show active" id="executive-plan-pane" role="tabpanel" aria-labelledby="executive-plan-tab" tabindex="0">
   <div id="executive-plan-results" data-loading="{% if plan %}false{% else %}true{% endif %}">
   {% if not plan %}
     <div class="executive-loading" role="status" aria-live="polite">
@@ -293,6 +325,51 @@
   {% endfor %}
   {% endif %}
   </div>
+  </div>
+
+  <div class="tab-pane fade" id="executive-report-pane" role="tabpanel" aria-labelledby="executive-report-tab" tabindex="0">
+    <section class="executive-report-card">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+          <h2 class="h5 mb-1">Executive Plan PDF report</h2>
+          <p class="text-muted mb-0">Choose the report audience. Shared DEV/OPS work packages are included for either team.</p>
+        </div>
+        <span class="executive-badge"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF</span>
+      </div>
+
+      <form method="post" action="{{ url_for('home_blueprint.executive_plan_report_route') }}" target="_blank" id="executive-report-form">
+        <fieldset>
+          <legend class="h6 mb-3">Teams included in the report</legend>
+          <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6">
+              <label class="executive-team-choice">
+                <input type="checkbox" name="teams" value="DEV" checked>
+                <span class="executive-team-choice-body">
+                  <span class="executive-team-icon"><i class="bi bi-code-slash" aria-hidden="true"></i></span>
+                  <span><strong class="d-block">DEV</strong><span class="small text-muted">Schema design, query and application changes.</span></span>
+                </span>
+              </label>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="executive-team-choice">
+                <input type="checkbox" name="teams" value="OPS" checked>
+                <span class="executive-team-choice-body">
+                  <span class="executive-team-icon"><i class="bi bi-gear" aria-hidden="true"></i></span>
+                  <span><strong class="d-block">OPS</strong><span class="small text-muted">Operations, maintenance and PostgreSQL configuration.</span></span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </fieldset>
+        <div class="alert alert-warning d-none" id="executive-report-validation" role="alert">Select at least one team.</div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-file-earmark-arrow-down me-2" aria-hidden="true"></i>Generate PDF report
+        </button>
+        <p class="small text-muted mt-3 mb-0">The advisors are run again to generate a report based on the latest database state. This may take a few minutes.</p>
+      </form>
+    </section>
+  </div>
+  </div>
 </div>
 {% endblock content %}
 
@@ -331,6 +408,20 @@ function initializeExecutivePlanActions(root) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+  const reportForm = document.getElementById("executive-report-form");
+  if (reportForm) {
+    reportForm.addEventListener("submit", function (event) {
+      const selectedTeams = reportForm.querySelectorAll('input[name="teams"]:checked');
+      const validation = document.getElementById("executive-report-validation");
+      if (!selectedTeams.length) {
+        event.preventDefault();
+        if (validation) validation.classList.remove("d-none");
+      } else if (validation) {
+        validation.classList.add("d-none");
+      }
+    });
+  }
+
   const results = document.getElementById("executive-plan-results");
   if (!results) return;
 

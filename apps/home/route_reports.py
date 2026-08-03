@@ -1,17 +1,18 @@
 # -*- encoding: utf-8 -*-
 """Routes for reports and global advisor pages."""
 
+
 import traceback
 
 from apps.home import blueprint
-from flask import jsonify, redirect, render_template, request, session
+from flask import jsonify, redirect, render_template, request, send_file, session
 
 from . import database
 from . import executive_plan
+from . import executive_plan_pdf
 from . import global_advisor
 from . import llm
 from . import reporting
-
 
 @blueprint.route('/executive-plan.html', methods=['GET'])
 def executive_plan_route():
@@ -31,6 +32,35 @@ def executive_plan_route():
             "home/executive_plan.html",
             segment="executive_plan.html",
             plan=plan,
+        )
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=exc, traceback_text=tb), 500
+
+
+@blueprint.route('/executive-plan/report.pdf', methods=['POST'])
+def executive_plan_report_route():
+    if not session.get("db_connected"):
+        return redirect("/database.html")
+
+    teams = request.form.getlist("teams")
+    if not ({"DEV", "OPS"} & set(teams)):
+        return jsonify({"error": "Select at least one team."}), 400
+
+    try:
+        plan = executive_plan.build_executive_plan(session)
+        pdf = executive_plan_pdf.build_executive_plan_pdf(plan, teams)
+        database_name = database.get_resolved_database_name(session) or "database"
+        safe_database_name = "".join(
+            character if character.isalnum() or character in {"-", "_"} else "-"
+            for character in database_name
+        )
+        return send_file(
+            pdf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"pgassistant-executive-plan-{safe_database_name}.pdf",
         )
     except Exception as exc:
         tb = traceback.format_exc()

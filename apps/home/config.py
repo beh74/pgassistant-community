@@ -14,20 +14,35 @@ ENV_KEYS = [
 
 def init_or_load_env(config_path=CONFIG_PATH, keys=ENV_KEYS):
     """
-    If the config.json file exists, load its values into os.environ.
-    If it doesn't exist, create it from the current os.environ values.
+    Initialize the persisted LLM configuration without losing container values.
+
+    Non-empty values saved from the settings page remain authoritative. Missing
+    or empty persisted values are initialized from non-empty environment
+    variables, which also repairs config files created empty by older images.
     """
+    config = {}
     if os.path.exists(config_path):
-        # Load and apply existing config
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-        for key, value in config.items():
-            os.environ[key] = value
-       
-    else:
-        # Create config from current environment
-        config = {key: os.environ.get(key, "") for key in keys}
-        with open(config_path, "w") as f:
+        if not isinstance(config, dict):
+            raise ValueError("The LLM configuration must be a JSON object.")
+
+    changed = not os.path.exists(config_path)
+    for key in keys:
+        persisted_value = str(config.get(key) or "")
+        environment_value = str(os.environ.get(key) or "")
+
+        if persisted_value:
+            os.environ[key] = persisted_value
+        elif environment_value:
+            config[key] = environment_value
+            changed = True
+        elif key not in config:
+            config[key] = ""
+            changed = True
+
+    if changed:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
 
 
