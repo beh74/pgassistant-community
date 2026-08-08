@@ -55,6 +55,25 @@
   color: var(--bs-body-color);
 }
 
+.fillfactor-modal-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.fillfactor-modal-metrics .tables-summary-card {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+  .fillfactor-modal-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 399.98px) {
+  .fillfactor-modal-metrics { grid-template-columns: 1fr; }
+}
+
 .summary-help-icon {
   font-size: 0.8rem;
   color: var(--bs-secondary-color);
@@ -228,6 +247,11 @@
   color: #212529;
 }
 
+.table-status-no-bloat {
+  background: #198754;
+  color: #fff;
+}
+
 .table-status-small,
 .table-status-no-stats {
   background: #6c757d;
@@ -290,30 +314,154 @@
   color: #9a6b00 !important;
 }
 
-.table-card-footer {
+.table-update-panel {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: auto;
-}
-
-.table-card-footer .btn {
-  flex: 1 1 auto;
-}
-
-.table-card-footer .table-tetris-btn {
-  border-color: rgba(124, 58, 237, .28);
-  color: var(--pga-violet, #7c3aed);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
   background: rgba(255, 255, 255, .72);
-  font-weight: 800;
 }
 
-.table-card-footer .table-tetris-btn:hover,
-.table-card-footer .table-tetris-btn:focus {
-  border-color: transparent;
+.fillfactor-advisor-summary {
+  min-width: 0;
+}
+
+.fillfactor-advisor-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--bs-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.table-update-status {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.table-update-status-good { background: #d1e7dd; color: #0f5132; }
+.table-update-status-warning { background: #fff3cd; color: #664d03; }
+.table-update-status-muted { background: #e9ecef; color: #495057; }
+
+.fillfactor-recommendation-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.fillfactor-confidence {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: #e9ecef;
+  color: #495057;
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.fillfactor-check-results {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.fillfactor-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.65rem;
+  background: var(--bs-body-bg);
+}
+
+.fillfactor-check-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #6c757d;
+}
+
+.fillfactor-check-dot.ok { background: #198754; }
+.fillfactor-check-dot.warning { background: #ffc107; }
+.fillfactor-check-dot.unknown { background: #6c757d; }
+
+@media (max-width: 575.98px) {
+  .table-update-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fillfactor-advisor-btn { width: 100%; }
+}
+
+.table-card-footer {
+  display: grid;
+  grid-template-columns: repeat(5, 2.75rem);
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.table-card-footer .table-action-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.8rem;
+  border-width: 1px;
+  font-size: 1.05rem;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, .07);
+  transition: transform .16s ease, box-shadow .16s ease, color .16s ease, background .16s ease;
+}
+
+.table-card-footer .table-action-btn:hover,
+.table-card-footer .table-action-btn:focus-visible {
+  transform: translateY(-2px);
   color: #fff;
-  background: linear-gradient(135deg, var(--pga-violet, #7c3aed), var(--pga-primary, #2563eb));
-  box-shadow: 0 12px 24px rgba(124, 58, 237, .18);
+  box-shadow: 0 9px 18px rgba(15, 23, 42, .15);
+}
+
+.table-action-rfc { color: #fff; background: #2563eb; border-color: #2563eb; }
+.table-action-rfc:hover, .table-action-rfc:focus-visible { background: #1d4ed8; border-color: #1d4ed8; }
+.table-action-conventions { color: #0f766e; background: #ecfdf5; border-color: #99f6e4; }
+.table-action-conventions:hover, .table-action-conventions:focus-visible { background: #0f766e; border-color: #0f766e; }
+.table-action-indexes { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+.table-action-indexes:hover, .table-action-indexes:focus-visible { background: #d97706; border-color: #d97706; }
+.table-action-queries { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
+.table-action-queries:hover, .table-action-queries:focus-visible { background: #0284c7; border-color: #0284c7; }
+.table-action-tetris { color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe; }
+.table-action-tetris:hover, .table-action-tetris:focus-visible { background: #7c3aed; border-color: #7c3aed; }
+
+@media (max-width: 575.98px) {
+  .table-card-footer {
+    grid-template-columns: repeat(5, 2.5rem);
+    gap: 0.45rem;
+  }
+
+  .table-card-footer .table-action-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 
 /* ---------------------------------- */
@@ -684,6 +832,7 @@
             <option value="HIGH">High</option>
             <option value="MEDIUM">Medium</option>
             <option value="LOW">Low</option>
+            <option value="NO_BLOAT">No bloat</option>
             <option value="SMALL_TABLE">Small table</option>
             <option value="NO_STATS">No statistics</option>
           </select>
@@ -698,6 +847,7 @@
             <option value="rows">Row count</option>
             <option value="dead_pct">Dead tuple percentage</option>
             <option value="index_pct">Index percentage</option>
+            <option value="hot_pct">HOT update percentage</option>
           </select>
         </div>
 
@@ -733,6 +883,14 @@
         {% set dead_pct = r.dead_pct if r.dead_pct is defined else r['dead_pct'] %}
         {% set estimated_dead_size = r.estimated_dead_size if r.estimated_dead_size is defined else r['estimated_dead_size'] %}
         {% set bloat = r.bloat_indicator if r.bloat_indicator is defined else r['bloat_indicator'] %}
+        {% set updates = r.updates|default(0, true) %}
+        {% set hot_updates = r.hot_updates|default(0, true) %}
+        {% set non_hot_updates = r.non_hot_updates|default(0, true) %}
+        {% set hot_update_pct = r.hot_update_pct|default(0, true) %}
+        {% set fillfactor = r.fillfactor|default('100', true) %}
+        {% set fillfactor_min = r.fillfactor_min|default(100, true) %}
+        {% set fillfactor_max = r.fillfactor_max|default(100, true) %}
+        {% set stats_reset = r.stats_reset|default('', true) %}
 
         <div
           class="table-card-item"
@@ -743,6 +901,7 @@
           data-rows="{{ numeric_attr(row_count) }}"
           data-dead-pct="{{ numeric_attr(dead_pct) }}"
           data-index-pct="{{ numeric_attr(index_pct) }}"
+          data-hot-pct="{{ numeric_attr(hot_update_pct) }}"
         >
           <div class="card shadow-sm h-100 table-card">
 
@@ -758,6 +917,8 @@
                   <span class="table-status-badge table-status-medium">Medium bloat</span>
                 {% elif bloat == 'LOW' %}
                   <span class="table-status-badge table-status-low">Low bloat</span>
+                {% elif bloat == 'NO_BLOAT' %}
+                  <span class="table-status-badge table-status-no-bloat">No bloat</span>
                 {% elif bloat == 'SMALL_TABLE' %}
                   <span class="table-status-badge table-status-small">Small table</span>
                 {% elif bloat == 'NO_STATS' %}
@@ -827,39 +988,125 @@
                 </div>
               </div>
 
+              {% if updates|int > 0 %}
+                {% set advice = namespace(case='monitor', text='Keep monitoring; no strong signal for a change yet.', confidence='medium', recommended='', status='Monitor', status_class='table-update-status-muted') %}
+                {% if fillfactor == 'MIXED' %}
+                  {% set advice.case = 'mixed' %}
+                  {% set advice.text = 'Review leaf partitions individually.' %}
+                  {% set advice.confidence = 'high' %}
+                  {% set advice.status = 'Mixed fillfactor' %}
+                {% elif updates|int < 1000 %}
+                  {% set advice.case = 'low_sample' %}
+                  {% set advice.text = 'Continue observing before changing the fillfactor.' %}
+                  {% set advice.confidence = 'low' %}
+                  {% set advice.status = 'Low sample' %}
+                {% elif hot_update_pct|float >= 80 %}
+                  {% set advice.case = 'keep' %}
+                  {% set advice.text = 'Keep the current fillfactor.' %}
+                  {% set advice.confidence = 'high' %}
+                  {% set advice.status = 'HOT-friendly' %}
+                  {% set advice.status_class = 'table-update-status-good' %}
+                {% elif hot_update_pct|float < 50 and fillfactor|int >= 100 %}
+                  {% set advice.case = 'experiment' %}
+                  {% set advice.text = 'Candidate for a controlled fillfactor experiment.' %}
+                  {% set advice.confidence = 'medium' %}
+                  {% set advice.recommended = '90' %}
+                  {% set advice.status = 'Review' %}
+                  {% set advice.status_class = 'table-update-status-warning' %}
+                {% elif hot_update_pct|float < 50 %}
+                  {% set advice.case = 'investigate' %}
+                  {% set advice.text = 'Investigate other causes before lowering it further.' %}
+                  {% set advice.confidence = 'medium' %}
+                  {% set advice.status = 'Investigate' %}
+                  {% set advice.status_class = 'table-update-status-warning' %}
+                {% endif %}
+
+                <div class="table-update-panel">
+                  <div class="fillfactor-advisor-summary">
+                    <div class="fillfactor-advisor-heading">
+                      <span>Fillfactor advisor</span>
+                      <span class="table-update-status {{ advice.status_class }}">{{ advice.status }}</span>
+                    </div>
+                    <div class="fillfactor-recommendation-text{% if advice.case in ['experiment', 'investigate'] %} text-metric-warning{% endif %}">
+                      {{ advice.text }}
+                      <span class="fillfactor-confidence">{{ advice.confidence }}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-shrink-0 fillfactor-advisor-btn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#fillfactorAdvisorModal"
+                    data-advice-case="{{ advice.case }}"
+                    data-schema-name="{{ schema|e }}"
+                    data-table-name="{{ table|e }}"
+                    data-fillfactor="{{ fillfactor|e }}"
+                    data-fillfactor-min="{{ fillfactor_min }}"
+                    data-fillfactor-max="{{ fillfactor_max }}"
+                    data-updates="{{ updates }}"
+                    data-hot-updates="{{ hot_updates }}"
+                    data-non-hot-updates="{{ non_hot_updates }}"
+                    data-hot-pct="{{ hot_update_pct }}"
+                    data-confidence="{{ advice.confidence }}"
+                    data-recommended-fillfactor="{{ advice.recommended }}"
+                    data-stats-reset="{{ stats_reset|e }}"
+                  >
+                    <i class="bi bi-sliders me-1"></i>Details &amp; SQL
+                  </button>
+                </div>
+              {% endif %}
+
               <div class="table-card-footer">
                 <a
-                  class="btn btn-sm btn-primary"
+                  class="btn table-action-btn table-action-rfc"
                   href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}"
+                  title="Check RFC"
+                  aria-label="Check RFC for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-check2-circle me-1"></i>Check RFC
+                  <i class="bi bi-check2-circle" aria-hidden="true"></i>
                 </a>
 
                 <a
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn table-action-btn table-action-conventions"
                   href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}"
+                  title="Check conventions"
+                  aria-label="Check conventions for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-list-check me-1"></i>Check conventions
+                  <i class="bi bi-list-check" aria-hidden="true"></i>
                 </a>
 
 
 
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-primary table-index-stats-btn"
+                  class="btn table-action-btn table-action-indexes table-index-stats-btn"
                   data-bs-toggle="modal"
                   data-bs-target="#tableIndexStatsModal"
                   data-schema-name="{{ schema|e }}"
                   data-table-name="{{ table|e }}"
+                  title="Index stats"
+                  aria-label="Show index statistics for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-bar-chart-line me-1"></i>Index stats
+                  <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
                 </button>
 
                 <a
-                  class="btn btn-sm btn-outline-secondary table-tetris-btn"
-                  href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}"
+                  class="btn table-action-btn table-action-queries table-relative-queries-btn"
+                  href="/topqueries.html?schema={{ schema|urlencode }}&amp;tablename={{ table|urlencode }}"
+                  title="Relative queries"
+                  aria-label="Show relative queries for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-grid-3x3-gap me-1"></i>Play Tetris
+                  <i class="bi bi-code-square" aria-hidden="true"></i>
+                </a>
+
+                <a
+                  class="btn table-action-btn table-action-tetris table-tetris-btn"
+                  href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}"
+                  title="Play Tetris"
+                  aria-label="Play Tetris with {{ schema|e }}.{{ table|e }}"
+                >
+                  <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
                 </a>
               </div>
             </div>
@@ -876,6 +1123,114 @@
     <div id="tables-pagination" class="pagination-wrapper">
       <div id="tables-pagination-info" class="pagination-info"></div>
       <div id="tables-pagination-controls" class="pagination-controls"></div>
+    </div>
+
+    <div class="modal fade" id="fillfactorAdvisorModal" tabindex="-1" aria-labelledby="fillfactorAdvisorModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="fillfactorAdvisorModalTitle">Fillfactor advisor</h5>
+              <div class="text-muted small" id="fillfactorAdvisorObject">Select a table to inspect.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="fillfactor-modal-metrics mb-3">
+              <div class="tables-summary-card" id="fillfactorAdvisorCurrentWrapper">
+                <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+                  Current fillfactor
+                  <i
+                    class="bi bi-question-circle summary-help-icon"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Percentage of each table page PostgreSQL aims to fill during inserts."
+                  ></i>
+                </span>
+                <span class="tables-summary-value" id="fillfactorAdvisorCurrent">—</span>
+              </div>
+
+              <div class="tables-summary-card">
+                <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+                  Updates
+                  <i
+                    class="bi bi-question-circle summary-help-icon"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Rows updated since PostgreSQL statistics were last reset."
+                  ></i>
+                </span>
+                <span class="tables-summary-value" id="fillfactorAdvisorUpdates">—</span>
+              </div>
+
+              <div class="tables-summary-card">
+                <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+                  HOT / non-HOT
+                  <i
+                    class="bi bi-question-circle summary-help-icon"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="HOT updates avoid new index entries; non-HOT updates require index maintenance."
+                  ></i>
+                </span>
+                <span class="tables-summary-value" id="fillfactorAdvisorHotCounts">—</span>
+              </div>
+
+              <div class="tables-summary-card">
+                <span class="tables-summary-label d-inline-flex align-items-center gap-1">
+                  HOT ratio
+                  <i
+                    class="bi bi-question-circle summary-help-icon"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Share of all updates that were HOT; a higher percentage means less index maintenance."
+                  ></i>
+                </span>
+                <span class="tables-summary-value" id="fillfactorAdvisorHotPct">—</span>
+              </div>
+            </div>
+
+            <div class="alert alert-info" id="fillfactorAdvisorRecommendation"></div>
+
+            <div class="mb-3">
+              <h6>Why this recommendation?</h6>
+              <p class="text-muted mb-0" id="fillfactorAdvisorExplanation"></p>
+            </div>
+
+            <div class="border rounded p-3 mb-3" id="fillfactorAdvisorChecks">
+              <div class="d-flex justify-content-between align-items-center gap-2">
+                <div>
+                  <h6 class="mb-1">Validate possible causes</h6>
+                  <div class="small text-muted">Check indexed-column updates, vacuum pressure and long transactions.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0" id="fillfactorAdvisorCheckBtn">
+                  <i class="bi bi-search me-1"></i>Check it
+                </button>
+              </div>
+              <div class="small text-muted mt-3 d-none" id="fillfactorAdvisorCheckLoading">Running read-only checks…</div>
+              <div class="alert alert-warning mt-3 mb-0 d-none" id="fillfactorAdvisorCheckError"></div>
+              <div class="fillfactor-check-results mt-3 d-none" id="fillfactorAdvisorCheckResults"></div>
+            </div>
+
+            <div>
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div>
+                  <h6 class="mb-0">SQL to apply or test</h6>
+                  <div class="small text-muted" id="fillfactorAdvisorSqlHelp"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="fillfactorAdvisorCopySql">Copy SQL</button>
+              </div>
+              <pre class="table-index-code mb-0"><code id="fillfactorAdvisorSql">—</code></pre>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <div class="text-muted small me-auto" id="fillfactorAdvisorStatsWindow"></div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="modal fade table-index-modal" id="tableIndexStatsModal" tabindex="-1" aria-labelledby="tableIndexStatsModalTitle" aria-hidden="true">
@@ -1002,6 +1357,27 @@ document.addEventListener("DOMContentLoaded", function () {
   const paginationControls = document.getElementById("tables-pagination-controls");
   const visibleCount = document.getElementById("tables-visible-count");
 
+  const fillfactorAdvisorModal = document.getElementById("fillfactorAdvisorModal");
+  const fillfactorAdvisorObject = document.getElementById("fillfactorAdvisorObject");
+  const fillfactorAdvisorCurrentWrapper = document.getElementById("fillfactorAdvisorCurrentWrapper");
+  const fillfactorAdvisorCurrent = document.getElementById("fillfactorAdvisorCurrent");
+  const fillfactorAdvisorUpdates = document.getElementById("fillfactorAdvisorUpdates");
+  const fillfactorAdvisorHotCounts = document.getElementById("fillfactorAdvisorHotCounts");
+  const fillfactorAdvisorHotPct = document.getElementById("fillfactorAdvisorHotPct");
+  const fillfactorAdvisorRecommendation = document.getElementById("fillfactorAdvisorRecommendation");
+  const fillfactorAdvisorExplanation = document.getElementById("fillfactorAdvisorExplanation");
+  const fillfactorAdvisorSqlHelp = document.getElementById("fillfactorAdvisorSqlHelp");
+  const fillfactorAdvisorSql = document.getElementById("fillfactorAdvisorSql");
+  const fillfactorAdvisorCopySql = document.getElementById("fillfactorAdvisorCopySql");
+  const fillfactorAdvisorStatsWindow = document.getElementById("fillfactorAdvisorStatsWindow");
+  const fillfactorAdvisorCheckBtn = document.getElementById("fillfactorAdvisorCheckBtn");
+  const fillfactorAdvisorCheckLoading = document.getElementById("fillfactorAdvisorCheckLoading");
+  const fillfactorAdvisorCheckError = document.getElementById("fillfactorAdvisorCheckError");
+  const fillfactorAdvisorCheckResults = document.getElementById("fillfactorAdvisorCheckResults");
+  let currentFillfactorSql = "";
+  let currentFillfactorSchema = "";
+  let currentFillfactorTable = "";
+
 
   const tableIndexModalTitle = document.getElementById("tableIndexStatsModalTitle");
   const tableIndexModalSubtitle = document.getElementById("tableIndexStatsModalSubtitle");
@@ -1026,6 +1402,150 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
+
+  function quoteSqlIdentifier(value) {
+    return '"' + String(value || "").replace(/"/g, '""') + '"';
+  }
+
+  function quoteSqlLiteral(value) {
+    return "'" + String(value || "").replace(/'/g, "''") + "'";
+  }
+
+  function formatInteger(value) {
+    const numericValue = Number(value || 0);
+    return Number.isFinite(numericValue) ? numericValue.toLocaleString() : "0";
+  }
+
+  function buildFillfactorAdvice(button) {
+    const adviceCase = button.dataset.adviceCase || "monitor";
+    const schemaName = button.dataset.schemaName || "";
+    const tableName = button.dataset.tableName || "";
+    const fillfactor = button.dataset.fillfactor || "100";
+    const fillfactorMin = button.dataset.fillfactorMin || "100";
+    const fillfactorMax = button.dataset.fillfactorMax || "100";
+    const updates = button.dataset.updates || "0";
+    const hotUpdates = button.dataset.hotUpdates || "0";
+    const nonHotUpdates = button.dataset.nonHotUpdates || "0";
+    const hotPct = button.dataset.hotPct || "0";
+    const confidence = button.dataset.confidence || "low";
+    const recommendedFillfactor = button.dataset.recommendedFillfactor || "";
+    const statsReset = button.dataset.statsReset || "";
+    const qualifiedTable = quoteSqlIdentifier(schemaName) + "." + quoteSqlIdentifier(tableName);
+    const qualifiedTableLiteral = quoteSqlLiteral(qualifiedTable);
+
+    let recommendation = "Keep monitoring; there is no strong signal for a fillfactor change yet.";
+    let explanation = hotPct + "% of " + formatInteger(updates) + " updates are HOT. The result is not decisive enough to trade storage density for additional page free space.";
+    let sqlHelp = "No storage change is proposed. Use this query to capture the current counters again later.";
+    let sql = "SELECT n_tup_upd, n_tup_hot_upd,\n       n_tup_upd - n_tup_hot_upd AS n_tup_non_hot_upd\nFROM pg_stat_user_tables\nWHERE relid = " + qualifiedTableLiteral + "::regclass;";
+
+    if (adviceCase === "no_activity") {
+      recommendation = "No recommendation without observed update activity.";
+      explanation = "No updates have been recorded during the current statistics window. The fillfactor is intentionally hidden because there is no update workload against which to evaluate it.";
+      sqlHelp = "Capture the table counters after a representative workload period.";
+      sql = "SELECT n_tup_upd, n_tup_hot_upd,\n       n_tup_upd - n_tup_hot_upd AS n_tup_non_hot_upd,\n       last_autovacuum\nFROM pg_stat_user_tables\nWHERE relid = " + qualifiedTableLiteral + "::regclass;";
+    } else if (adviceCase === "low_sample") {
+      recommendation = "Continue observing before changing the fillfactor.";
+      explanation = "Only " + formatInteger(updates) + " updates have been recorded. This sample is too small to separate a persistent HOT-update issue from normal workload variation.";
+      sqlHelp = "Run this query after more update activity and compare the counters.";
+    } else if (adviceCase === "keep") {
+      recommendation = "Keep the current fillfactor; HOT updates are effective.";
+      explanation = hotPct + "% of " + formatInteger(updates) + " updates are HOT. Lowering the fillfactor would reserve more disk and cache space without clear evidence that it is needed.";
+      sqlHelp = "No change is recommended; the SQL documents the current setting.";
+      sql = "-- No fillfactor change recommended for " + qualifiedTable + ".\n-- Current effective fillfactor: " + fillfactor + ".";
+    } else if (adviceCase === "experiment") {
+      recommendation = "Test fillfactor " + recommendedFillfactor + " first; consider 80 only if the measured result remains poor.";
+      explanation = "Only " + hotPct + "% of " + formatInteger(updates) + " updates are HOT with fillfactor 100. Reserving 10% free space may help same-page row versions. First verify that indexed columns are not being updated and that autovacuum or long transactions are not the primary cause.";
+      sqlHelp = "ALTER TABLE affects future inserts and does not rewrite existing pages. Observe a representative workload, then keep or restore the original value.";
+      sql = "-- Test on future inserts; existing pages are not rewritten.\nALTER TABLE " + qualifiedTable + " SET (fillfactor = " + recommendedFillfactor + ");\n\n-- Restore the original setting if the test is not beneficial.\nALTER TABLE " + qualifiedTable + " SET (fillfactor = " + fillfactor + ");";
+    } else if (adviceCase === "investigate") {
+      recommendation = "Investigate indexed columns and maintenance before lowering the fillfactor further.";
+      explanation = "The table already uses fillfactor " + fillfactor + ", but only " + hotPct + "% of " + formatInteger(updates) + " updates are HOT. Indexed-column updates, row growth, autovacuum behavior or long-running transactions may matter more than free page space.";
+      sqlHelp = "Review index definitions before considering another storage change.";
+      sql = "SELECT indexname, indexdef\nFROM pg_indexes\nWHERE schemaname = " + quoteSqlLiteral(schemaName) + "\n  AND tablename = " + quoteSqlLiteral(tableName) + "\nORDER BY indexname;";
+    } else if (adviceCase === "mixed") {
+      recommendation = "Review leaf partitions individually before applying a fillfactor.";
+      explanation = "Leaf partitions use fillfactors from " + fillfactorMin + " to " + fillfactorMax + ". Their update patterns may differ, so an aggregate ALTER TABLE recommendation would be misleading.";
+      sqlHelp = "List each direct partition and its configured or default fillfactor.";
+      sql = "SELECT child.oid::regclass AS partition,\n       COALESCE(ff.fillfactor, 100) AS fillfactor\nFROM pg_inherits AS inh\nJOIN pg_class AS child ON child.oid = inh.inhrelid\nLEFT JOIN LATERAL (\n  SELECT option_value::integer AS fillfactor\n  FROM pg_options_to_table(child.reloptions)\n  WHERE option_name = 'fillfactor'\n) AS ff ON TRUE\nWHERE inh.inhparent = " + qualifiedTableLiteral + "::regclass\nORDER BY partition::text;";
+    }
+
+    if (fillfactorAdvisorObject) fillfactorAdvisorObject.textContent = schemaName + "." + tableName;
+    if (fillfactorAdvisorCurrentWrapper) fillfactorAdvisorCurrentWrapper.classList.toggle("d-none", adviceCase === "no_activity");
+    if (fillfactorAdvisorCurrent) fillfactorAdvisorCurrent.textContent = fillfactor === "MIXED" ? "Mixed " + fillfactorMin + "–" + fillfactorMax : fillfactor;
+    if (fillfactorAdvisorUpdates) fillfactorAdvisorUpdates.textContent = formatInteger(updates);
+    if (fillfactorAdvisorHotCounts) fillfactorAdvisorHotCounts.textContent = formatInteger(hotUpdates) + " / " + formatInteger(nonHotUpdates);
+    if (fillfactorAdvisorHotPct) fillfactorAdvisorHotPct.textContent = Number(updates) > 0 ? hotPct + "%" : "—";
+    if (fillfactorAdvisorRecommendation) fillfactorAdvisorRecommendation.textContent = recommendation + " Confidence: " + confidence + ".";
+    if (fillfactorAdvisorExplanation) fillfactorAdvisorExplanation.textContent = explanation;
+    if (fillfactorAdvisorSqlHelp) fillfactorAdvisorSqlHelp.textContent = sqlHelp;
+    if (fillfactorAdvisorSql) fillfactorAdvisorSql.textContent = sql;
+    if (fillfactorAdvisorStatsWindow) fillfactorAdvisorStatsWindow.textContent = statsReset ? "Cumulative statistics since " + statsReset + "." : "Cumulative PostgreSQL statistics.";
+    currentFillfactorSql = sql;
+    currentFillfactorSchema = schemaName;
+    currentFillfactorTable = tableName;
+    fillfactorAdvisorCheckLoading?.classList.add("d-none");
+    fillfactorAdvisorCheckError?.classList.add("d-none");
+    fillfactorAdvisorCheckResults?.classList.add("d-none");
+    if (fillfactorAdvisorCheckResults) fillfactorAdvisorCheckResults.innerHTML = "";
+  }
+
+  fillfactorAdvisorModal?.addEventListener("show.bs.modal", function (event) {
+    const button = event.relatedTarget;
+    if (button) buildFillfactorAdvice(button);
+  });
+
+  fillfactorAdvisorCopySql?.addEventListener("click", async function () {
+    if (!currentFillfactorSql) return;
+    const originalText = fillfactorAdvisorCopySql.textContent;
+    try {
+      await navigator.clipboard.writeText(currentFillfactorSql);
+      fillfactorAdvisorCopySql.textContent = "Copied";
+    } catch (err) {
+      fillfactorAdvisorCopySql.textContent = "Copy failed";
+    }
+    window.setTimeout(function () { fillfactorAdvisorCopySql.textContent = originalText; }, 1200);
+  });
+
+  fillfactorAdvisorCheckBtn?.addEventListener("click", async function () {
+    if (!currentFillfactorSchema || !currentFillfactorTable) return;
+    fillfactorAdvisorCheckBtn.disabled = true;
+    fillfactorAdvisorCheckLoading?.classList.remove("d-none");
+    fillfactorAdvisorCheckError?.classList.add("d-none");
+    fillfactorAdvisorCheckResults?.classList.add("d-none");
+
+    try {
+      const url = "/api/v1/fillfactor_checks/" + encodeURIComponent(currentFillfactorSchema) + "/" + encodeURIComponent(currentFillfactorTable);
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok || data.success === false) throw new Error(data.error || "Unable to run checks.");
+
+      const labels = [
+        ["indexed_updates", "Indexed-column updates"],
+        ["autovacuum", "Autovacuum"],
+        ["long_transactions", "Long transactions"]
+      ];
+      if (fillfactorAdvisorCheckResults) {
+        fillfactorAdvisorCheckResults.innerHTML = labels.map(function (entry) {
+          const check = data.checks?.[entry[0]] || {};
+          const status = ["ok", "warning", "unknown"].includes(check.status) ? check.status : "unknown";
+          return '<div class="fillfactor-check-item">' +
+            '<span class="fillfactor-check-dot ' + status + '"></span>' +
+            '<div><div class="fw-semibold">' + escapeHtml(check.label || entry[1]) + '</div>' +
+            '<div class="small text-muted">' + escapeHtml(check.summary || "No result returned.") + '</div></div>' +
+          '</div>';
+        }).join("");
+        fillfactorAdvisorCheckResults.classList.remove("d-none");
+      }
+    } catch (err) {
+      if (fillfactorAdvisorCheckError) {
+        fillfactorAdvisorCheckError.textContent = err.message || "Unable to run checks.";
+        fillfactorAdvisorCheckError.classList.remove("d-none");
+      }
+    } finally {
+      fillfactorAdvisorCheckLoading?.classList.add("d-none");
+      fillfactorAdvisorCheckBtn.disabled = false;
+    }
+  });
 
   function formatIndexValue(value, suffix) {
     if (value === null || value === undefined || value === "") return "-";
@@ -1234,6 +1754,7 @@ document.addEventListener("DOMContentLoaded", function () {
     HIGH: 5,
     MEDIUM: 4,
     LOW: 3,
+    NO_BLOAT: 2,
     SMALL_TABLE: 2,
     NO_STATS: 1
   };
@@ -1281,6 +1802,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (sort === "index_pct") {
         return getNumber(b, "data-index-pct") - getNumber(a, "data-index-pct");
+      }
+
+      if (sort === "hot_pct") {
+        return getNumber(b, "data-hot-pct") - getNumber(a, "data-hot-pct");
       }
 
       return (

@@ -6,6 +6,7 @@ import re
 from flask import render_template, request, session, redirect
 
 from . import config
+from . import analyze_param
 from . import database
 from . import llm
 from . import pgstat_helper
@@ -226,28 +227,49 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
         
         # get optional tablename parameter from URL
         if tablename is None:
-            tablename = request.args.get('tablename')  
+            tablename = request.args.get('tablename')
+        schema_name = (request.args.get('schema') or '').strip()
 
         # get top queries
         rows = database.get_top_queries(session)
 
         # add additional information on queries
-        for row in rows:            
-            row['tables'] = sqlhelper.get_tables(row['query'])
+        for row in rows:
+            query = row.get('query') or ''
+            row['tables'] = analyze_param.extract_referenced_tables_safe(query)
+            if not row['tables']:
+                # Keep non-PostgreSQL or truncated pg_stat_statements entries visible.
+                row['tables'] = sqlhelper.get_tables(query)
             row['operation_type'] = sqlhelper.get_sql_type(row['query'])
 
         # Get PostgreSQL internal tables
         pga_tables = database.get_pga_tables()
 
         # Filter queries to ignore system tables
-        rows_filtered = [row for row in rows if not any(table in pga_tables for table in row['tables'])]
+        rows_filtered = [
+            row for row in rows
+            if not any(table.split(".")[-1] in pga_tables for table in row['tables'])
+        ]
 
         # Filter even more if 'tablename' is provided
         if tablename:
-            rows_filtered = [row for row in rows_filtered if tablename in row['tables']]
+            rows_filtered = [
+                row for row in rows_filtered
+                if analyze_param.query_references_table(
+                    row.get('query') or '', schema_name, tablename
+                )
+            ]
 
         # Render the template with the filtered data
-        return render_template(f"home/{template}", segment=segment, rows=rows_filtered, tablename=tablename,column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
+        return render_template(
+            f"home/{template}",
+            segment=segment,
+            rows=rows_filtered,
+            tablename=tablename,
+            schema_name=schema_name,
+            related_mode=bool(tablename),
+            column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS,
+        )
 
     else:
         return redirect("/database.html")

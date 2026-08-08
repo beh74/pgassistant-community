@@ -18,6 +18,7 @@ from . import indexe_helper
 from . import query_index_advisor
 from . import query_parameter_advisor
 from . import schema_helper
+from . import fillfactor_advisor
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -389,6 +390,27 @@ def api_table_indexe_stats(schemaname, tablename):
             "error": str(exc)
         }), 500
 
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+@blueprint.route("/api/v1/fillfactor_checks/<schemaname>/<tablename>", methods=["GET"])
+def api_fillfactor_checks(schemaname, tablename):
+    """Run read-only checks that qualify a table fillfactor recommendation."""
+    conn = None
+    try:
+        if not session.get("db_host") and not session.get("db_uri"):
+            return jsonify({"success": False, "error": "No database connection found in session."}), 400
+        conn, status = database.connectdb(session)
+        if conn is None or status != "OK":
+            return jsonify({"success": False, "error": status or "Unable to connect to database."}), 500
+        return jsonify(fillfactor_advisor.run_fillfactor_checks(conn, schemaname, tablename)), 200
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
     finally:
         if conn is not None:
             try:

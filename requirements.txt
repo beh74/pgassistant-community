@@ -24,6 +24,7 @@ pymdown-extensions>=10.0
 pygments>=2.19.2
 sqlparse
 sqlglot
+pglast>=8.4,<9
 #hvac
 pyyaml
 reportlab

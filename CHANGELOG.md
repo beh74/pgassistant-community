@@ -1,5 +1,20 @@
 # Change Log
 
+## [3.6.2] - 2026-08-08
+
+## Improvements
+
+- Table Advisor: add a fillfactor advisor based on the effective table fillfactor and PostgreSQL update statistics, including HOT updates, non-HOT updates, HOT ratio, confidence, and a controlled recommendation.
+- Table Advisor : add a menu to see all queries relative to a table.
+- Table Advisor: add a compact, color-coded icon action bar for RFC checks, convention checks, index statistics, related queries, and Tetris, with hover labels and accessible names.
+- Query analysis: use PostgreSQL's native grammar through `pglast` as the primary parameter-to-column parser, with support for casts, `IN`, `BETWEEN`, reversed predicates, aliases, subqueries, `UPDATE` assignments, and `INSERT` values.
+
+## Bug fixes
+
+- Table Advisor: classify large tables with exactly zero dead tuples as `NO_BLOAT` instead of incorrectly displaying `Low bloat`.
+- Query activity: preserve schema-qualified table names and match table filters by parsed relation rather than by approximate SQL text or an unqualified name.
+- Query activity: exclude CTE aliases from the displayed list of physical tables and avoid false matches between same-named tables in different schemas.
+
 ## [3.6.1] - 2026-08-04
 
 ## Improvements

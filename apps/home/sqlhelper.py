@@ -607,9 +607,10 @@ def map_query_parameters(query, connection):
         print(f"Warning: parameter extraction failed: {e}")
         param_columns = {}
 
+    # The regex fallback fills gaps, but must not replace AST-backed matches.
     param_columns = {
-        **(param_columns or {}),
         **fallback_columns,
+        **(param_columns or {}),
     }
 
     if not param_columns:

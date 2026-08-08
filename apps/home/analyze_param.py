@@ -2,6 +2,8 @@
 
 import re
 import sqlglot
+from pglast import ast, parse_sql
+from pglast.parser import ParseError as PglastParseError
 from sqlglot.expressions import (
     Column, Literal, And, Or, EQ, GT, LT, Like, Parameter, Table,
     Select, Subquery, In, Paren, GTE, LTE, NEQ, Alias, Not, Where, Between
@@ -114,7 +116,7 @@ def extract_param_keys_from_expr(expr):
     return keys
 
 
-def extract_parameter_columns(sql_query):
+def _extract_parameter_columns_sqlglot(sql_query):
     """
     Main helper used by query analysis to understand what each bind parameter targets.
 
@@ -253,3 +255,295 @@ def extract_parameter_columns(sql_query):
                 param_columns[param_key] = full_column_name
 
     return param_columns
+
+
+_STATEMENT_NODES = (
+    ast.SelectStmt,
+    ast.UpdateStmt,
+    ast.InsertStmt,
+    ast.DeleteStmt,
+)
+
+
+def _iter_ast_children(node):
+    """Yield the child values of a pglast AST node or collection."""
+    if isinstance(node, ast.Node):
+        for attribute in type(node).__slots__:
+            value = getattr(node, attribute, None)
+            if value is not None:
+                yield value
+    elif isinstance(node, (list, tuple)):
+        yield from node
+
+
+def _walk_ast(node, stop_at_statements=False):
+    """Walk a pglast tree, optionally leaving nested statements to their scope."""
+    if node is None:
+        return
+
+    if isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _walk_ast(item, stop_at_statements=stop_at_statements)
+        return
+
+    if not isinstance(node, ast.Node):
+        return
+
+    yield node
+    if stop_at_statements and isinstance(node, _STATEMENT_NODES):
+        return
+
+    for child in _iter_ast_children(node):
+        yield from _walk_ast(child, stop_at_statements=stop_at_statements)
+
+
+def _parameter_numbers(node):
+    return {
+        str(item.number)
+        for item in _walk_ast(node)
+        if isinstance(item, ast.ParamRef) and item.number
+    }
+
+
+def _column_parts(column):
+    return [
+        field.sval
+        for field in column.fields or ()
+        if isinstance(field, ast.String)
+    ]
+
+
+def _range_vars(node):
+    """Return physical table references contained in a FROM/USING clause."""
+    return [item for item in _walk_ast(node) if isinstance(item, ast.RangeVar)]
+
+
+def _scope_tables(statement):
+    """Build alias resolution and choose the statement's default table."""
+    ranges = []
+
+    relation = getattr(statement, "relation", None)
+    if isinstance(relation, ast.RangeVar):
+        ranges.append(relation)
+
+    for attribute in ("fromClause", "usingClause"):
+        ranges.extend(_range_vars(getattr(statement, attribute, None)))
+
+    aliases = {}
+    tables = []
+    for range_var in ranges:
+        table = range_var.relname
+        if not table:
+            continue
+        tables.append(table)
+        aliases[table] = table
+        if range_var.alias and range_var.alias.aliasname:
+            aliases[range_var.alias.aliasname] = table
+
+    return aliases, (tables[0] if tables else None)
+
+
+def _qualified_column(column, aliases, default_table):
+    parts = _column_parts(column)
+    if not parts:
+        return None
+
+    column_name = parts[-1]
+    qualifier = parts[-2] if len(parts) > 1 else None
+    table = aliases.get(qualifier, qualifier) if qualifier else default_table
+    return f"{table}.{column_name}" if table else column_name
+
+
+def _map_predicates(node, aliases, default_table, result):
+    """Associate parameters and columns found on opposite sides of predicates."""
+    for expression in _walk_ast(node, stop_at_statements=True):
+        if not isinstance(expression, ast.A_Expr):
+            continue
+
+        left_columns = [
+            item for item in _walk_ast(expression.lexpr)
+            if isinstance(item, ast.ColumnRef)
+        ]
+        right_columns = [
+            item for item in _walk_ast(expression.rexpr)
+            if isinstance(item, ast.ColumnRef)
+        ]
+        left_parameters = _parameter_numbers(expression.lexpr)
+        right_parameters = _parameter_numbers(expression.rexpr)
+
+        pairs = (
+            (left_columns, right_parameters),
+            (right_columns, left_parameters),
+        )
+        for columns, parameters in pairs:
+            if not columns or not parameters:
+                continue
+            full_column = _qualified_column(columns[0], aliases, default_table)
+            if full_column:
+                for number in parameters:
+                    result[number] = full_column
+
+
+def _map_select_projections(statement, aliases, default_table, result):
+    for target in statement.targetList or ():
+        if not isinstance(target, ast.ResTarget):
+            continue
+
+        parameters = _parameter_numbers(target.val)
+        if not parameters:
+            continue
+
+        column = next(
+            (item for item in _walk_ast(target.val) if isinstance(item, ast.ColumnRef)),
+            None,
+        )
+        if column:
+            full_column = _qualified_column(column, aliases, default_table)
+        else:
+            column_name = target.name or "expr"
+            full_column = (
+                f"{default_table}.{column_name}" if default_table else column_name
+            )
+
+        for number in parameters:
+            result[number] = full_column
+
+
+def _map_update_targets(statement, aliases, default_table, result):
+    for target in statement.targetList or ():
+        if not isinstance(target, ast.ResTarget) or not target.name:
+            continue
+        full_column = (
+            f"{default_table}.{target.name}" if default_table else target.name
+        )
+        for number in _parameter_numbers(target.val):
+            result[number] = full_column
+
+
+def _map_insert_targets(statement, result):
+    table = statement.relation.relname if statement.relation else None
+    columns = [target.name for target in statement.cols or () if target.name]
+    select = statement.selectStmt
+    if not columns or not isinstance(select, ast.SelectStmt):
+        return
+
+    rows = select.valuesLists or ()
+    if not rows and select.targetList:
+        rows = (tuple(target.val for target in select.targetList),)
+
+    for row in rows:
+        for column, value in zip(columns, row):
+            full_column = f"{table}.{column}" if table else column
+            for number in _parameter_numbers(value):
+                result[number] = full_column
+
+
+def _nested_statements(statement):
+    for child in _iter_ast_children(statement):
+        for item in _walk_ast(child, stop_at_statements=True):
+            if isinstance(item, _STATEMENT_NODES):
+                yield item
+
+
+def _analyze_pglast_statement(statement, result):
+    aliases, default_table = _scope_tables(statement)
+
+    for attribute in ("whereClause", "havingClause", "fromClause", "usingClause"):
+        _map_predicates(
+            getattr(statement, attribute, None), aliases, default_table, result
+        )
+
+    if isinstance(statement, ast.SelectStmt):
+        _map_select_projections(statement, aliases, default_table, result)
+    elif isinstance(statement, ast.UpdateStmt):
+        _map_update_targets(statement, aliases, default_table, result)
+    elif isinstance(statement, ast.InsertStmt):
+        _map_insert_targets(statement, result)
+
+    for nested in _nested_statements(statement):
+        _analyze_pglast_statement(nested, result)
+
+
+def _extract_parameter_columns_pglast(sql_query):
+    """Map bind parameters with PostgreSQL's own grammar through pglast."""
+    result = {}
+    for raw_statement in parse_sql(sql_query):
+        if isinstance(raw_statement.stmt, _STATEMENT_NODES):
+            _analyze_pglast_statement(raw_statement.stmt, result)
+    return result
+
+
+def extract_referenced_tables(sql_query):
+    """Return table references found by PostgreSQL's parser.
+
+    Qualified names are returned as ``schema.table`` and unqualified names as
+    ``table``. CTE names are excluded so callers can match physical relations.
+    """
+    references = []
+    seen = set()
+
+    for raw_statement in parse_sql(sql_query):
+        statement = raw_statement.stmt
+        cte_names = {
+            item.ctename
+            for item in _walk_ast(statement)
+            if isinstance(item, ast.CommonTableExpr) and item.ctename
+        }
+
+        for range_var in _range_vars(statement):
+            if not range_var.relname or (
+                not range_var.schemaname and range_var.relname in cte_names
+            ):
+                continue
+            relation = (
+                f"{range_var.schemaname}.{range_var.relname}"
+                if range_var.schemaname
+                else range_var.relname
+            )
+            if relation not in seen:
+                references.append(relation)
+                seen.add(relation)
+
+    return references
+
+
+def extract_referenced_tables_safe(sql_query):
+    """Return pglast table references, or an empty list for invalid SQL."""
+    try:
+        return extract_referenced_tables(sql_query)
+    except (PglastParseError, ValueError, TypeError):
+        return []
+
+
+def query_references_table(sql_query, schema_name, table_name):
+    """Return whether a parsed query references the selected physical table."""
+    expected_schema = (schema_name or "").casefold()
+    expected_table = (table_name or "").casefold()
+
+    try:
+        references = extract_referenced_tables(sql_query)
+    except (PglastParseError, ValueError, TypeError):
+        return False
+
+    for reference in references:
+        parts = reference.casefold().split(".")
+        if parts[-1] != expected_table:
+            continue
+        if len(parts) == 1 or not expected_schema or parts[-2] == expected_schema:
+            return True
+    return False
+
+
+def extract_parameter_columns(sql_query):
+    """
+    Return ``{parameter_number: table.column}`` for PostgreSQL bind parameters.
+
+    pglast is the primary parser because it follows PostgreSQL's native grammar.
+    SQLGlot remains a compatibility fallback for incomplete or non-PostgreSQL SQL.
+    """
+    try:
+        result = _extract_parameter_columns_pglast(sql_query)
+    except (PglastParseError, ValueError, TypeError):
+        return _extract_parameter_columns_sqlglot(sql_query)
+
+    return result or _extract_parameter_columns_sqlglot(sql_query)
