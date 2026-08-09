@@ -1512,6 +1512,244 @@ recommendations:
             schema_name,
             object_name;   
 
+  - id: Tables with significant buffer cache misses
+    label: Table with significant PostgreSQL buffer-cache misses
+    source: buffer_cache_checks
+    category_id: CONFIGURATION
+    team: OPS
+    object_type: TABLE
+    outcome_id: PERFORMANCE
+    advisor_group: CONFIGURATION_ISSUES
+    risk_level: LOW
+    action_type: REVIEW_ONLY
+    action_safety: SAFE_TO_REVIEW
+    requires_lock: false
+    requires_maintenance_window: false
+    can_generate_sql: false
+    can_auto_apply: false
+    tags:
+      - cache
+      - shared-buffers
+      - io
+      - workload
+      - post-remediation-validation
+    why_it_matters: >
+      A low PostgreSQL buffer-cache hit ratio can increase latency and I/O, but
+      the database-wide ratio alone does not identify the cause. The tables that
+      account for a material share of buffer misses provide the actionable scope.
+    fix_strategy: >
+      First implement and validate the relevant schema, query, statistics, bloat,
+      and index recommendations. Then measure again over a representative workload.
+      If the same tables still account for significant misses, OPS should review
+      working-set size, memory pressure, shared_buffers, operating-system cache,
+      storage latency, sequential scans, and batch access patterns. Do not increase
+      memory or change effective_cache_size from this signal alone.
+    expected_benefit: >
+      A cause-oriented cache investigation focused on the relations responsible
+      for meaningful I/O, without masking inefficient schema or query behavior.
+
+    enabled_by_default: true
+    manual_review_required: true
+
+    confidence: 80
+    impact: 65
+    effort: 20
+
+    result_mapping:
+      object_id: object_id
+      object_name: object_name
+      schema_name: schema_name
+      table_name: table_name
+      recommendation_note: recommendation_note
+      recommendation_level: pga_recommendation_level
+
+    sql: |
+        WITH params AS (
+            SELECT
+                95.0::numeric AS maximum_database_hit_pct,
+                95.0::numeric AS maximum_relation_hit_pct,
+                10000::bigint AS minimum_database_accesses,
+                10000::bigint AS minimum_relation_accesses,
+                1000::bigint AS minimum_relation_misses,
+                0.05::numeric AS minimum_read_share,
+                10000::bigint AS significant_absolute_misses,
+                24.0::numeric AS minimum_observation_hours
+        ),
+        database_stats AS (
+            SELECT
+                d.datname,
+                d.blks_hit::bigint AS database_blocks_hit,
+                d.blks_read::bigint AS database_blocks_read,
+                (d.blks_hit + d.blks_read)::bigint AS database_block_accesses,
+                ROUND(
+                    100.0 * d.blks_hit
+                    / NULLIF(d.blks_hit + d.blks_read, 0),
+                    2
+                ) AS database_cache_hit_pct,
+                COALESCE(d.stats_reset, pg_postmaster_start_time()) AS observation_started_at,
+                ROUND(
+                    EXTRACT(
+                        EPOCH FROM now() - COALESCE(
+                            d.stats_reset,
+                            pg_postmaster_start_time()
+                        )
+                    )::numeric / 3600,
+                    1
+                ) AS observation_hours
+            FROM pg_stat_database AS d
+            WHERE d.datname = current_database()
+        ),
+        relation_stats AS (
+            SELECT
+                c.oid AS object_id,
+                s.schemaname AS schema_name,
+                s.relname AS table_name,
+                s.schemaname || '.' || s.relname AS object_name,
+                COALESCE(s.heap_blks_hit, 0)::bigint AS heap_blocks_hit,
+                COALESCE(s.heap_blks_read, 0)::bigint AS heap_blocks_read,
+                COALESCE(s.idx_blks_hit, 0)::bigint AS index_blocks_hit,
+                COALESCE(s.idx_blks_read, 0)::bigint AS index_blocks_read,
+                (
+                    COALESCE(s.heap_blks_hit, 0)
+                    + COALESCE(s.heap_blks_read, 0)
+                )::bigint AS heap_block_accesses,
+                (
+                    COALESCE(s.idx_blks_hit, 0)
+                    + COALESCE(s.idx_blks_read, 0)
+                )::bigint AS index_block_accesses,
+                (
+                    COALESCE(s.heap_blks_hit, 0)
+                    + COALESCE(s.heap_blks_read, 0)
+                    + COALESCE(s.idx_blks_hit, 0)
+                    + COALESCE(s.idx_blks_read, 0)
+                )::bigint AS relation_block_accesses,
+                (
+                    COALESCE(s.heap_blks_read, 0)
+                    + COALESCE(s.idx_blks_read, 0)
+                )::bigint AS relation_blocks_read,
+                st.seq_scan,
+                st.idx_scan,
+                pg_total_relation_size(c.oid) AS total_size_bytes
+            FROM pg_statio_user_tables AS s
+            JOIN pg_class AS c
+              ON c.relname = s.relname
+            JOIN pg_namespace AS n
+              ON n.oid = c.relnamespace
+             AND n.nspname = s.schemaname
+            LEFT JOIN pg_stat_user_tables AS st
+              ON st.relid = c.oid
+            WHERE c.relkind IN ('r', 'm')
+        ),
+        relation_totals AS (
+            SELECT
+                COALESCE(SUM(relation_blocks_read), 0)::numeric AS all_relation_blocks_read
+            FROM relation_stats
+        ),
+        measured AS (
+            SELECT
+                rs.*,
+                ds.database_blocks_hit,
+                ds.database_blocks_read,
+                ds.database_block_accesses,
+                ds.database_cache_hit_pct,
+                ds.observation_started_at,
+                ds.observation_hours,
+                ROUND(
+                    100.0 * rs.heap_blocks_hit
+                    / NULLIF(rs.heap_block_accesses, 0),
+                    2
+                ) AS heap_cache_hit_pct,
+                ROUND(
+                    100.0 * rs.index_blocks_hit
+                    / NULLIF(rs.index_block_accesses, 0),
+                    2
+                ) AS index_cache_hit_pct,
+                ROUND(
+                    100.0 * (rs.heap_blocks_hit + rs.index_blocks_hit)
+                    / NULLIF(rs.relation_block_accesses, 0),
+                    2
+                ) AS relation_cache_hit_pct,
+                ROUND(
+                    rs.relation_blocks_read::numeric
+                    / NULLIF(rt.all_relation_blocks_read, 0),
+                    4
+                ) AS relation_read_share
+            FROM relation_stats AS rs
+            CROSS JOIN database_stats AS ds
+            CROSS JOIN relation_totals AS rt
+        ),
+        candidates AS (
+            SELECT
+                m.*,
+                CASE
+                    WHEN m.database_cache_hit_pct < 90
+                     AND (
+                        m.relation_read_share >= 0.20
+                        OR m.relation_blocks_read >= 100000
+                     ) THEN 'HIGH'
+                    ELSE 'MEDIUM'
+                END AS pga_recommendation_level
+            FROM measured AS m
+            CROSS JOIN params AS p
+            WHERE m.database_cache_hit_pct < p.maximum_database_hit_pct
+              AND m.database_block_accesses >= p.minimum_database_accesses
+              AND m.observation_hours >= p.minimum_observation_hours
+              AND m.relation_block_accesses >= p.minimum_relation_accesses
+              AND m.relation_blocks_read >= p.minimum_relation_misses
+              AND m.relation_cache_hit_pct < p.maximum_relation_hit_pct
+              AND (
+                    m.relation_read_share >= p.minimum_read_share
+                    OR m.relation_blocks_read >= p.significant_absolute_misses
+              )
+        )
+        SELECT
+            object_id,
+            object_name,
+            schema_name,
+            table_name,
+            pga_recommendation_level,
+            database_cache_hit_pct,
+            heap_cache_hit_pct,
+            index_cache_hit_pct,
+            relation_cache_hit_pct,
+            heap_blocks_read,
+            index_blocks_read,
+            relation_blocks_read,
+            ROUND(relation_read_share * 100, 2) AS relation_read_share_pct,
+            seq_scan,
+            idx_scan,
+            total_size_bytes,
+            pg_size_pretty(total_size_bytes) AS total_size_pretty,
+            observation_started_at,
+            observation_hours,
+            'Database PostgreSQL buffer-cache hit ratio: '
+                || database_cache_hit_pct::text
+                || '%. Table '
+                || format('%I.%I', schema_name, table_name)
+                || ' accounts for '
+                || ROUND(relation_read_share * 100, 2)::text
+                || '% of user-table buffer misses, with '
+                || relation_blocks_read::text
+                || ' blocks read outside PostgreSQL shared buffers. Heap hit ratio: '
+                || COALESCE(heap_cache_hit_pct::text || '%', 'n/a')
+                || '; index hit ratio: '
+                || COALESCE(index_cache_hit_pct::text || '%', 'n/a')
+                || '. This is not proof of insufficient RAM. Apply schema, query, '
+                || 'statistics, bloat, and index recommendations first, then measure '
+                || 'again over a representative workload before changing memory settings.'
+                AS recommendation_note
+        FROM candidates
+        ORDER BY
+            CASE pga_recommendation_level
+                WHEN 'HIGH' THEN 2
+                ELSE 1
+            END DESC,
+            relation_blocks_read DESC,
+            relation_read_share DESC,
+            schema_name,
+            table_name
+        LIMIT 20;
+
   - id: Important PostgreSQL settings disabled or suboptimal
     source: configuration_checks
     category_id: CONFIGURATION

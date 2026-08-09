@@ -57,6 +57,9 @@ class SchemaWorkloadTest(unittest.TestCase):
         self.assertIn("workload centrality", prompt)
         self.assertIn("query_count is the number of distinct captured statements", prompt)
         self.assertIn("Clearly label every inferred usage pattern as an inference", prompt)
+        self.assertIn("What is the role of this database?", prompt)
+        self.assertIn("before any heading", prompt)
+        self.assertIn("If the available evidence is insufficient", prompt)
         self.assertIn("- Observed database usage", prompt)
         self.assertIn("- Database architecture", prompt)
 

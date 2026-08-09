@@ -879,7 +879,10 @@ Goals:
 11. Clearly label every inferred usage pattern as an inference and cite the supporting table, operation, and metric values.
 12. Provide actionable PostgreSQL SQL only when it is safe and directly supported by the digest.
 
-Return the answer in Markdown with these sections:
+Begin the answer with one concise paragraph, before any heading, that directly answers:
+"What is the role of this database?" Infer its likely business or technical purpose from the schema relationships and observed workload. Clearly state that this is an inference and cite the strongest supporting evidence. If the available evidence is insufficient, say so explicitly instead of inventing a role.
+
+Then return the answer in Markdown with these sections:
 - Executive summary
 - Database architecture
 - Observed database usage

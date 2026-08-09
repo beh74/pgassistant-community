@@ -77,6 +77,20 @@
   .executive-task-header { padding: 1rem; }
   .executive-task-body { padding: 0 1rem 1rem; border-top: 1px solid #e2e8f0; }
   .executive-badge { display: inline-block; margin: .15rem .25rem .15rem 0; padding: .25rem .55rem; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: .72rem; font-weight: 850; }
+  .executive-team-dev { background: #dcfce7; color: #166534; }
+  .executive-team-ops { background: #dbeafe; color: #1d4ed8; }
+  .executive-team-dev-ops {
+    border: 1px solid #67e8f9;
+    background: linear-gradient(135deg, #dbeafe, #ccfbf1);
+    color: #0f5f68;
+  }
+  .executive-maintenance-window { background: #fee2e2; color: #b91c1c; }
+  .pg-summary-card.executive-summary-dev { border-color: #86efac; background: #f0fdf4; }
+  .pg-summary-card.executive-summary-ops { border-color: #93c5fd; background: #eff6ff; }
+  .pg-summary-card.executive-summary-dev-ops {
+    border-color: #67e8f9;
+    background: linear-gradient(135deg, #eff6ff, #f0fdfa);
+  }
   .executive-source-badge { background: #ecfeff; color: #0e7490; }
   .executive-index-task { border-left: 4px solid #4f46e5; }
   .executive-design-task { border-left: 4px solid #0891b2; }
@@ -199,13 +213,13 @@
     <div class="pg-summary-card is-violet">
       <span class="pg-summary-label">Recommendations <span class="pg-summary-value">{{ plan.summary.recommendations_after_deduplication }}</span></span>
     </div>
-    <div class="pg-summary-card is-high">
+    <div class="pg-summary-card executive-summary-dev">
       <span class="pg-summary-label">DEV tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV }}</span></span>
     </div>
-    <div class="pg-summary-card is-info">
+    <div class="pg-summary-card executive-summary-ops">
       <span class="pg-summary-label">OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.OPS }}</span></span>
     </div>
-    <div class="pg-summary-card is-violet">
+    <div class="pg-summary-card executive-summary-dev-ops">
       <span class="pg-summary-label">DEV/OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV_OPS }}</span></span>
     </div>
   </div>
@@ -222,9 +236,9 @@
           <p class="small text-muted mb-0">{{ phase.rationale }}</p>
         </div>
         <div class="executive-phase-actions">
-          <span class="executive-badge">{{ phase.team|replace('_', '/') }}</span>
+          <span class="executive-badge {% if phase.team == 'DEV' %}executive-team-dev{% elif phase.team == 'OPS' %}executive-team-ops{% else %}executive-team-dev-ops{% endif %}">{{ phase.team|replace('_', '/') }}</span>
           {% if phase.requires_maintenance_window %}
-            <span class="executive-badge" title="Plan a maintenance window for this chapter">
+            <span class="executive-badge executive-maintenance-window" title="Plan a maintenance window for this chapter">
               <i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Maintenance window
             </span>
           {% endif %}
@@ -268,7 +282,7 @@
                 </div>
               </div>
               <div>
-                <span class="executive-badge">{{ task.team|replace('_', '/') }}</span>
+                <span class="executive-badge {% if task.team == 'DEV' %}executive-team-dev{% elif task.team == 'OPS' %}executive-team-ops{% else %}executive-team-dev-ops{% endif %}">{{ task.team|replace('_', '/') }}</span>
                 <span class="executive-badge">{{ task.priority }}</span>
                 {% if task.requires_restart %}<span class="executive-badge">Restart</span>{% endif %}
               </div>

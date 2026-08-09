@@ -179,6 +179,66 @@ class ExecutivePlanTests(unittest.TestCase):
         self.assertTrue(plan["phases"][0]["requires_maintenance_window"])
         self.assertFalse(plan["phases"][0]["requires_restart"])
 
+    def test_buffer_cache_review_is_ops_work_scheduled_last(self):
+        results = {
+            "global_advisor": {
+                "recommendations": [
+                    {
+                        "recommendation_id": "missing_primary_key",
+                        "category_id": "DESIGN",
+                        "team": "DEV",
+                        "schema_name": "public",
+                        "table_name": "orders",
+                        "object_name": "public.orders",
+                        "title": "Add a primary key",
+                    },
+                    {
+                        "recommendation_id": "Tables with significant buffer cache misses",
+                        "category_id": "CONFIGURATION",
+                        "action_type": "REVIEW_ONLY",
+                        "team": "OPS",
+                        "priority": "HIGH",
+                        "schema_name": "public",
+                        "table_name": "orders",
+                        "object_name": "public.orders",
+                        "title": "Review buffer-cache misses on public.orders",
+                    },
+                ]
+            },
+            "index_advisor": {
+                "results": [
+                    {
+                        "queryid": "101",
+                        "actionable_recommendations": [
+                            {
+                                "schema": "public",
+                                "table": "orders",
+                                "confidence": "safe",
+                                "reason": "Frequent filtered scan.",
+                                "recommendation_type": "create_index",
+                                "create_index_sql": "CREATE INDEX ON public.orders (customer_id);",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+        plan = build_plan_from_results(results, "application", policy=load_rules())
+
+        self.assertEqual([phase["number"] for phase in plan["phases"]], [20, 40, 70])
+        cache_task = next(
+            task for task in plan["tasks"]
+            if task["workstream"] == "CACHE_EFFICIENCY_VALIDATION"
+        )
+        self.assertEqual(cache_task["team"], "OPS")
+        self.assertEqual(cache_task["phase"], 70)
+        self.assertEqual(
+            cache_task["title"],
+            "Reassess buffer-cache efficiency after workload improvements",
+        )
+        self.assertEqual(cache_task["sql_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

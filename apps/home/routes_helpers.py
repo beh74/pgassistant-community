@@ -296,6 +296,24 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             ]
 
         table_stats = query_table_stats.aggregate_by_table(rows_filtered)
+        activity_graph = ""
+        activity_graph_error = ""
+        graph_conn, graph_status = database.connectdb(session)
+        if graph_conn is not None and graph_status == "OK":
+            try:
+                activity_graph, activity_graph_error = (
+                    query_table_stats.build_query_activity_graph(
+                        graph_conn,
+                        rows_filtered,
+                        table_stats,
+                    )
+                )
+            except Exception as exc:
+                activity_graph_error = f"Unable to build the activity graph: {exc}"
+            finally:
+                graph_conn.close()
+        else:
+            activity_graph_error = str(graph_status or "Database connection unavailable.")
 
         # Render the template with the filtered data
         return render_template(
@@ -307,6 +325,8 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             related_mode=bool(tablename),
             topqueries_loading=False,
             table_stats=table_stats,
+            activity_graph=activity_graph,
+            activity_graph_error=activity_graph_error,
             column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS,
         )
 

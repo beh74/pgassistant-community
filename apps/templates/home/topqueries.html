@@ -123,6 +123,42 @@
   .query-operation-details .table { background: #fff; border: 1px solid #e2e8f0; }
   #query-activity-tab-content > .tab-pane { display: none; }
   #query-activity-tab-content > .tab-pane.active { display: block; }
+  .query-activity-graph-card {
+    padding: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06));
+  }
+  .query-activity-graph-shell {
+    min-height: 32rem;
+    max-height: 72vh;
+    padding: 1rem;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: .8rem;
+    background: #f8fafc;
+  }
+  .query-graph-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .query-graph-zoom-controls { display: inline-flex; align-items: center; gap: .35rem; }
+  .query-graph-zoom-level { min-width: 3.6rem; color: #475569; font-size: .82rem; font-weight: 850; text-align: center; }
+  .query-activity-graph-canvas { position: relative; min-width: 100%; min-height: 30rem; }
+  #queryActivityMermaidGraph { display: inline-block; transform-origin: top left; }
+  #queryActivityMermaidGraph svg { display: block; width: auto !important; height: auto !important; max-width: none !important; }
+  /* Mermaid applies entity classes to alternating attribute rows as well as
+     table headers. Keep workload color on the header and use stable,
+     high-contrast backgrounds for column details. */
+  #queryActivityMermaidGraph .attributeBoxOdd { fill: #fff !important; }
+  #queryActivityMermaidGraph .attributeBoxEven { fill: #f8fafc !important; }
+  #queryActivityMermaidGraph .attributeBoxOdd + text,
+  #queryActivityMermaidGraph .attributeBoxEven + text,
+  #queryActivityMermaidGraph .attributeBoxOdd ~ text,
+  #queryActivityMermaidGraph .attributeBoxEven ~ text { fill: #0f172a !important; color: #0f172a !important; }
+  #queryActivityMermaidGraph .entityLabel { fill: #0f172a !important; color: #0f172a !important; }
+  .query-graph-legend { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; }
+  .query-graph-legend-item { display: inline-flex; align-items: center; gap: .35rem; color: #475569; font-size: .75rem; }
+  .query-graph-swatch { width: 1.1rem; height: 1.1rem; border: 1px solid #94a3b8; border-radius: .25rem; }
   .pg-query-activity-page .activity-query-sql.topquery-sql {
     height: 11rem;
     min-height: 11rem;
@@ -250,6 +286,9 @@
     <button class="nav-link" id="query-tables-tab" data-bs-toggle="tab" data-bs-target="#query-tables-pane" type="button" role="tab" aria-controls="query-tables-pane" aria-selected="false">
       <i class="bi bi-table me-1" aria-hidden="true"></i>By table
       <span class="badge text-bg-secondary ms-1">{{ table_stats|default([], true)|length }}</span>
+    </button>
+    <button class="nav-link" id="query-graph-tab" data-bs-toggle="tab" data-bs-target="#query-graph-pane" type="button" role="tab" aria-controls="query-graph-pane" aria-selected="false">
+      <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Graph
     </button>
   </div>
 </nav>
@@ -588,6 +627,49 @@
   <div class="no-results">No parsed table statistics are available for this workload.</div>
   {% endif %}
 </div><!-- /#query-tables-pane -->
+
+<div class="tab-pane fade" id="query-graph-pane" role="tabpanel" aria-labelledby="query-graph-tab" tabindex="0">
+  <div class="alert alert-info small">
+    The graph shows primary keys, foreign keys, and columns detected in the captured statements. A darker table header means a higher total execution time relative to the other tables in this graph, consistently with the Total time column in By table. A statement involving several tables contributes its execution time to each table.
+  </div>
+  {% if activity_graph %}
+  <div class="query-activity-graph-card">
+    <div class="query-graph-legend" aria-label="Relative total execution time legend">
+      <span class="query-graph-legend-item"><span class="query-graph-swatch" style="background:#f8fafc"></span>No captured activity</span>
+      <span class="query-graph-legend-item"><span class="query-graph-swatch" style="background:#e0f2fe"></span>Lower total time</span>
+      <span class="query-graph-legend-item"><span class="query-graph-swatch" style="background:#7dd3fc"></span>Medium total time</span>
+      <span class="query-graph-legend-item"><span class="query-graph-swatch" style="background:#0ea5e9"></span>Higher total time</span>
+    </div>
+    <div class="query-graph-toolbar">
+      <span class="small text-muted">Use the controls or scroll the canvas to inspect large schemas.</span>
+      <div class="query-graph-zoom-controls" aria-label="Activity graph zoom controls">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="queryGraphCopyMermaid">
+          <i class="bi bi-clipboard me-1" aria-hidden="true"></i>Copy Mermaid
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="queryGraphZoomOut" title="Zoom out" aria-label="Zoom out">
+          <i class="bi bi-zoom-out" aria-hidden="true"></i>
+        </button>
+        <span class="query-graph-zoom-level" id="queryGraphZoomLevel">100%</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="queryGraphZoomIn" title="Zoom in" aria-label="Zoom in">
+          <i class="bi bi-zoom-in" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="queryGraphZoomReset" title="Reset zoom" aria-label="Reset zoom">
+          <i class="bi bi-aspect-ratio" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <pre id="queryActivityMermaidSource" class="d-none">{{ activity_graph }}</pre>
+    <div class="query-activity-graph-shell">
+      <div class="query-activity-graph-canvas" id="queryActivityMermaidCanvas">
+        <div id="queryActivityMermaidGraph" aria-label="Query activity relationship graph"></div>
+      </div>
+    </div>
+    <div class="alert alert-danger d-none mt-3 mb-0" id="queryActivityMermaidError"></div>
+  </div>
+  {% else %}
+  <div class="no-results">{{ activity_graph_error or 'No relationship graph is available for the captured workload.' }}</div>
+  {% endif %}
+</div><!-- /#query-graph-pane -->
 </div><!-- /#query-activity-tab-content -->
 </div><!-- /.pg-query-activity-page -->
 
@@ -993,4 +1075,104 @@
 
 {% endblock content %}
 
-{% block javascripts %}{% endblock javascripts %}
+{% block javascripts %}
+{% if not topqueries_loading and activity_graph %}
+<script type="module">
+  import mermaid from '{{ config.ASSETS_ROOT }}/js/mermaid.esm.min.mjs';
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose',
+    theme: 'default',
+    maxTextSize: 1000000,
+    maxEdges: 2000
+  });
+  let queryActivityGraphRendered = false;
+  let queryActivityGraphZoom = 1;
+  let queryActivityGraphNaturalSize = { width: 0, height: 0 };
+
+  const queryGraph = document.getElementById('queryActivityMermaidGraph');
+  const queryGraphCanvas = document.getElementById('queryActivityMermaidCanvas');
+  const queryGraphZoomLevel = document.getElementById('queryGraphZoomLevel');
+  const queryGraphCopyMermaid = document.getElementById('queryGraphCopyMermaid');
+
+  function updateQueryGraphZoom(nextZoom) {
+    queryActivityGraphZoom = Math.min(8, Math.max(.25, nextZoom));
+    if (queryGraph) queryGraph.style.transform = `scale(${queryActivityGraphZoom})`;
+    if (queryGraphCanvas && queryActivityGraphNaturalSize.width && queryActivityGraphNaturalSize.height) {
+      queryGraphCanvas.style.width = `${Math.ceil(queryActivityGraphNaturalSize.width * queryActivityGraphZoom)}px`;
+      queryGraphCanvas.style.height = `${Math.ceil(queryActivityGraphNaturalSize.height * queryActivityGraphZoom)}px`;
+    }
+    if (queryGraphZoomLevel) queryGraphZoomLevel.textContent = `${Math.round(queryActivityGraphZoom * 100)}%`;
+  }
+
+  function captureQueryGraphNaturalSize() {
+    if (!queryGraph) return;
+    queryGraph.style.transform = 'scale(1)';
+    const svg = queryGraph.querySelector('svg');
+    if (!svg) return;
+    svg.style.width = 'auto';
+    svg.style.height = 'auto';
+    svg.style.maxWidth = 'none';
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', Math.ceil(viewBox.width));
+      svg.setAttribute('height', Math.ceil(viewBox.height));
+    }
+    const box = svg.getBoundingClientRect();
+    queryActivityGraphNaturalSize = {
+      width: Math.max(box.width, 1),
+      height: Math.max(box.height, 1)
+    };
+  }
+
+  async function copyQueryActivityMermaid() {
+    const source = document.getElementById('queryActivityMermaidSource');
+    if (!source || !queryGraphCopyMermaid) return;
+    try {
+      await navigator.clipboard.writeText(source.textContent || '');
+      queryGraphCopyMermaid.textContent = 'Copied';
+    } catch (copyError) {
+      queryGraphCopyMermaid.textContent = 'Copy failed';
+    }
+    window.setTimeout(function () {
+      queryGraphCopyMermaid.innerHTML = '<i class="bi bi-clipboard me-1" aria-hidden="true"></i>Copy Mermaid';
+    }, 1200);
+  }
+
+  async function renderQueryActivityGraph() {
+    if (queryActivityGraphRendered) return;
+    const source = document.getElementById('queryActivityMermaidSource');
+    const target = document.getElementById('queryActivityMermaidGraph');
+    const error = document.getElementById('queryActivityMermaidError');
+    if (!source || !target) return;
+
+    const graph = document.createElement('pre');
+    graph.className = 'mermaid';
+    graph.textContent = source.textContent || 'erDiagram';
+    target.replaceChildren(graph);
+    try {
+      await mermaid.run({ querySelector: '#queryActivityMermaidGraph .mermaid' });
+      captureQueryGraphNaturalSize();
+      updateQueryGraphZoom(queryActivityGraphZoom);
+      queryActivityGraphRendered = true;
+    } catch (renderError) {
+      error.textContent = `The activity graph could not be rendered: ${renderError.message || renderError}`;
+      error.classList.remove('d-none');
+    }
+  }
+
+  document.getElementById('queryGraphZoomOut')?.addEventListener('click', function () {
+    updateQueryGraphZoom(queryActivityGraphZoom - .25);
+  });
+  document.getElementById('queryGraphZoomIn')?.addEventListener('click', function () {
+    updateQueryGraphZoom(queryActivityGraphZoom + .25);
+  });
+  document.getElementById('queryGraphZoomReset')?.addEventListener('click', function () {
+    updateQueryGraphZoom(1);
+  });
+  queryGraphCopyMermaid?.addEventListener('click', copyQueryActivityMermaid);
+  document.getElementById('query-graph-tab')?.addEventListener('shown.bs.tab', renderQueryActivityGraph);
+</script>
+{% endif %}
+{% endblock javascripts %}

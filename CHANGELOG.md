@@ -7,11 +7,14 @@
 - Query activity: display an immediate waiting page while `pg_stat_statements` entries are loaded, parsed, filtered, and prepared for display.
 - Query activity: add a **By table** tab grouping statement counts, calls, processed rows, and execution time by physical relation and operation type (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, or `OTHER`).
 - Query activity: add a per-table zoom action that opens the Statements tab filtered to the selected physical relation.
+- Query activity: add a Graph tab showing workload tables, PK/FK relationships, query-used columns, and relative total execution time as a color scale.
 - DB Design: enrich the LLM schema digest with the top 20 tables by `pg_stat_statements` calls, including workload metrics grouped by statement type, and display a waiting state during LLM analysis.
 - Executive Plan: optionally include the LLM-generated DB Design analysis in the PDF report, with native rendering for Markdown headings, lists, emphasis, links, and SQL code blocks.
 - Table Advisor: add an on-demand table and column workload modal backed by a pglast API, with statement, call, execution-time, and SQL-context metrics.
 - Table Advisor: display the internal column role `projection` as the DBA-friendly `SELECT` label, with a concise explanation.
 - Table Advisor: add a Column Statistics modal backed by a `pg_stats` API, with readable planner metrics and a dropdown limited to the ten most common values.
+- Global Advisor: identify the tables responsible for significant PostgreSQL buffer-cache misses, with volume, read-share, and observation-age safeguards.
+- Executive Plan: schedule buffer-cache investigation as an OPS validation task after schema, query, and index improvements.
 
 ## Bug fixes
 

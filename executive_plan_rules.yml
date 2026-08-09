@@ -153,6 +153,18 @@ rules:
       group_by: [database, workstream]
       task_title: Review workload-related PostgreSQL parameters
 
+  - id: buffer_cache_efficiency
+    match:
+      source: global_advisor
+      advisor_id: Tables with significant buffer cache misses
+    classify:
+      phase: 70
+      workstream: CACHE_EFFICIENCY_VALIDATION
+      team: OPS
+      group_by: [database, workstream]
+      max_items: 20
+      task_title: Reassess buffer-cache efficiency after workload improvements
+
   - id: global_configuration
     match:
       source: global_advisor
