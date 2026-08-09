@@ -412,7 +412,7 @@
 
 .table-card-footer {
   display: grid;
-  grid-template-columns: repeat(5, 2.75rem);
+  grid-template-columns: repeat(7, 2.75rem);
   justify-content: center;
   gap: 0.65rem;
   margin-top: auto;
@@ -449,12 +449,16 @@
 .table-action-indexes:hover, .table-action-indexes:focus-visible { background: #d97706; border-color: #d97706; }
 .table-action-queries { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
 .table-action-queries:hover, .table-action-queries:focus-visible { background: #0284c7; border-color: #0284c7; }
+.table-action-columns { color: #be185d; background: #fdf2f8; border-color: #fbcfe8; }
+.table-action-columns:hover, .table-action-columns:focus-visible { background: #db2777; border-color: #db2777; }
+.table-action-column-stats { color: #4f46e5; background: #eef2ff; border-color: #c7d2fe; }
+.table-action-column-stats:hover, .table-action-column-stats:focus-visible { background: #4f46e5; border-color: #4f46e5; }
 .table-action-tetris { color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe; }
 .table-action-tetris:hover, .table-action-tetris:focus-visible { background: #7c3aed; border-color: #7c3aed; }
 
 @media (max-width: 575.98px) {
   .table-card-footer {
-    grid-template-columns: repeat(5, 2.5rem);
+    grid-template-columns: repeat(7, 2.5rem);
     gap: 0.45rem;
   }
 
@@ -1100,6 +1104,32 @@
                   <i class="bi bi-code-square" aria-hidden="true"></i>
                 </a>
 
+                <button
+                  type="button"
+                  class="btn table-action-btn table-action-columns table-column-usage-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#tableColumnUsageModal"
+                  data-schema-name="{{ schema|e }}"
+                  data-table-name="{{ table|e }}"
+                  title="Column usage"
+                  aria-label="Show column usage for {{ schema|e }}.{{ table|e }}"
+                >
+                  <i class="bi bi-columns-gap" aria-hidden="true"></i>
+                </button>
+
+                <button
+                  type="button"
+                  class="btn table-action-btn table-action-column-stats table-column-stats-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#tableColumnStatsModal"
+                  data-schema-name="{{ schema|e }}"
+                  data-table-name="{{ table|e }}"
+                  title="Column statistics"
+                  aria-label="Show pg_stats column statistics for {{ schema|e }}.{{ table|e }}"
+                >
+                  <i class="bi bi-distribute-vertical" aria-hidden="true"></i>
+                </button>
+
                 <a
                   class="btn table-action-btn table-action-tetris table-tetris-btn"
                   href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}"
@@ -1324,6 +1354,82 @@
         </div>
       </div>
     </div>
+
+    <div class="modal fade table-index-modal" id="tableColumnUsageModal" tabindex="-1" aria-labelledby="tableColumnUsageModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="tableColumnUsageModalTitle">Table and column usage</h5>
+              <div class="table-index-subtitle" id="tableColumnUsageSubtitle">Select a table to analyze its statements.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="tableColumnUsageLoading" class="alert alert-info mb-0">Finding related statements and analyzing their columns with pglast...</div>
+            <div id="tableColumnUsageError" class="alert alert-warning d-none mb-0"></div>
+            <div id="tableColumnUsageContent" class="d-none">
+              <div class="table-index-kpis mb-3">
+                <div class="table-index-kpi"><span class="label">Statements</span><span class="value" id="columnUsageStatements">0</span></div>
+                <div class="table-index-kpi"><span class="label">Calls</span><span class="value" id="columnUsageCalls">0</span></div>
+                <div class="table-index-kpi"><span class="label">Total time</span><span class="value" id="columnUsageTime">0 ms</span></div>
+                <div class="table-index-kpi"><span class="label">Columns used</span><span class="value" id="columnUsageColumns">0</span></div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-index-table align-middle mb-0">
+                  <thead><tr><th>Column</th><th>Usage</th><th class="text-end">Statements</th><th class="text-end">Calls</th></tr></thead>
+                  <tbody id="tableColumnUsageRows"></tbody>
+                </table>
+              </div>
+              <div id="tableColumnUsageNotice" class="small text-muted mt-3"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <div class="text-muted small me-auto">Derived from cumulative pg_stat_statements counters; column roles are inferred from parsed SQL.</div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade table-index-modal" id="tableColumnStatsModal" tabindex="-1" aria-labelledby="tableColumnStatsModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="tableColumnStatsModalTitle">Column statistics</h5>
+              <div class="table-index-subtitle" id="tableColumnStatsSubtitle">Planner statistics from pg_stats.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="tableColumnStatsLoading" class="alert alert-info mb-0">Loading PostgreSQL column statistics...</div>
+            <div id="tableColumnStatsError" class="alert alert-warning d-none mb-0"></div>
+            <div id="tableColumnStatsContent" class="d-none">
+              <div class="alert alert-light border small" id="tableColumnStatsContext"></div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-index-table align-middle mb-0">
+                  <thead><tr>
+                    <th>Column</th>
+                    <th class="text-end">NULL <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="Estimated percentage of rows containing NULL."></i></th>
+                    <th class="text-end">Avg. width <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="Average stored width of the column value, in bytes."></i></th>
+                    <th class="text-end">Distinct estimate <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="Estimated number of distinct non-null values. PostgreSQL may derive it from a fraction of the table row estimate."></i></th>
+                    <th class="text-end">Correlation <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="How closely the physical row order follows this column, from -1 to 1."></i></th>
+                    <th>Most common values <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="Up to ten values PostgreSQL considers most frequent, with their estimated share of table rows."></i></th>
+                    <th class="text-end">Histogram <i class="bi bi-question-circle ms-1" data-bs-toggle="tooltip" title="Number of boundaries used to estimate range predicates such as less-than, greater-than, and BETWEEN."></i></th>
+                  </tr></thead>
+                  <tbody id="tableColumnStatsRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <div class="text-muted small me-auto">These estimates are maintained by ANALYZE and used by the PostgreSQL planner.</div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
   {% else %}
     <div class="tables-empty-state">
       <div class="empty-title">No table available</div>
@@ -1393,6 +1499,19 @@ document.addEventListener("DOMContentLoaded", function () {
   const tableIndexDetailDefinition = document.getElementById("tableIndexDetailDefinition");
   const tableIndexCopyDefinitionBtn = document.getElementById("tableIndexCopyDefinitionBtn");
   let currentIndexDefinition = "";
+
+  const columnUsageSubtitle = document.getElementById("tableColumnUsageSubtitle");
+  const columnUsageLoading = document.getElementById("tableColumnUsageLoading");
+  const columnUsageError = document.getElementById("tableColumnUsageError");
+  const columnUsageContent = document.getElementById("tableColumnUsageContent");
+  const columnUsageRows = document.getElementById("tableColumnUsageRows");
+  const columnUsageNotice = document.getElementById("tableColumnUsageNotice");
+  const columnStatsSubtitle = document.getElementById("tableColumnStatsSubtitle");
+  const columnStatsLoading = document.getElementById("tableColumnStatsLoading");
+  const columnStatsError = document.getElementById("tableColumnStatsError");
+  const columnStatsContent = document.getElementById("tableColumnStatsContent");
+  const columnStatsContext = document.getElementById("tableColumnStatsContext");
+  const columnStatsRows = document.getElementById("tableColumnStatsRows");
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -1727,6 +1846,121 @@ document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".table-index-stats-btn").forEach(function (button) {
     button.addEventListener("click", function () {
       loadTableIndexStats(button.dataset.schemaName || "", button.dataset.tableName || "");
+    });
+  });
+
+  function setColumnUsageState(state, message) {
+    columnUsageLoading?.classList.toggle("d-none", state !== "loading");
+    columnUsageError?.classList.toggle("d-none", state !== "error");
+    columnUsageContent?.classList.toggle("d-none", state !== "ready");
+    if (state === "error" && columnUsageError) columnUsageError.textContent = message || "Unable to load column usage.";
+  }
+
+  function formatHumanDuration(milliseconds) {
+    const value = Number(milliseconds || 0);
+    if (!Number.isFinite(value) || value <= 0) return "0 ms";
+    if (value < 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " ms";
+    const seconds = value / 1000;
+    if (seconds < 60) return seconds.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " s";
+    const minutes = seconds / 60;
+    if (minutes < 60) return minutes.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " min";
+    return (minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " h";
+  }
+
+  async function loadTableColumnUsage(schemaName, tableName) {
+    if (columnUsageSubtitle) columnUsageSubtitle.textContent = schemaName + "." + tableName;
+    if (columnUsageRows) columnUsageRows.innerHTML = "";
+    setColumnUsageState("loading");
+    try {
+      const url = "/api/v1/table_column_usage/" + encodeURIComponent(schemaName) + "/" + encodeURIComponent(tableName);
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok || data.success === false) throw new Error(data.error || "Unable to analyze table usage.");
+      const summary = data.summary || {};
+      document.getElementById("columnUsageStatements").textContent = Number(summary.statements || 0).toLocaleString();
+      document.getElementById("columnUsageCalls").textContent = Number(summary.calls || 0).toLocaleString();
+      document.getElementById("columnUsageTime").textContent = formatHumanDuration(summary.total_exec_time);
+      document.getElementById("columnUsageColumns").textContent = Number(summary.columns_used || 0).toLocaleString();
+      if (columnUsageRows) {
+        columnUsageRows.innerHTML = (data.columns || []).map(function (column) {
+          const roles = (column.roles || []).map(function (role) {
+            const roleName = String(role.role || "");
+            const roleLabels = { projection: "SELECT", group_sort: "GROUP / SORT" };
+            const roleHelp = {
+              projection: "Column read to build the query result, including expressions and aggregates."
+            };
+            const label = roleLabels[roleName] || roleName.replace("_", " ").toUpperCase();
+            const title = roleHelp[roleName] ? ' title="' + escapeHtml(roleHelp[roleName]) + '"' : '';
+            return '<span class="table-index-pill table-index-pill-muted me-1"' + title + '>' + escapeHtml(label) + ' ' + Number(role.statements || 0) + '</span>';
+          }).join("");
+          return '<tr><td><strong>' + escapeHtml(column.column) + '</strong></td><td>' + (roles || '<span class="text-muted">-</span>') + '</td><td class="text-end">' + Number(column.statements || 0).toLocaleString() + '</td><td class="text-end fw-semibold">' + Number(column.calls || 0).toLocaleString() + '</td></tr>';
+        }).join("") || '<tr><td colspan="4" class="text-center text-muted py-4">No column usage could be attributed unambiguously.</td></tr>';
+      }
+      if (columnUsageNotice) {
+        const ambiguous = data.ambiguous_columns || [];
+        columnUsageNotice.textContent = ambiguous.length ? "Unqualified columns not attributed because multiple tables are involved: " + ambiguous.join(", ") + "." : "Only columns attributable to this table are included.";
+      }
+      setColumnUsageState("ready");
+    } catch (err) {
+      setColumnUsageState("error", err.message || "Unable to load column usage.");
+    }
+  }
+
+  document.querySelectorAll(".table-column-usage-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      loadTableColumnUsage(button.dataset.schemaName || "", button.dataset.tableName || "");
+    });
+  });
+
+  function setColumnStatsState(state, message) {
+    columnStatsLoading?.classList.toggle("d-none", state !== "loading");
+    columnStatsError?.classList.toggle("d-none", state !== "error");
+    columnStatsContent?.classList.toggle("d-none", state !== "ready");
+    if (state === "error" && columnStatsError) columnStatsError.textContent = message || "Unable to load column statistics.";
+  }
+
+  async function loadTableColumnStats(schemaName, tableName) {
+    if (columnStatsSubtitle) columnStatsSubtitle.textContent = schemaName + "." + tableName;
+    if (columnStatsRows) columnStatsRows.innerHTML = "";
+    setColumnStatsState("loading");
+    try {
+      const url = "/api/v1/table_column_statistics/" + encodeURIComponent(schemaName) + "/" + encodeURIComponent(tableName);
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok || data.success === false) throw new Error(data.error || "Unable to load pg_stats.");
+      if (columnStatsContext) {
+        const analyzedAt = data.last_autoanalyze || data.last_analyze;
+        columnStatsContext.innerHTML = "Estimated table rows: <strong>" + Number(data.estimated_rows || 0).toLocaleString() + "</strong> · Last analyze: <strong>" + escapeHtml(analyzedAt ? new Date(analyzedAt).toLocaleString() : "unknown") + "</strong>";
+      }
+      if (columnStatsRows) {
+        columnStatsRows.innerHTML = (data.columns || []).map(function (column) {
+          const values = column.most_common_values || [];
+          const commonValues = values.length
+            ? '<select class="form-select form-select-sm" aria-label="Most common values for ' + escapeHtml(column.column) + '">' + values.map(function (item) {
+                return '<option>' + escapeHtml(item.value + " (" + Number(item.frequency_pct || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%)") + '</option>';
+              }).join("") + '</select>'
+            : '<span class="text-muted">Not available</span>';
+          const correlation = column.correlation === null ? "Not available" : Number(column.correlation).toLocaleString(undefined, { maximumFractionDigits: 4 });
+          return '<tr>' +
+            '<td><strong>' + escapeHtml(column.column) + '</strong></td>' +
+            '<td class="text-end">' + Number(column.null_percent || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) + '%</td>' +
+            '<td class="text-end">' + Number(column.average_width_bytes || 0).toLocaleString() + ' bytes</td>' +
+            '<td class="text-end"><strong>' + Number(column.distinct_estimate || 0).toLocaleString() + '</strong></td>' +
+            '<td class="text-end">' + escapeHtml(correlation) + '</td>' +
+            '<td style="min-width:16rem">' + commonValues + '</td>' +
+            '<td class="text-end">' + Number(column.histogram_bounds_count || 0).toLocaleString() + ' bounds</td>' +
+          '</tr>';
+        }).join("");
+      }
+      setColumnStatsState("ready");
+    } catch (err) {
+      setColumnStatsState("error", err.message || "Unable to load column statistics.");
+    }
+  }
+
+  document.querySelectorAll(".table-column-stats-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      loadTableColumnStats(button.dataset.schemaName || "", button.dataset.tableName || "");
     });
   });
 

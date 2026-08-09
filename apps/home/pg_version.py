@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
 POSTGRESQL_VERSIONS_URL = "https://www.postgresql.org/versions.json"
-CACHE_TTL_SECONDS = 24 * 60 * 60
-
-_versions_cache: tuple[float, list[dict[str, Any]]] | None = None
+CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
+DEFAULT_CACHE_PATH = Path(
+    os.environ.get(
+        "PGA_POSTGRESQL_VERSIONS_CACHE_FILE",
+        Path(__file__).resolve().parents[2] / "postgresql_versions_cache.json",
+    )
+)
 
 
 @dataclass(frozen=True)
@@ -102,27 +109,70 @@ def _version_sort_key(version: str) -> tuple[int, ...]:
     )
 
 
+def _validate_versions_payload(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, list):
+        raise RuntimeError(
+            "Unexpected response received from the PostgreSQL versions endpoint."
+        )
+
+    required_fields = {"major", "latestMinor", "supported"}
+    for release in payload:
+        if not isinstance(release, dict) or not required_fields.issubset(release):
+            raise RuntimeError(
+                "The PostgreSQL versions response does not contain the expected fields."
+            )
+    return payload
+
+
+def _read_versions_cache(cache_path: Path) -> tuple[list[dict[str, Any]], float] | None:
+    try:
+        with cache_path.open("r", encoding="utf-8") as cache_file:
+            payload = _validate_versions_payload(json.load(cache_file))
+        return payload, max(0.0, time.time() - cache_path.stat().st_mtime)
+    except (OSError, json.JSONDecodeError, RuntimeError):
+        return None
+
+
+def _write_versions_cache(cache_path: Path, payload: list[dict[str, Any]]) -> None:
+    """Atomically replace the cache so concurrent readers never see partial JSON."""
+    temporary_path = None
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=cache_path.parent,
+            prefix=f".{cache_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            json.dump(payload, temporary_file, ensure_ascii=False, indent=2)
+            temporary_file.write("\n")
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        os.replace(temporary_path, cache_path)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
+
+
 def _fetch_postgresql_versions(
     *,
     timeout_seconds: float = 5.0,
     force_refresh: bool = False,
+    cache_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Fetch PostgreSQL version information from the official PostgreSQL website.
 
-    Results are cached in memory for 24 hours to avoid one HTTP request for
-    every analyzed database.
+    Results are stored in a file for 30 days. A stale valid cache is used as a
+    fallback when postgresql.org cannot be reached.
     """
-    global _versions_cache
-
-    now = time.monotonic()
-
-    if (
-        not force_refresh
-        and _versions_cache is not None
-        and now - _versions_cache[0] < CACHE_TTL_SECONDS
-    ):
-        return _versions_cache[1]
+    resolved_cache_path = Path(cache_path) if cache_path else DEFAULT_CACHE_PATH
+    cached = _read_versions_cache(resolved_cache_path)
+    if not force_refresh and cached is not None and cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
 
     request = Request(
         POSTGRESQL_VERSIONS_URL,
@@ -137,45 +187,27 @@ def _fetch_postgresql_versions(
             request,
             timeout=timeout_seconds,
         ) as response:
-            payload = json.load(response)
+            payload = _validate_versions_payload(json.load(response))
 
     except (
         HTTPError,
         URLError,
         TimeoutError,
         json.JSONDecodeError,
+        RuntimeError,
     ) as exc:
+        if cached is not None:
+            return cached[0]
         raise RuntimeError(
             "Unable to retrieve PostgreSQL release information from "
             "postgresql.org."
         ) from exc
 
-    if not isinstance(payload, list):
-        raise RuntimeError(
-            "Unexpected response received from the PostgreSQL "
-            "versions endpoint."
-        )
-
-    required_fields = {
-        "major",
-        "latestMinor",
-        "supported",
-    }
-
-    for release in payload:
-        if not isinstance(release, dict):
-            raise RuntimeError(
-                "Unexpected release entry received from "
-                "postgresql.org."
-            )
-
-        if not required_fields.issubset(release):
-            raise RuntimeError(
-                "The PostgreSQL versions response does not contain "
-                "the expected fields."
-            )
-
-    _versions_cache = (now, payload)
+    try:
+        _write_versions_cache(resolved_cache_path, payload)
+    except OSError:
+        # A read-only filesystem must not prevent version recommendations.
+        pass
 
     return payload
 

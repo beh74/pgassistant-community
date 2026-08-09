@@ -17,8 +17,11 @@ from . import sqlhelper
 from . import indexe_helper
 from . import query_index_advisor
 from . import query_parameter_advisor
+from . import query_table_stats
+from . import query_column_usage
 from . import schema_helper
 from . import fillfactor_advisor
+from . import column_statistics
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -493,7 +496,11 @@ def api_database_schema_llm_context():
                 "error": status or "Unable to connect to database."
             }), 500
 
-        result = schema_helper.get_database_schema_llm_context(conn)
+        table_workload = query_table_stats.load_top_table_workload(session, limit=None)
+        result = schema_helper.get_database_schema_llm_context(
+            conn,
+            table_workload=table_workload,
+        )
         return jsonify(result), 200
 
     except Exception as exc:
@@ -508,3 +515,57 @@ def api_database_schema_llm_context():
                 conn.close()
             except Exception:
                 pass
+
+
+@blueprint.route("/api/v1/table_column_usage/<schema_name>/<table_name>", methods=["GET"])
+def api_table_column_usage(schema_name, table_name):
+    """Return pg_stat_statements usage observations for a table and its columns."""
+    conn = None
+    try:
+        conn, status = database.connectdb(session)
+        if conn is None or status != "OK":
+            return jsonify({"success": False, "error": status or "Unable to connect to database."}), 500
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT a.attname
+                FROM pg_catalog.pg_attribute AS a
+                JOIN pg_catalog.pg_class AS c ON c.oid = a.attrelid
+                JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+                WHERE n.nspname = %s AND c.relname = %s
+                  AND a.attnum > 0 AND NOT a.attisdropped
+                ORDER BY a.attnum
+                """,
+                (schema_name, table_name),
+            )
+            columns = [row[0] for row in cursor.fetchall()]
+        if not columns:
+            return jsonify({"success": False, "error": "Table not found or no columns available."}), 404
+        result = query_column_usage.build_table_usage(
+            database.get_top_queries(session), schema_name, table_name, columns
+        )
+        return jsonify(result), 200
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@blueprint.route("/api/v1/table_column_statistics/<schema_name>/<table_name>", methods=["GET"])
+def api_table_column_statistics(schema_name, table_name):
+    """Return readable pg_stats values for one table."""
+    conn = None
+    try:
+        conn, status = database.connectdb(session)
+        if conn is None or status != "OK":
+            return jsonify({"success": False, "error": status or "Unable to connect to database."}), 500
+        result = column_statistics.load_column_statistics(conn, schema_name, table_name)
+        if not result["columns"]:
+            return jsonify({"success": False, "error": "No pg_stats data found. Run ANALYZE on this table first."}), 404
+        return jsonify(result), 200
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()

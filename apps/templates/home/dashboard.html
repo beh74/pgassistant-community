@@ -213,6 +213,37 @@
     </div>
   </div>
 
+  {% set architecture = dbinfo.get('architecture', {}) %}
+  <div class="pg-card mb-4">
+    <div class="dashboard-card-header">
+      <span class="dashboard-section-title">
+        <i class="bi bi-diagram-3"></i>
+        <span>Database architecture</span>
+      </span>
+      <a href="/database_analyze_llm.html" class="btn btn-sm btn-outline-primary">Open DB Design</a>
+    </div>
+    <div class="pg-card-body d-flex align-items-center flex-wrap gap-2">
+      <strong class="me-2">{{ architecture.get('type', 'Unknown') }}</strong>
+      <span class="badge dashboard-architecture-badge">
+        Role: {{ architecture.get('server_role', 'Unknown') }}
+      </span>
+      {% if architecture.get('wal_archiving') %}
+        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-enabled">WAL archiving enabled</span>
+        <span class="badge dashboard-architecture-badge">{{ architecture.get('archive_tool', 'Unknown') }}</span>
+      {% else %}
+        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-disabled">WAL archiving disabled</span>
+      {% endif %}
+      {% if architecture.get('connected_replicas', 0) | int > 0 %}
+        <span class="badge dashboard-architecture-badge">
+          {{ architecture.get('connected_replicas') }} connected replica{% if architecture.get('connected_replicas') | int != 1 %}s{% endif %}
+        </span>
+      {% endif %}
+      {% if architecture.get('type') == 'Unknown' %}
+        <span class="small text-muted">Architecture information is unavailable for the connected role.</span>
+      {% endif %}
+    </div>
+  </div>
+
   {% if dbinfo.get('multi_db') and dbinfo.get('databases') %}
   <div class="pg-card mb-4" id="cluster-databases-card">
     <div class="dashboard-card-header">

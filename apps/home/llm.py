@@ -83,7 +83,7 @@ def _ollama_post(root: str, path: str, payload: dict, timeout: int = 600) -> dic
     except Exception:
         raise Exception(f"Ollama API returned non-JSON: {r.text[:2000]}")
 
-def query_chatgpt(question):
+def query_chatgpt(question, render_html=True):
     api_key = get_config_value('OPENAI_API_KEY', None)
     local_llm = get_config_value('LOCAL_LLM_URI', None)
     model_llm = get_config_value('OPENAI_API_MODEL', None)
@@ -183,6 +183,9 @@ def query_chatgpt(question):
         raise Exception("OpenAI path not included in this snippet (unchanged).")
 
     md_text = fix_code_blocks(output)
+
+    if not render_html:
+        return md_text
 
     html = markdown.markdown(
         md_text,

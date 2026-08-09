@@ -1,6 +1,10 @@
 import unittest
 
-from apps.home.executive_plan_pdf import _wrap_sql, build_executive_plan_pdf, filter_plan_for_teams
+from apps.home.executive_plan_pdf import (
+    _wrap_sql,
+    build_executive_plan_pdf,
+    filter_plan_for_teams,
+)
 
 def _sample_plan():
     dev_task = {
@@ -67,6 +71,33 @@ class ExecutivePlanPdfTests(unittest.TestCase):
 
         self.assertTrue(pdf.getvalue().startswith(b"%PDF"))
         self.assertGreater(len(pdf.getvalue()), 5_000)
+
+    def test_pdf_can_include_markdown_db_design_analysis(self):
+        markdown = """# Schema overview
+
+The **orders** table is central to the model.
+
+- Review the foreign keys
+- Validate indexes on `customer_id`
+
+## Suggested SQL
+
+| Table | Calls | Risk |
+| --- | ---: | --- |
+| orders | 2008 | High |
+
+```sql
+CREATE INDEX CONCURRENTLY ON public.orders (customer_id);
+```
+"""
+        pdf = build_executive_plan_pdf(
+            _sample_plan(),
+            ["DEV"],
+            db_design_markdown=markdown,
+        )
+
+        self.assertTrue(pdf.getvalue().startswith(b"%PDF"))
+        self.assertGreater(len(pdf.getvalue()), 6_000)
 
     def test_requires_at_least_one_team(self):
         with self.assertRaises(ValueError):

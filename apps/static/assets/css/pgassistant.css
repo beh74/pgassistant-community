@@ -1333,6 +1333,24 @@ body {
   min-height: 116px;
 }
 
+.dashboard-architecture-badge {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.dashboard-architecture-badge-enabled {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.dashboard-architecture-badge-disabled {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
 .dashboard-kpi-icon,
 .dashboard-row-icon,
 .dashboard-profile-icon,

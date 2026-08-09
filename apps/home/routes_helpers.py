@@ -11,6 +11,7 @@ from . import database
 from . import llm
 from . import pgstat_helper
 from . import pgtune
+from . import query_table_stats
 from . import ranking
 from . import schema_helper
 from . import sqlcolumns
@@ -218,6 +219,21 @@ def handle_dashboard_get(segment: str):
     if not is_db_connected(session):
         return redirect("/database.html")
     dbinfo = database.get_db_info(session)
+    architecture_conn, architecture_status = database.connectdb(session)
+    if architecture_conn is not None and architecture_status == "OK":
+        try:
+            dbinfo["architecture"] = schema_helper.get_database_architecture(
+                architecture_conn
+            )
+        finally:
+            architecture_conn.close()
+    else:
+        dbinfo["architecture"] = {
+            "type": "Unknown",
+            "server_role": "Unknown",
+            "wal_archiving": False,
+            "archive_tool": "Unknown",
+        }
     return render_template("home/dashboard.html", segment=segment, dbinfo=dbinfo)
 
 def handle_topqueries_get(template: str, segment: str, tablename: str = None):
@@ -230,8 +246,23 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             tablename = request.args.get('tablename')
         schema_name = (request.args.get('schema') or '').strip()
 
+        if request.args.get("load") != "1":
+            return render_template(
+                f"home/{template}",
+                segment=segment,
+                rows=None,
+                tablename=tablename,
+                schema_name=schema_name,
+                related_mode=bool(tablename),
+                topqueries_loading=True,
+                column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS,
+            )
+
         # get top queries
         rows = database.get_top_queries(session)
+
+        relation_names = query_table_stats.load_user_relation_names(session)
+        pga_tables = database.get_pga_tables()
 
         # add additional information on queries
         for row in rows:
@@ -240,15 +271,19 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             if not row['tables']:
                 # Keep non-PostgreSQL or truncated pg_stat_statements entries visible.
                 row['tables'] = sqlhelper.get_tables(query)
+            row['_had_table_references'] = bool(row['tables'])
+            row['tables'] = query_table_stats.normalize_table_references(
+                row['tables'],
+                relation_names=relation_names,
+                excluded_names=pga_tables,
+            )
             row['operation_type'] = sqlhelper.get_sql_type(row['query'])
 
-        # Get PostgreSQL internal tables
-        pga_tables = database.get_pga_tables()
-
-        # Filter queries to ignore system tables
+        # Ignore statements whose parsed relations were exclusively internal.
+        # Statements without any parseable relation remain visible.
         rows_filtered = [
             row for row in rows
-            if not any(table.split(".")[-1] in pga_tables for table in row['tables'])
+            if row['tables'] or not row['_had_table_references']
         ]
 
         # Filter even more if 'tablename' is provided
@@ -260,6 +295,8 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
                 )
             ]
 
+        table_stats = query_table_stats.aggregate_by_table(rows_filtered)
+
         # Render the template with the filtered data
         return render_template(
             f"home/{template}",
@@ -268,6 +305,8 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             tablename=tablename,
             schema_name=schema_name,
             related_mode=bool(tablename),
+            topqueries_loading=False,
+            table_stats=table_stats,
             column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS,
         )
 
@@ -384,7 +423,14 @@ def handle_database_analyze_llm_post(template: str, segment: str):
         if conn is None or status != "OK":
             return render_template("home/page-500.html", err=status, traceback_text=status), 500
         try:
-            result = schema_helper.get_database_schema_llm_context(conn)
+            table_workload = query_table_stats.load_top_table_workload(
+                session,
+                limit=None,
+            )
+            result = schema_helper.get_database_schema_llm_context(
+                conn,
+                table_workload=table_workload,
+            )
             llm_prompt = result.get("llm_prompt", "")
         finally:
             conn.close()
@@ -437,13 +483,11 @@ def handle_tools_get():
 
 def handle_reset_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_reset")
-    rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
+    return redirect("/topqueries.html")
 
 def handle_enable_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_enable")
-    rows = database.get_top_queries(session)
-    return render_template("home/topqueries.html", segment="topqueries.html", rows=rows, column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS)
+    return redirect("/topqueries.html")
 
 def handle_lint_post():
     original_sql = request.form.get('sqlo')

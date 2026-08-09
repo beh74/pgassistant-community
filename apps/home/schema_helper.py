@@ -221,6 +221,34 @@ WHERE datname = current_database()
 """
 
 
+ARCHITECTURE_SQL = """
+WITH settings AS (
+    SELECT
+        MAX(setting) FILTER (WHERE name = 'archive_mode') AS archive_mode,
+        MAX(setting) FILTER (WHERE name = 'archive_command') AS archive_command,
+        MAX(setting) FILTER (WHERE name = 'archive_library') AS archive_library,
+        MAX(setting) FILTER (WHERE name = 'restore_command') AS restore_command,
+        MAX(setting) FILTER (WHERE name = 'primary_conninfo') AS primary_conninfo,
+        MAX(setting) FILTER (WHERE name = 'primary_slot_name') AS primary_slot_name,
+        MAX(setting) FILTER (WHERE name = 'wal_level') AS wal_level,
+        MAX(setting) FILTER (WHERE name = 'max_wal_senders') AS max_wal_senders,
+        MAX(setting) FILTER (WHERE name = 'hot_standby') AS hot_standby,
+        MAX(setting) FILTER (WHERE name = 'cluster_name') AS cluster_name
+    FROM pg_settings
+    WHERE name IN (
+        'archive_mode', 'archive_command', 'archive_library', 'restore_command',
+        'primary_conninfo', 'primary_slot_name', 'wal_level', 'max_wal_senders',
+        'hot_standby', 'cluster_name'
+    )
+)
+SELECT
+    pg_is_in_recovery() AS is_in_recovery,
+    (SELECT COUNT(*) FROM pg_stat_replication) AS connected_replicas,
+    settings.*
+FROM settings
+"""
+
+
 COLUMN_STATS_SQL = """
 SELECT
     s.schemaname,
@@ -284,6 +312,115 @@ def _format_stat(value: Any, suffix: str = "") -> str:
     if value is None:
         return "-"
     return f"{value}{suffix}"
+
+
+def _detect_wal_archive_tool(*values: Any) -> str:
+    """Classify WAL archive tooling without exposing command contents."""
+    command = " ".join(str(value or "") for value in values).casefold()
+    detectors = (
+        ("pgBackRest", ("pgbackrest",)),
+        ("Barman", ("barman-wal-archive", "barman-cloud-wal-archive", "barman")),
+        ("WAL-G", ("wal-g", "walg")),
+        ("WAL-E", ("wal-e", "wale")),
+        ("pg_probackup", ("pg_probackup", "pg-probackup")),
+        ("AWS S3 command", ("aws s3", "s3cmd")),
+        ("Google Cloud Storage command", ("gsutil", "gcloud storage")),
+        ("Azure storage command", ("azcopy", "az storage")),
+        ("rsync", ("rsync",)),
+    )
+    for label, patterns in detectors:
+        if any(pattern in command for pattern in patterns):
+            return label
+    return "Custom command or library" if command.strip() else "Not configured"
+
+
+def _build_database_architecture(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a safe, evidence-based architecture summary from server settings."""
+    is_in_recovery = bool(row.get("is_in_recovery"))
+    connected_replicas = int(row.get("connected_replicas") or 0)
+    archive_mode = str(row.get("archive_mode") or "off").casefold()
+    wal_archiving = archive_mode in {"on", "always"}
+    archive_tool = (
+        _detect_wal_archive_tool(
+            row.get("archive_command"),
+            row.get("archive_library"),
+            row.get("restore_command"),
+        )
+        if wal_archiving
+        else "Not enabled"
+    )
+
+    if is_in_recovery or connected_replicas > 0:
+        architecture_type = "Replicated PostgreSQL cluster"
+    elif wal_archiving:
+        architecture_type = "Standalone PostgreSQL with WAL archiving"
+    else:
+        architecture_type = "Standalone PostgreSQL"
+
+    if is_in_recovery:
+        server_role = "Standby"
+    else:
+        server_role = "Primary"
+
+    try:
+        max_wal_senders = int(row.get("max_wal_senders") or 0)
+    except (TypeError, ValueError):
+        max_wal_senders = 0
+    replication_capable = (
+        str(row.get("wal_level") or "").casefold() in {"replica", "logical"}
+        and max_wal_senders > 0
+    )
+
+    return {
+        "type": architecture_type,
+        "server_role": server_role,
+        "is_in_recovery": is_in_recovery,
+        "connected_replicas": connected_replicas,
+        "replication_capable": replication_capable,
+        "standby_source_configured": bool(str(row.get("primary_conninfo") or "").strip()),
+        "replication_slot_configured": bool(str(row.get("primary_slot_name") or "").strip()),
+        "wal_level": row.get("wal_level") or "unknown",
+        "wal_archiving": wal_archiving,
+        "archive_mode": archive_mode,
+        "archive_tool": archive_tool,
+        "cluster_name": row.get("cluster_name") or "",
+        "inference_note": (
+            "Cluster membership is confirmed only when this server is a standby or "
+            "has connected replicas. Replication-capable settings alone do not prove "
+            "that a cluster is currently active."
+        ),
+    }
+
+
+def get_database_architecture(conn) -> Dict[str, Any]:
+    """Read and safely classify the connected PostgreSQL architecture."""
+    try:
+        rows = _fetch_all_dicts(conn, ARCHITECTURE_SQL)
+        if rows:
+            return _build_database_architecture(rows[0])
+    except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {
+            "type": "Unknown",
+            "server_role": "Unknown",
+            "connected_replicas": 0,
+            "wal_archiving": False,
+            "archive_mode": "unknown",
+            "archive_tool": "Unknown",
+            "error": str(exc),
+        }
+
+    return {
+        "type": "Unknown",
+        "server_role": "Unknown",
+        "connected_replicas": 0,
+        "wal_archiving": False,
+        "archive_mode": "unknown",
+        "archive_tool": "Unknown",
+    }
 
 
 def _column_distinct_estimate(n_distinct: Any, live_rows: int) -> Any:
@@ -378,9 +515,28 @@ def _build_llm_context(digest: Dict[str, Any]) -> str:
         f"- PK/FK column statistics: {digest['summary'].get('column_stat_count', 0)}",
         f"- Foreign keys without covering index: {digest['summary']['foreign_keys_without_covering_index']}",
         f"- pg_stat_database.stats_reset: {digest.get('stats_reset') or '-'}",
-        "",
-        "## Tables",
     ]
+
+    architecture = digest.get("architecture") or {}
+    lines.extend(
+        [
+            "",
+            "## Database architecture",
+            f"- Inferred architecture: {architecture.get('type', 'Unknown')}",
+            f"- Server role: {architecture.get('server_role', 'Unknown')}",
+            f"- Cluster name: {architecture.get('cluster_name') or 'not configured'}",
+            f"- Connected downstream replicas: {architecture.get('connected_replicas', 0)}",
+            f"- WAL level: {architecture.get('wal_level', 'unknown')}",
+            f"- WAL archiving: {'enabled' if architecture.get('wal_archiving') else 'disabled'}",
+            f"- Archive mode: {architecture.get('archive_mode', 'unknown')}",
+            f"- Archive or restore tool detected: {architecture.get('archive_tool', 'Unknown')}",
+            f"- Standby source configured: {'yes' if architecture.get('standby_source_configured') else 'no'}",
+            f"- Replication slot configured: {'yes' if architecture.get('replication_slot_configured') else 'no'}",
+            f"- Inference limitation: {architecture.get('inference_note', 'None provided')}",
+            "",
+            "## Tables",
+        ]
+    )
 
     for table in digest["tables"]:
         pk = table.get("primary_key") or []
@@ -465,6 +621,30 @@ def _build_llm_context(digest: Dict[str, Any]) -> str:
                 f"on_update={fk['on_update']}, fk_index={coverage}]"
             )
 
+    lines.extend(["", "## Top table workload from pg_stat_statements"])
+    table_workload = digest.get("table_workload") or []
+    if not table_workload:
+        lines.append("- No parsed pg_stat_statements table workload was available.")
+    else:
+        lines.append(
+            "- Attribution note: a statement referencing multiple tables contributes its counters to each table."
+        )
+        for table in table_workload:
+            lines.append(
+                f"- {table['table']}: statements={table['query_count']}, "
+                f"calls={table['calls']}, rows={table['rows']}, "
+                f"total_exec_ms={table['total_exec_time']:.2f}, "
+                f"mean_per_call_ms={table['mean_exec_time']:.3f}"
+            )
+            for operation in table.get("operations") or []:
+                lines.append(
+                    f"  - {operation['operation'].upper()}: "
+                    f"statements={operation['query_count']}, calls={operation['calls']}, "
+                    f"rows={operation['rows']}, "
+                    f"total_exec_ms={operation['total_exec_time']:.2f}, "
+                    f"mean_per_call_ms={operation['mean_exec_time']:.3f}"
+                )
+
     return "\n".join(lines)
 
 
@@ -508,6 +688,96 @@ def _average_live_rows(tables: List[Dict[str, Any]]) -> float:
     if not positive_live_rows:
         return 0
     return sum(positive_live_rows) / len(positive_live_rows)
+
+
+def _resolve_and_merge_table_workload(table_workload, table_map, limit=20):
+    """Resolve schema names, merge duplicates, rank, then limit workload."""
+    operation_order = ("select", "insert", "update", "delete", "other")
+    merged = {}
+
+    for raw_stats in table_workload or ():
+        table_name = str(raw_stats.get("table") or "")
+        resolved_name = table_name if table_name in table_map else None
+
+        if not resolved_name and "." not in table_name:
+            candidates = [
+                qualified_name
+                for qualified_name in table_map
+                if qualified_name.rsplit(".", 1)[-1] == table_name
+            ]
+            if len(candidates) == 1:
+                resolved_name = candidates[0]
+
+        # DB Design should only receive workload for relations in its digest.
+        if not resolved_name:
+            continue
+
+        table_stats = merged.setdefault(
+            resolved_name,
+            {"table": resolved_name, "operation_stats": {}},
+        )
+        operations = raw_stats.get("operations") or [
+            {
+                "operation": "other",
+                "query_count": raw_stats.get("query_count", 0),
+                "calls": raw_stats.get("calls", 0),
+                "rows": raw_stats.get("rows", 0),
+                "total_exec_time": raw_stats.get("total_exec_time", 0),
+            }
+        ]
+
+        for operation in operations:
+            operation_name = str(operation.get("operation") or "other").casefold()
+            if operation_name not in operation_order:
+                operation_name = "other"
+            target = table_stats["operation_stats"].setdefault(
+                operation_name,
+                {
+                    "operation": operation_name,
+                    "query_count": 0,
+                    "calls": 0,
+                    "rows": 0,
+                    "total_exec_time": 0.0,
+                },
+            )
+            target["query_count"] += int(operation.get("query_count") or 0)
+            target["calls"] += int(operation.get("calls") or 0)
+            target["rows"] += int(operation.get("rows") or 0)
+            target["total_exec_time"] += float(operation.get("total_exec_time") or 0)
+
+    result = []
+    for table_stats in merged.values():
+        operations = []
+        for operation_name in operation_order:
+            operation = table_stats["operation_stats"].get(operation_name)
+            if not operation:
+                continue
+            operation["mean_exec_time"] = (
+                operation["total_exec_time"] / operation["calls"]
+                if operation["calls"]
+                else 0.0
+            )
+            operations.append(operation)
+
+        table_stats["operations"] = operations
+        table_stats["query_count"] = sum(item["query_count"] for item in operations)
+        table_stats["calls"] = sum(item["calls"] for item in operations)
+        table_stats["rows"] = sum(item["rows"] for item in operations)
+        table_stats["total_exec_time"] = sum(
+            item["total_exec_time"] for item in operations
+        )
+        table_stats["mean_exec_time"] = (
+            table_stats["total_exec_time"] / table_stats["calls"]
+            if table_stats["calls"]
+            else 0.0
+        )
+        del table_stats["operation_stats"]
+        result.append(table_stats)
+
+    result.sort(
+        key=lambda stats: (-stats["calls"], -stats["total_exec_time"], stats["table"])
+    )
+    return result[:limit]
 
 
 def _build_mermaid_code(digest: Dict[str, Any]) -> str:
@@ -577,9 +847,16 @@ def _build_llm_prompt(llm_context: str) -> str:
 Analyze the following compact database schema relationship digest.
 
 Goals:
-1. Explain the main functional areas you infer from table relationships.
-2. Identify central tables and high-impact relationships.
-3. Detect possible schema design risks:
+1. Describe the observed database architecture: standalone, standalone with WAL archiving, or replicated cluster. State the server role, WAL archive status, detected archive/restore tool, and the evidence and limitations behind the classification.
+2. Explain how the database appears to be used in practice, based on the observed pg_stat_statements workload:
+   - characterize it as read-heavy, write-heavy, or mixed
+   - identify the busiest tables by call volume and by total execution time
+   - distinguish frequent inexpensive operations from less frequent expensive operations
+   - describe the observed SELECT, INSERT, UPDATE, and DELETE mix
+   - identify likely transactional, reporting, batch, ingestion, or maintenance patterns only when supported by evidence
+3. Explain the main functional areas suggested by table names and relationships, and connect them to the observed workload.
+4. Identify central tables and high-impact relationships. Distinguish structural centrality (PK/FK relationships) from workload centrality (calls and execution time).
+5. Detect possible schema design risks:
    - missing primary keys
    - isolated tables
    - suspicious missing foreign keys
@@ -589,19 +866,30 @@ Goals:
    - circular dependencies
    - tables with high sequential scan activity compared to index usage
    - stale statistics or maintenance concerns
-4. Use pg_stat and pg_stats values as context, not as absolute truth. Mention the stats reset timestamp.
-5. Do not invent tables or columns that are not present in the digest.
-6. If a recommendation is speculative, clearly mark it as an assumption.
-7. Provide actionable PostgreSQL SQL only when it is safe and directly supported by the digest.
+6. Use pg_stat and pg_stats values as context, not as absolute truth. Mention the stats reset timestamp.
+7. Interpret workload counters carefully:
+   - they are cumulative for the available statistics window, not a live trace
+   - a statement referencing multiple tables contributes its counters to every referenced table
+   - query_count is the number of distinct captured statements, while calls is their execution count
+   - total_exec_ms measures cumulative impact, while mean_per_call_ms helps identify individually expensive operations
+   - rows does not by itself prove business volume or rows physically modified
+8. If no parsed workload is available, say that database usage cannot be inferred from pg_stat_statements and rely only on structural observations.
+9. Do not expose or reconstruct archive commands, restore commands, credentials, connection strings, or other secrets. Use only the safe architecture classification supplied in the digest.
+10. Do not invent tables, columns, queries, users, applications, business processes, or time-of-day patterns that are not present in the digest.
+11. Clearly label every inferred usage pattern as an inference and cite the supporting table, operation, and metric values.
+12. Provide actionable PostgreSQL SQL only when it is safe and directly supported by the digest.
 
 Return the answer in Markdown with these sections:
 - Executive summary
+- Database architecture
+- Observed database usage
 - Relationship map
 - Central tables
 - Risks and anomalies
 - Missing or weak relationships to investigate
 - Foreign-key index coverage
 - pg_stat observations
+- Workload evidence by table and statement type
 - Column statistics observations
 - Recommended next actions
 - SQL suggestions, if any
@@ -612,7 +900,7 @@ Schema digest:
 """
 
 
-def get_database_schema_llm_context(conn) -> Dict[str, Any]:
+def get_database_schema_llm_context(conn, table_workload=None) -> Dict[str, Any]:
     """Return a compact relationship digest and LLM-ready text for a database."""
     tables = _fetch_all_dicts(conn, TABLES_SQL)
     constraints = _fetch_all_dicts(conn, CONSTRAINTS_SQL)
@@ -620,6 +908,7 @@ def get_database_schema_llm_context(conn) -> Dict[str, Any]:
     column_stats = _fetch_all_dicts(conn, COLUMN_STATS_SQL)
     stats_reset_rows = _fetch_all_dicts(conn, STATS_RESET_SQL)
     stats_reset = stats_reset_rows[0].get("stats_reset") if stats_reset_rows else None
+    architecture = get_database_architecture(conn)
 
     table_map: Dict[str, Dict[str, Any]] = {}
     for row in tables:
@@ -712,8 +1001,14 @@ def get_database_schema_llm_context(conn) -> Dict[str, Any]:
             ),
         },
         "stats_reset": stats_reset,
+        "architecture": architecture,
         "tables": list(table_map.values()),
         "foreign_keys": normalized_fks,
+        "table_workload": _resolve_and_merge_table_workload(
+            table_workload,
+            table_map,
+            limit=20,
+        ),
     }
 
     return {

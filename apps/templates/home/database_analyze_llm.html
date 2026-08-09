@@ -182,12 +182,19 @@
   <div id="schemaLoading" class="schema-llm-state">
     <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
     <div class="fw-bold">Loading schema relationship digest</div>
-    <p class="text-muted mb-0">pgAssistant is collecting PK, FK, UNIQUE constraints and pg_stat information.</p>
+    <p class="text-muted mb-0">pgAssistant is collecting PK, FK, UNIQUE constraints, pg_stat information and the top table workload from pg_stat_statements.</p>
   </div>
 
   <div id="schemaError" class="schema-llm-state d-none">
     <div class="fw-bold">Unable to load schema digest</div>
     <p class="text-muted mb-0" id="schemaErrorMessage">The API returned an error.</p>
+  </div>
+
+  <div id="schemaAnalyzeLoading" class="schema-llm-state d-none" role="status" aria-live="polite">
+    <div class="spinner-border text-primary mb-3" aria-hidden="true"></div>
+    <div class="fw-bold">Analyzing database design with the LLM</div>
+    <p class="text-muted mb-1" id="schemaAnalyzeLoadingMessage">Sending schema relationships and workload context…</p>
+    <p class="small text-muted mb-0">This may take a few minutes. Please keep this page open.</p>
   </div>
 
   <div id="schemaContent" class="d-none">
@@ -219,6 +226,26 @@
       <div class="tables-summary-card">
         <span class="tables-summary-label">Stats reset</span>
         <span class="tables-summary-value fs-6" id="schemaStatsReset">-</span>
+      </div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Workload tables</span>
+        <span class="tables-summary-value" id="schemaWorkloadTables">0</span>
+      </div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Architecture</span>
+        <span class="tables-summary-value fs-6" id="schemaArchitecture">-</span>
+      </div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Server role</span>
+        <span class="tables-summary-value fs-6" id="schemaServerRole">-</span>
+      </div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">WAL archiving</span>
+        <span class="tables-summary-value fs-6" id="schemaWalArchiving">-</span>
+      </div>
+      <div class="tables-summary-card">
+        <span class="tables-summary-label">Archive tool</span>
+        <span class="tables-summary-value fs-6" id="schemaArchiveTool">-</span>
       </div>
     </div>
 
@@ -325,6 +352,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const error = document.getElementById("schemaError");
   const errorMessage = document.getElementById("schemaErrorMessage");
   const content = document.getElementById("schemaContent");
+  const analyzeLoading = document.getElementById("schemaAnalyzeLoading");
+  const analyzeLoadingMessage = document.getElementById("schemaAnalyzeLoadingMessage");
+  const analyzeForm = document.getElementById("schemaAnalyzeForm");
+  const analyzeLlmBtn = document.getElementById("analyzeLlmBtn");
   const mermaidSource = document.getElementById("mermaidSource");
   const mermaidError = document.getElementById("schemaMermaidError");
   const canvas = document.getElementById("schemaMermaidCanvas");
@@ -428,6 +459,12 @@ document.addEventListener("DOMContentLoaded", function () {
       setText("schemaAverageRows", formatNumber(summary.average_live_rows || 0));
       setText("schemaColumnStats", formatNumber(summary.column_stat_count || 0));
       setText("schemaStatsReset", digest.stats_reset || "-");
+      setText("schemaWorkloadTables", (digest.table_workload || []).length);
+      const architecture = digest.architecture || {};
+      setText("schemaArchitecture", architecture.type || "Unknown");
+      setText("schemaServerRole", architecture.server_role || "Unknown");
+      setText("schemaWalArchiving", architecture.wal_archiving ? "Enabled" : "Disabled");
+      setText("schemaArchiveTool", architecture.archive_tool || "Unknown");
 
       const prompt = data.llm_prompt || "";
       const mermaidCode = data.mermaid_code || "erDiagram";
@@ -450,6 +487,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
   promptTextarea.addEventListener("input", function () {
     promptInput.value = promptTextarea.value;
+  });
+
+  analyzeForm.addEventListener("submit", function () {
+    analyzeLlmBtn.disabled = true;
+    analyzeLlmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Analyzing…';
+    content.classList.add("d-none");
+    analyzeLoading.classList.remove("d-none");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    const messages = [
+      "Sending schema relationships and workload context…",
+      "Reviewing central and write-heavy tables…",
+      "Relating query patterns to database relationships…",
+      "Preparing design risks and recommendations…"
+    ];
+    let messageIndex = 0;
+    window.setInterval(function () {
+      messageIndex = (messageIndex + 1) % messages.length;
+      if (analyzeLoadingMessage) analyzeLoadingMessage.textContent = messages[messageIndex];
+    }, 3500);
   });
 
   copyPromptBtn.addEventListener("click", function () {

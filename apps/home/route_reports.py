@@ -12,7 +12,9 @@ from . import executive_plan
 from . import executive_plan_pdf
 from . import global_advisor
 from . import llm
+from . import query_table_stats
 from . import reporting
+from . import schema_helper
 
 @blueprint.route('/executive-plan.html', methods=['GET'])
 def executive_plan_route():
@@ -50,7 +52,32 @@ def executive_plan_report_route():
 
     try:
         plan = executive_plan.build_executive_plan(session)
-        pdf = executive_plan_pdf.build_executive_plan_pdf(plan, teams)
+        db_design_markdown = None
+        if request.form.get("include_db_design") == "1":
+            conn, status = database.connectdb(session)
+            if conn is None or status != "OK":
+                raise RuntimeError(status or "Unable to connect to the database.")
+            try:
+                table_workload = query_table_stats.load_top_table_workload(
+                    session,
+                    limit=None,
+                )
+                schema_context = schema_helper.get_database_schema_llm_context(
+                    conn,
+                    table_workload=table_workload,
+                )
+            finally:
+                conn.close()
+            db_design_markdown = llm.query_chatgpt(
+                schema_context.get("llm_prompt", ""),
+                render_html=False,
+            )
+
+        pdf = executive_plan_pdf.build_executive_plan_pdf(
+            plan,
+            teams,
+            db_design_markdown=db_design_markdown,
+        )
         database_name = database.get_resolved_database_name(session) or "database"
         safe_database_name = "".join(
             character if character.isalnum() or character in {"-", "_"} else "-"

@@ -5,6 +5,133 @@
 {% block stylesheets %}
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
 <link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css?v=query-activity-cards">
+<style>
+  .topqueries-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 340px;
+    margin-top: 1.25rem;
+    padding: 2rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06));
+  }
+  .topqueries-loading-icon {
+    width: 4rem;
+    height: 4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    border-radius: 1.2rem;
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #06b6d4);
+    font-size: 1.6rem;
+    box-shadow: 0 16px 30px rgba(37, 99, 235, .2);
+  }
+  .query-table-stats-card {
+    overflow: hidden;
+    border: 1px solid var(--ga-border, #dbe4ef);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06));
+  }
+  .query-table-stats-card .table { margin-bottom: 0; }
+  .query-table-stats-card th {
+    padding: .8rem .75rem;
+    color: #64748b;
+    background: #f8fafc;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .query-table-stats-card td { padding: .85rem .75rem; vertical-align: middle; }
+  .query-table-group + .query-table-group { border-top: 2px solid #dbe4ef; }
+  .query-table-summary { cursor: pointer; }
+  .query-table-summary:hover td { background: #f8fbff; }
+  .query-table-summary:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: -3px; }
+  .query-table-name-cell { min-width: 13rem; }
+  .query-table-name-cell code {
+    color: #0f172a;
+    font-weight: 800 !important;
+  }
+  .query-table-total { margin-top: .35rem; color: #64748b; font-size: .72rem; }
+  .query-operation-badges { display: flex; flex-wrap: wrap; gap: .35rem; min-width: 17rem; }
+  .query-operation-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .25rem;
+    min-width: 4.7rem;
+    padding: .3rem .5rem;
+    border-radius: 999px;
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 800;
+    text-align: center;
+  }
+  .query-operation-select { background: #0284c7; }
+  .query-operation-insert { background: #059669; }
+  .query-operation-update { background: #d97706; }
+  .query-operation-delete { background: #dc2626; }
+  .query-operation-other { background: #64748b; }
+  .query-statements-badge {
+    display: inline-flex;
+    min-width: 2rem;
+    justify-content: center;
+    padding: .3rem .5rem;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 850;
+  }
+  .query-table-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: #2563eb;
+    background: #eff6ff;
+    transition: transform .18s ease;
+  }
+  .query-table-row-actions { display: inline-flex; align-items: center; gap: .4rem; }
+  .query-table-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    color: #1d4ed8;
+    background: #fff;
+  }
+  .query-table-filter-btn:hover,
+  .query-table-filter-btn:focus-visible { color: #fff; background: #2563eb; border-color: #2563eb; }
+  .query-table-summary[aria-expanded="true"] .query-table-toggle { transform: rotate(180deg); }
+  .query-table-details-row > td { padding: 0 !important; background: #f8fafc; }
+  .query-operation-details { padding: .75rem 1rem 1rem 2rem; }
+  .query-operation-details .table { background: #fff; border: 1px solid #e2e8f0; }
+  #query-activity-tab-content > .tab-pane { display: none; }
+  #query-activity-tab-content > .tab-pane.active { display: block; }
+  .pg-query-activity-page .activity-query-sql.topquery-sql {
+    height: 11rem;
+    min-height: 11rem;
+    max-height: 11rem;
+    margin: 0 0 1rem !important;
+    padding: .95rem 1rem !important;
+    overflow: auto;
+  }
+</style>
 {% endblock stylesheets %}
 
 {% block content %}
@@ -34,7 +161,7 @@
         <i class="bi bi-arrow-left me-2"></i>Table advisor
       </a>
       {% endif %}
-      {% if not related_mode and (rows is not defined or rows|length == 0) %}
+      {% if not topqueries_loading and not related_mode and not rows %}
       <button onclick="location.href='/enable_pg_statistics.html'" type="button" class="btn btn-primary d-inline-flex align-items-center">
         <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4.5 12.75 6 6 9-13.5"></path>
@@ -43,7 +170,7 @@
       </button>
       {% endif %}
 
-      {% if not related_mode and rows is defined and rows|length > 0 %}
+      {% if not topqueries_loading and not related_mode and rows %}
       <button onclick="location.href='/reset_pg_statistics.html'" type="button" class="btn btn-outline-danger d-inline-flex align-items-center">
         <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
@@ -77,6 +204,58 @@
       </p>
     </div>
   </section>
+
+{% if topqueries_loading %}
+  <div class="topqueries-loading" role="status" aria-live="polite">
+    <div class="topqueries-loading-icon">
+      <i class="bi bi-arrow-repeat spinner-border" aria-hidden="true"></i>
+    </div>
+    <h2 class="h4">Loading query activity</h2>
+    <p class="text-muted mb-2" id="topqueries-loading-message">
+      Reading statements captured by pg_stat_statements…
+    </p>
+    <p class="small text-muted mb-0">
+      Parsing PostgreSQL statements and identifying their related tables. Please keep this page open.
+    </p>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const messages = [
+      "Reading statements captured by pg_stat_statements…",
+      "Parsing PostgreSQL syntax with pglast…",
+      "Identifying physical tables and schemas…",
+      {% if related_mode %}{{ ("Keeping statements related to " ~ (schema_name ~ "." if schema_name else "") ~ tablename ~ "…") | tojson }},{% else %}"Preparing query activity metrics…",{% endif %}
+      "Preparing Query Analyze links…"
+    ];
+    const message = document.getElementById("topqueries-loading-message");
+    let messageIndex = 0;
+    window.setInterval(function () {
+      messageIndex = (messageIndex + 1) % messages.length;
+      if (message) message.textContent = messages[messageIndex];
+    }, 2800);
+
+    const runUrl = new URL(window.location.href);
+    runUrl.searchParams.set("load", "1");
+    window.location.replace(runUrl.toString());
+  });
+  </script>
+{% else %}
+
+<nav class="mb-4" aria-label="Query activity views">
+  <div class="nav nav-tabs tune-nav-tabs" id="query-activity-tabs" role="tablist">
+    <button class="nav-link active" id="query-statements-tab" data-bs-toggle="tab" data-bs-target="#query-statements-pane" type="button" role="tab" aria-controls="query-statements-pane" aria-selected="true">
+      <i class="bi bi-code-slash me-1" aria-hidden="true"></i>Statements
+    </button>
+    <button class="nav-link" id="query-tables-tab" data-bs-toggle="tab" data-bs-target="#query-tables-pane" type="button" role="tab" aria-controls="query-tables-pane" aria-selected="false">
+      <i class="bi bi-table me-1" aria-hidden="true"></i>By table
+      <span class="badge text-bg-secondary ms-1">{{ table_stats|default([], true)|length }}</span>
+    </button>
+  </div>
+</nav>
+
+<div class="tab-content" id="query-activity-tab-content">
+<div class="tab-pane fade show active" id="query-statements-pane" role="tabpanel" aria-labelledby="query-statements-tab" tabindex="0">
 
 <div class="pg-toolbar-card">
 
@@ -308,7 +487,109 @@
       <button id="nextPageBtn" class="btn btn-outline-primary btn-sm">Next</button>
     </div>
   </div>
-</div>
+</div><!-- /#query-statements-pane -->
+
+<div class="tab-pane fade" id="query-tables-pane" role="tabpanel" aria-labelledby="query-tables-tab" tabindex="0">
+  <div class="alert alert-info small">
+    Metrics are grouped by physical table and statement type. A statement referencing multiple tables contributes its counters to each table, so these rows should not be summed into a database total.
+  </div>
+
+  {% if table_stats %}
+  <div class="query-table-stats-card table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Table</th>
+          <th>Types</th>
+          <th>Statements</th>
+          <th class="text-end">Calls</th>
+          <th class="text-end">Rows</th>
+          <th class="text-end">Total time</th>
+          <th class="text-end">Mean / call</th>
+          <th><span class="visually-hidden">Details</span></th>
+        </tr>
+      </thead>
+      {% for stat in table_stats %}
+      <tbody class="query-table-group">
+        <tr
+          class="query-table-summary"
+          role="button"
+          tabindex="0"
+          aria-expanded="false"
+          aria-controls="query-table-details-{{ loop.index }}"
+          data-details-id="query-table-details-{{ loop.index }}"
+        >
+          <td class="query-table-name-cell">
+            <code class="fw-semibold">{{ stat.table }}</code>
+            <div class="query-table-total">{{ stat.query_count }} statements · {{ "{:,}".format(stat.calls) }} calls total</div>
+          </td>
+          <td>
+            <div class="query-operation-badges">
+            {% for operation in stat.operations %}
+              <span class="query-operation-badge query-operation-{{ operation.operation }}">{{ operation.operation|upper }} {{ operation.query_count }}</span>
+            {% endfor %}
+            </div>
+          </td>
+          <td><span class="query-statements-badge">{{ stat.query_count }}</span></td>
+          <td class="text-end fw-semibold">{{ "{:,}".format(stat.calls) }}</td>
+          <td class="text-end">{{ "{:,}".format(stat.rows) }}</td>
+          <td class="text-end">{{ "%.2f"|format(stat.total_exec_time) }} ms</td>
+          <td class="text-end">{{ "%.3f"|format(stat.mean_exec_time) }} ms</td>
+          <td class="text-end">
+            <span class="query-table-row-actions">
+              <button
+                type="button"
+                class="query-table-filter-btn"
+                data-table-name="{{ stat.table }}"
+                title="Show statements for {{ stat.table }}"
+                aria-label="Show statements for {{ stat.table }}"
+              >
+                <i class="bi bi-zoom-in" aria-hidden="true"></i>
+              </button>
+              <span class="query-table-toggle"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+            </span>
+          </td>
+        </tr>
+        <tr class="query-table-details-row d-none" id="query-table-details-{{ loop.index }}" aria-hidden="true">
+          <td colspan="8">
+            <div class="query-operation-details">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Statements</th>
+                    <th class="text-end">Calls</th>
+                    <th class="text-end">Rows</th>
+                    <th class="text-end">Total time</th>
+                    <th class="text-end">Mean / call</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for operation in stat.operations %}
+                  <tr>
+                    <td><span class="query-operation-badge query-operation-{{ operation.operation }}">{{ operation.operation|upper }}</span></td>
+                    <td><span class="query-statements-badge">{{ operation.query_count }}</span></td>
+                    <td class="text-end fw-semibold">{{ "{:,}".format(operation.calls) }}</td>
+                    <td class="text-end">{{ "{:,}".format(operation.rows) }}</td>
+                    <td class="text-end">{{ "%.2f"|format(operation.total_exec_time) }} ms</td>
+                    <td class="text-end">{{ "%.3f"|format(operation.mean_exec_time) }} ms</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <div class="no-results">No parsed table statistics are available for this workload.</div>
+  {% endif %}
+</div><!-- /#query-tables-pane -->
+</div><!-- /#query-activity-tab-content -->
+</div><!-- /.pg-query-activity-page -->
 
 <div class="modal fade" id="queryDetailsModal" tabindex="-1" aria-labelledby="queryDetailsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -353,6 +634,12 @@
 
 <script>
 
+  const visibleUrl = new URL(window.location.href);
+  if (visibleUrl.searchParams.has("load")) {
+    visibleUrl.searchParams.delete("load");
+    window.history.replaceState({}, "", visibleUrl.toString());
+  }
+
     function refreshPage() {
     const btn = document.getElementById('refreshBtn');
     const spinner = document.getElementById('refreshSpinner');
@@ -384,6 +671,7 @@
 
   let currentPage = 1;
   let pageSize = parseInt(pageSizeSelect.value, 10);
+  let activeTableFilter = '';
 
   function normalizeText(value) {
     return (value || '').toString().toLowerCase().trim();
@@ -402,14 +690,36 @@
   function getFilteredCards() {
     const searchTerm = normalizeText(searchInput.value);
 
-    if (!searchTerm) {
+    if (!searchTerm && !activeTableFilter) {
       return [...cards];
     }
 
     return cards.filter(card => {
+      if (activeTableFilter) {
+        const row = JSON.parse(card.dataset.row || '{}');
+        const rowTables = Array.isArray(row.tables) ? row.tables : [];
+        if (!rowTables.some(table => normalizeText(table) === activeTableFilter)) {
+          return false;
+        }
+      }
       const haystack = normalizeText(card.getAttribute('data-search'));
-      return haystack.includes(searchTerm);
+      return !searchTerm || haystack.includes(searchTerm);
     });
+  }
+
+  function showStatementsForTable(tableName) {
+    activeTableFilter = normalizeText(tableName);
+    searchInput.value = tableName;
+    currentPage = 1;
+    renderCards();
+
+    const statementsTab = document.getElementById('query-statements-tab');
+    if (statementsTab && window.bootstrap) {
+      bootstrap.Tab.getOrCreateInstance(statementsTab).show();
+    } else if (statementsTab) {
+      statementsTab.click();
+    }
+    searchInput.focus();
   }
 
   function sortCards(cardList) {
@@ -604,17 +914,48 @@
     });
   });
 
+  function toggleTableOperationDetails(summaryRow) {
+    const detailsId = summaryRow.dataset.detailsId;
+    const detailsRow = detailsId ? document.getElementById(detailsId) : null;
+    if (!detailsRow) return;
+
+    const expanded = summaryRow.getAttribute('aria-expanded') === 'true';
+    summaryRow.setAttribute('aria-expanded', String(!expanded));
+    detailsRow.classList.toggle('d-none', expanded);
+    detailsRow.setAttribute('aria-hidden', String(expanded));
+  }
+
+  document.querySelectorAll('.query-table-summary').forEach(summaryRow => {
+    summaryRow.addEventListener('click', function () {
+      toggleTableOperationDetails(summaryRow);
+    });
+    summaryRow.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      toggleTableOperationDetails(summaryRow);
+    });
+  });
+
+  document.querySelectorAll('.query-table-filter-btn').forEach(button => {
+    button.addEventListener('click', function (event) {
+      event.stopPropagation();
+      showStatementsForTable(button.dataset.tableName || '');
+    });
+    button.addEventListener('keydown', function (event) {
+      event.stopPropagation();
+    });
+  });
+
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.table-filter-btn');
     if (!btn) return;
 
     const tableName = btn.dataset.tableName || '';
-    searchInput.value = tableName;
-    currentPage = 1;
-    renderCards();
+    showStatementsForTable(tableName);
   });
 
   searchInput.addEventListener('input', function () {
+    activeTableFilter = '';
     currentPage = 1;
     renderCards();
   });
@@ -648,6 +989,7 @@
   renderCards();
 })();
 </script>
+{% endif %}
 
 {% endblock content %}
 
