@@ -176,6 +176,7 @@ def route_template(template: str):
                 llm_uri=config.get_config_value("LOCAL_LLM_URI"),
                 llm_api_key=config.get_config_value("OPENAI_API_KEY"),
                 llm_model=config.get_config_value("OPENAI_API_MODEL"),
+                llm_verify_ssl=config.get_config_bool("LLM_VERIFY_SSL", True),
                 llm_sql_guidelines=config.get_config_value("LLM_SQL_GUIDELINES"),
                 llm_table_rfc_prompt_template=llm.get_configured_table_prompt_template(
                     "LLM_TABLE_RFC_PROMPT_TEMPLATE",
@@ -192,6 +193,7 @@ def route_template(template: str):
             llm_uri = request.form.get("llm_uri")
             llm_api_key = request.form.get("llm_api_key")
             llm_model = request.form.get("llm_model")
+            llm_verify_ssl = request.form.get("llm_disable_ssl_verification") != "on"
             llm_sql_guidelines = request.form.get("llm_sql_guidelines", "")
             llm_table_rfc_prompt_template = request.form.get(
                 "llm_table_rfc_prompt_template", ""
@@ -215,6 +217,7 @@ def route_template(template: str):
                     llm_uri=llm_uri,
                     llm_api_key=llm_api_key,
                     llm_model=llm_model,
+                    llm_verify_ssl=llm_verify_ssl,
                     llm_sql_guidelines=llm_sql_guidelines,
                     llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
                     llm_table_naming_prompt_template=llm_table_naming_prompt_template,
@@ -227,6 +230,7 @@ def route_template(template: str):
                 llm_uri=llm_uri,
                 llm_api_key=llm_api_key,
                 llm_model=llm_model,
+                llm_verify_ssl=llm_verify_ssl,
                 llm_sql_guidelines=llm_sql_guidelines,
                 llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
                 llm_table_naming_prompt_template=llm_table_naming_prompt_template,
@@ -238,6 +242,7 @@ def route_template(template: str):
                 llm_uri=llm_uri,
                 llm_api_key=llm_api_key,
                 llm_model=llm_model,
+                llm_verify_ssl=llm_verify_ssl,
                 llm_sql_guidelines=llm_sql_guidelines,
                 llm_table_rfc_prompt_template=llm_table_rfc_prompt_template,
                 llm_table_naming_prompt_template=llm_table_naming_prompt_template,

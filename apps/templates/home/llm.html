@@ -393,6 +393,24 @@
                     </div>
                   </div>
 
+                  <div class="llm-field llm-grid-full">
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        id="llm_disable_ssl_verification"
+                        name="llm_disable_ssl_verification"
+                        type="checkbox"
+                        {% if not llm_verify_ssl %}checked{% endif %}
+                      >
+                      <label class="form-check-label fw-semibold" for="llm_disable_ssl_verification">
+                        Bypass SSL certificate verification
+                      </label>
+                    </div>
+                    <div class="form-text text-danger">
+                      Use only for a trusted internal LLM endpoint with a self-signed certificate. Disabling verification makes HTTPS connections vulnerable to interception.
+                    </div>
+                  </div>
+
                   <div class="llm-field">
                     <label class="form-label" for="llm_api_key">API Key</label>
                     <div class="input-group">
@@ -576,6 +594,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const uriField = document.getElementById("llm_uri");
   const apiKeyField = document.getElementById("llm_api_key");
+  const disableSslVerificationField = document.getElementById("llm_disable_ssl_verification");
   const rfcPromptTemplate = document.getElementById("llm_table_rfc_prompt_template");
   const namingPromptTemplate = document.getElementById("llm_table_naming_prompt_template");
   const resetRfcPromptTemplate = document.getElementById("resetRfcPromptTemplate");
@@ -603,7 +622,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       body: JSON.stringify({
         llm_uri: uriField.value.trim(),
-        llm_api_key: apiKeyField.value.trim()
+        llm_api_key: apiKeyField.value.trim(),
+        llm_verify_ssl: !disableSslVerificationField.checked
       })
     });
 

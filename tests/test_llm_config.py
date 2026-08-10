@@ -5,9 +5,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from apps.home.config import init_or_load_env
+from apps.home.config import get_config_bool, init_or_load_env, update_llm_config
 
 class LlmConfigInitializationTests(unittest.TestCase):
+    def test_ssl_verification_defaults_to_enabled_and_can_be_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "config.json"
+            config_path.write_text("{}", encoding="utf-8")
+            with patch("apps.home.config.CONFIG_PATH", str(config_path)):
+                self.assertTrue(get_config_bool("LLM_VERIFY_SSL", True))
+                update_llm_config(
+                    llm_verify_ssl=False,
+                    config_path=str(config_path),
+                )
+                self.assertFalse(get_config_bool("LLM_VERIFY_SSL", True))
+
     def test_creates_first_start_config_from_environment(self):
         with tempfile.TemporaryDirectory() as directory:
             config_path = Path(directory) / "config.json"

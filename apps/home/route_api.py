@@ -68,9 +68,10 @@ def fetch_column_data_route():
 
 @blueprint.route("/api/v1/llm_get_models", methods=["POST"])
 def llm_get_models():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     llm_uri = data.get("llm_uri", "").rstrip("/")
     api_key = data.get("llm_api_key", "").strip()
+    verify_ssl = data.get("llm_verify_ssl", True) is not False
 
     if not llm_uri:
         return jsonify({"error": "Missing LLM URI"}), 400
@@ -81,16 +82,70 @@ def llm_get_models():
         headers["Authorization"] = f"Bearer {api_key}"
 
     try:
-        response = requests.get(models_url, headers=headers, timeout=10)
+        response = requests.get(
+            models_url,
+            headers=headers,
+            timeout=10,
+            verify=verify_ssl,
+        )
         response.raise_for_status()
         models_data = response.json()
-
-        model_names = [m.get("id") for m in models_data.get("data", []) if "id" in m]
+        model_names = _extract_openai_model_ids(models_data)
 
         return jsonify({"models": model_names})
 
-    except Exception:
-        return jsonify({"error": "Could not fetch models"}), 500
+    except requests.Timeout:
+        return jsonify({"error": "The LLM endpoint did not respond within 10 seconds."}), 504
+    except requests.HTTPError as exc:
+        upstream = exc.response
+        detail = _extract_upstream_error(upstream)
+        status = upstream.status_code if upstream is not None else 502
+        return jsonify({"error": f"LLM endpoint returned HTTP {status}: {detail}"}), status
+    except requests.RequestException as exc:
+        return jsonify({"error": f"Unable to reach the LLM endpoint: {exc}"}), 502
+    except (ValueError, TypeError) as exc:
+        return jsonify({"error": f"Invalid model-list response: {exc}"}), 502
+
+
+def _extract_openai_model_ids(payload):
+    """Read OpenAI-compatible model IDs from list or single-object data."""
+    if not isinstance(payload, dict):
+        raise TypeError("the response body is not a JSON object")
+    models = payload.get("data")
+    if isinstance(models, dict):
+        models = [models]
+    if not isinstance(models, list):
+        raise TypeError("the 'data' field is not a list")
+    return [
+        str(model["id"])
+        for model in models
+        if isinstance(model, dict) and model.get("id")
+    ]
+
+
+def _extract_upstream_error(response):
+    """Return a useful upstream error without echoing request credentials."""
+    if response is None:
+        return "request failed"
+    try:
+        payload = response.json()
+    except ValueError:
+        text = (response.text or "").strip()
+        return text[:300] if text else "no error detail was returned"
+
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict):
+        return str(
+            error.get("message")
+            or error.get("description")
+            or error.get("code")
+            or "request rejected"
+        )
+    if isinstance(error, str):
+        return error
+    if isinstance(payload, dict) and payload.get("message"):
+        return str(payload["message"])
+    return "request rejected"
 
 
 @blueprint.route("/api/v1/report", methods=["POST"])

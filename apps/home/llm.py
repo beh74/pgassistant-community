@@ -6,10 +6,10 @@ import re
 import json
 from urllib.parse import urlparse, urlunparse, urljoin
 
-from openai import OpenAI
+from openai import DefaultHttpxClient, OpenAI
 from .ddl import generate_tables_ddl
 from .sqlhelper import get_tables
-from .config import get_config_value
+from .config import get_config_bool, get_config_value
 from .database import get_pg_tune_parameter
 from .database import fetch_table_stats
 from .database import fetch_foreign_key_index_coverage
@@ -30,7 +30,7 @@ def extract_root_uri(uri):
     root = urlunparse((parsed.scheme, parsed.netloc, '/', '', '', ''))
     return root
 
-def check_ollama_status(base_uri=None, timeout=2):
+def check_ollama_status(base_uri=None, timeout=2, verify_ssl=True):
     """
     Checks whether an Ollama server is running at the specified base URI.
 
@@ -51,7 +51,7 @@ def check_ollama_status(base_uri=None, timeout=2):
     root_uri = extract_root_uri(base_uri)
 
     try:
-        response = requests.get(root_uri, timeout=timeout)
+        response = requests.get(root_uri, timeout=timeout, verify=verify_ssl)
         if response.status_code == 200 and "Ollama is running" in response.text:
             return "ollama"
         else:
@@ -73,9 +73,15 @@ def fix_code_blocks(text: str) -> str:
 
     return text
 
-def _ollama_post(root: str, path: str, payload: dict, timeout: int = 600) -> dict:
+def _ollama_post(
+    root: str,
+    path: str,
+    payload: dict,
+    timeout: int = 600,
+    verify_ssl: bool = True,
+) -> dict:
     url = urljoin(root if root.endswith("/") else root + "/", path.lstrip("/"))
-    r = requests.post(url, json=payload, timeout=timeout)
+    r = requests.post(url, json=payload, timeout=timeout, verify=verify_ssl)
     if r.status_code != 200:
         raise Exception(f"Ollama API error: {r.status_code} - {r.text[:2000]}")
     try:
@@ -83,12 +89,35 @@ def _ollama_post(root: str, path: str, payload: dict, timeout: int = 600) -> dic
     except Exception:
         raise Exception(f"Ollama API returned non-JSON: {r.text[:2000]}")
 
+
+def _extract_openai_output(completion) -> tuple[str, str | None]:
+    """Extract assistant text and finish reason from a chat completion."""
+    choices = getattr(completion, "choices", None) or []
+    if not choices:
+        raise Exception("The OpenAI-compatible endpoint returned no completion choice.")
+    choice = choices[0]
+    message = getattr(choice, "message", None)
+    content = getattr(message, "content", None) if message is not None else None
+    if isinstance(content, list):
+        content = "".join(
+            str(getattr(part, "text", None) or (part.get("text") if isinstance(part, dict) else "") or "")
+            for part in content
+        )
+    output = str(content or "")
+    if not output.strip():
+        raise Exception("The OpenAI-compatible endpoint returned an empty response.")
+    return output, getattr(choice, "finish_reason", None)
+
 def query_chatgpt(question, render_html=True):
     api_key = get_config_value('OPENAI_API_KEY', None)
     local_llm = get_config_value('LOCAL_LLM_URI', None)
     model_llm = get_config_value('OPENAI_API_MODEL', None)
+    verify_ssl = get_config_bool('LLM_VERIFY_SSL', True)
 
-    use_ollama = local_llm and check_ollama_status(local_llm) == "ollama"
+    use_ollama = (
+        local_llm
+        and check_ollama_status(local_llm, verify_ssl=verify_ssl) == "ollama"
+    )
     system_msg = "You are a Postgresql database expert"
 
     if use_ollama:
@@ -132,7 +161,13 @@ def query_chatgpt(question, render_html=True):
             payload["thinking"] = False            
 
         # 1) normal call
-        data = _ollama_post(root, "/api/chat", payload, timeout=600)
+        data = _ollama_post(
+            root,
+            "/api/chat",
+            payload,
+            timeout=600,
+            verify_ssl=verify_ssl,
+        )
 
         # Ollama /api/chat returns: {"message":{"role":"assistant","content":"..."}, "done":..., "done_reason":...}
         output = ((data.get("message") or {}).get("content")) or ""
@@ -158,7 +193,13 @@ def query_chatgpt(question, render_html=True):
             if think_level is not None:
                 payload2["think"] = think_level
 
-            data2 = _ollama_post(root, "/api/chat", payload2, timeout=600)
+            data2 = _ollama_post(
+                root,
+                "/api/chat",
+                payload2,
+                timeout=600,
+                verify_ssl=verify_ssl,
+            )
             output = (((data2.get("message") or {}).get("content")) or "")
             done_reason = data2.get("done_reason")
 
@@ -179,8 +220,33 @@ def query_chatgpt(question, render_html=True):
             )
 
     else:
-        # ... path OpenAI unchanged ...
-        raise Exception("OpenAI path not included in this snippet (unchanged).")
+        if not model_llm:
+            raise ValueError("No LLM model is configured. Select a model in LLM Settings.")
+        if not api_key and not local_llm:
+            raise ValueError("No OpenAI API key or compatible LLM endpoint is configured.")
+
+        client_options = {
+            "api_key": api_key or "none",
+            "timeout": 600.0,
+        }
+        if local_llm:
+            client_options["base_url"] = local_llm.rstrip("/") + "/"
+        if not verify_ssl:
+            client_options["http_client"] = DefaultHttpxClient(verify=False)
+        client = OpenAI(**client_options)
+        completion = client.chat.completions.create(
+            model=model_llm,
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": question},
+            ],
+        )
+        output, finish_reason = _extract_openai_output(completion)
+        if finish_reason == "length":
+            output += (
+                "\n\n> **Warning:** The LLM provider stopped because the model or "
+                "context limit was reached. The response may be incomplete."
+            )
 
     md_text = fix_code_blocks(output)
 

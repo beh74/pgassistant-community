@@ -1,5 +1,10 @@
 # Change Log
 
+## [3.6.4] - 2026-08-10
+
+- LLM settings: add an explicit opt-in to bypass SSL certificate verification for trusted internal endpoints using self-signed certificates.
+- LLM settings: expose safe upstream HTTP, timeout, and response-format errors when model discovery fails, and accept providers returning a single model object.
+
 ## [3.6.3] - 2026-08-09
 
 ## Improvements
@@ -20,6 +25,7 @@
 
 - Query activity: merge qualified and unqualified references when they resolve to one physical relation, and exclude PostgreSQL internal relations from statement and per-table views.
 - Docker image: optimize Docker image size
+
 
 ## [3.6.2] - 2026-08-08
 

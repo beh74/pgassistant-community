@@ -7,6 +7,7 @@ ENV_KEYS = [
     "LOCAL_LLM_URI",
     "OPENAI_API_KEY",
     "OPENAI_API_MODEL",
+    "LLM_VERIFY_SSL",
     "LLM_SQL_GUIDELINES",
     "LLM_TABLE_RFC_PROMPT_TEMPLATE",
     "LLM_TABLE_NAMING_PROMPT_TEMPLATE",
@@ -50,6 +51,7 @@ def update_llm_config(
     llm_uri=None,
     llm_api_key=None,
     llm_model=None,
+    llm_verify_ssl=None,
     config_path=CONFIG_PATH,
     llm_sql_guidelines=None,
     llm_table_rfc_prompt_template=None,
@@ -108,6 +110,8 @@ def update_llm_config(
         config["OPENAI_API_KEY"] = llm_api_key
     if llm_model is not None:
         config["OPENAI_API_MODEL"] = llm_model
+    if llm_verify_ssl is not None:
+        config["LLM_VERIFY_SSL"] = bool(llm_verify_ssl)
     if llm_table_rfc_prompt_template is not None:
         config["LLM_TABLE_RFC_PROMPT_TEMPLATE"] = llm_table_rfc_prompt_template
     if llm_table_naming_prompt_template is not None:
@@ -136,3 +140,16 @@ def get_config_value(key, default=""):
         config = json.load(f)
 
     return config.get(key, default)
+
+
+def get_config_bool(key, default=True):
+    """Return a persisted boolean while accepting legacy string values."""
+    value = get_config_value(key, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if not normalized:
+            return bool(default)
+        return normalized not in {"false", "0", "no", "off"}
+    return bool(value)
