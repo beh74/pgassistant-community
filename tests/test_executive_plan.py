@@ -4,6 +4,33 @@ from apps.home.executive_plan import build_plan_from_results, load_rules
 
 
 class ExecutivePlanTests(unittest.TestCase):
+    def test_pgtune_parameter_script_is_included_with_clear_provenance(self):
+        pgtune_sql = (
+            "-- Generated from pgTune estimates; review before applying.\n"
+            "ALTER SYSTEM SET shared_buffers = '2GB';\n"
+            "ALTER SYSTEM SET effective_cache_size = '6GB';\n"
+            "SELECT pg_reload_conf();"
+        )
+        results = {
+            "parameter_advisor": {
+                "recommendations": [{
+                    "parameter": "pgTune configuration",
+                    "source": "pgtune",
+                    "confidence": "review",
+                    "reason": "Calculated from a pgTune baseline.",
+                    "alter_system_sql": pgtune_sql,
+                }]
+            }
+        }
+
+        plan = build_plan_from_results(results, "application", policy=load_rules())
+
+        recommendation = plan["tasks"][0]["recommendations"][0]
+        self.assertEqual(recommendation["advisor_id"], "pgtune")
+        self.assertIn("pgTune", recommendation["title"])
+        self.assertEqual(recommendation["sql"], pgtune_sql)
+        self.assertEqual(plan["tasks"][0]["phase"], 60)
+
     def test_plan_orders_phases_and_deduplicates_index_actions(self):
         index_recommendation = {
             "schema": "public",

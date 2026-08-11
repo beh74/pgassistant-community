@@ -240,37 +240,32 @@ set_effective_io_concurrency() {
 }
 
 set_parallel_settings() {
-  declare -Ag parallel_settings
   if [ "$cpu_num" -lt 4 ] || ( [ ${db_version%.*} -le 9 ] && [ ${db_version//./} -lt 95 ] ); then
     return 0
   fi
-  parallel_settings[max_worker_processes]="$cpu_num"
+  max_worker_processes="$cpu_num"
   if [ "${db_version//./}" -ge "96" ] || [ ${db_version%.*} -ge 10 ]; then
     workers_per_gather=$(( cpu_num / 2 ))
     if [ "$workers_per_gather" -gt 4 ] && [[ "$db_type" != "dw" ]]; then
       workers_per_gather=4
     fi
-    parallel_settings[max_parallel_workers_per_gather]="$workers_per_gather"
+    max_parallel_workers_per_gather="$workers_per_gather"
   fi
   if [ ${db_version%.*} -ge 10 ]; then
-    parallel_settings[max_parallel_workers]="$cpu_num"
+    max_parallel_workers="$cpu_num"
   fi
   if [ ${db_version%.*} -ge 11 ]; then
     maintenance_workers=$(( cpu_num / 2 ))
     if [ "$maintenance_workers" -gt 4 ]; then
       maintenance_workers=4
     fi
-    parallel_settings[max_parallel_maintenance_workers]="$maintenance_workers"
+    max_parallel_maintenance_workers="$maintenance_workers"
   fi
 }
 
 set_work_mem() {
   local parallel_for_work_mem=1
-  if [ "${#parallel_settings[@]}" -gt "0" ]; then
-    if [[ ${parallel_settings[max_parallel_workers_per_gather]} ]]; then
-      parallel_for_work_mem=${parallel_settings[max_parallel_workers_per_gather]}
-    fi
-  elif [ ! -z ${max_parallel_workers_per_gather+x} ]; then
+  if [ ! -z ${max_parallel_workers_per_gather+x} ]; then
     parallel_for_work_mem=$max_parallel_workers_per_gather
   fi
 
@@ -465,9 +460,10 @@ echo "min_wal_size == $(format_value "$min_wal_size")"
 echo "max_wal_size == $(format_value "$max_wal_size")"
 echo "huge_pages == off"
 
-for key in "${!parallel_settings[@]}"; do
-  echo "$key == ${parallel_settings[$key]}"
-done
+[ ! -z ${max_worker_processes+x} ] && echo "max_worker_processes == $max_worker_processes"
+[ ! -z ${max_parallel_workers_per_gather+x} ] && echo "max_parallel_workers_per_gather == $max_parallel_workers_per_gather"
+[ ! -z ${max_parallel_workers+x} ] && echo "max_parallel_workers == $max_parallel_workers"
+[ ! -z ${max_parallel_maintenance_workers+x} ] && echo "max_parallel_maintenance_workers == $max_parallel_maintenance_workers"
 
 if [ ! -z ${checkpoint_segments+x} ]; then
   echo "checkpoint_segments == $checkpoint_segments"

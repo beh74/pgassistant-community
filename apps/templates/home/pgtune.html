@@ -53,8 +53,14 @@
             </div>
 
             <div class="mb-4">
-              <div class="tune-section-title">Server resources</div>
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div class="tune-section-title mb-0">Server resources</div>
+                <button class="btn btn-sm btn-outline-primary" type="button" id="detect-pgtune-resources">
+                  Detect
+                </button>
+              </div>
               <div class="tune-card-subtle">
+                <div id="pgtune-detection-status" class="small mb-3 d-none" role="status" aria-live="polite"></div>
                 <div class="row g-3">
                   <div class="col-12 col-md-4">
                     <label for="db_memory" class="form-label">
@@ -89,7 +95,7 @@
                         >?</span>
                       </span>
                     </label>
-                    <input class="form-control" value="{{ request.form.get('db_cpu', '1') if request is defined else '1' }}" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
+                    <input class="form-control" value="{{ request.form.get('db_cpu', '1') if request is defined else '1' }}" id="db_cpu" name="db_cpu" type="number" min="1" max="9999" required>
                   </div>
 
                   <div class="col-12 col-md-4">
@@ -209,6 +215,49 @@
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
       new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    const detectButton = document.getElementById("detect-pgtune-resources");
+    const status = document.getElementById("pgtune-detection-status");
+    const memory = document.getElementById("db_memory");
+    const memoryUnit = document.getElementById("db_memory_unity");
+    const cpu = document.getElementById("db_cpu");
+
+    detectButton.addEventListener("click", async function () {
+      const originalLabel = detectButton.textContent;
+      detectButton.disabled = true;
+      detectButton.textContent = "Detecting…";
+      status.className = "small mb-3 text-muted";
+      status.textContent = "Reading resources available to PostgreSQL…";
+
+      try {
+        const response = await fetch("/api/v1/pgtune/resources", {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          const errorMessage = result.error || "Resource detection failed.";
+          throw new Error(result.hint ? `${errorMessage} ${result.hint}` : errorMessage);
+        }
+
+        cpu.value = result.cpu;
+        if (result.memory_mb % 1024 === 0) {
+          memory.value = result.memory_mb / 1024;
+          memoryUnit.value = "GB";
+        } else {
+          memory.value = result.memory_mb;
+          memoryUnit.value = "MB";
+        }
+        status.className = "small mb-3 text-success";
+        status.textContent = `Detected ${result.cpu} CPU(s), ${result.memory_mb} MB of memory (${result.environment}).`;
+      } catch (error) {
+        status.className = "small mb-3 text-danger";
+        status.textContent = error.message;
+      } finally {
+        detectButton.disabled = false;
+        detectButton.textContent = originalLabel;
+      }
     });
   });
 </script>

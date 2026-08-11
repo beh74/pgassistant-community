@@ -22,6 +22,7 @@ from . import query_column_usage
 from . import schema_helper
 from . import fillfactor_advisor
 from . import column_statistics
+from . import pgtune_resource_detector
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -41,6 +42,36 @@ def execute_sql():
     finally:
         if con is not None:
             con.close()
+
+
+@blueprint.route("/api/v1/pgtune/resources", methods=["GET"])
+def api_pgtune_resources():
+    """Detect resources visible to the connected PostgreSQL server."""
+    if not session.get("db_name") and not session.get("db_uri"):
+        return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+    connection = None
+    try:
+        connection, message = database.connectdb(session)
+        if connection is None:
+            return jsonify({"success": False, "error": message or "Unable to connect to database."}), 500
+        result = pgtune_resource_detector.detect_postgresql_resources(connection)
+        return jsonify(result)
+    except RuntimeError as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "hint": (
+                "The connected database role must be allowed to use pg_read_file "
+                "on Linux system files (typically through superuser or "
+                "pg_read_server_files privileges)."
+            ),
+        }), 422
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 @blueprint.route('/api/v1/fetch_column_data', methods=['POST'])

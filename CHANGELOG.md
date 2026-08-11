@@ -1,5 +1,19 @@
 # Change Log
 
+## [3.6.5] - 2026-08-11
+
+## Improvements
+
+- pgTune: add `/api/v1/pgtune/resources` to detect the CPU count, memory limit, and environment visible to the PostgreSQL server process, including cgroup v1/v2 limits and Docker, Kubernetes, Podman, LXC, virtual machines, cgroup-constrained services, and host environments.
+- pgTune: add a **Detect** action to the pgTune form to populate CPU and memory automatically and display the detected environment.
+- Parameter Advisor: calculate a pgTune baseline from automatically detected CPU and memory, using **Web application** and **SSD** as the default workload and storage assumptions.
+- Executive Plan: include the consolidated pgTune recommendation in the PostgreSQL parameter-tuning phase, with explicit pgTune provenance, detected resources, assumptions, and restart requirements.
+
+## Bug fixes
+
+- pgTune: clarify when resource detection may be unavailable because the connected PostgreSQL role cannot read the required Linux system files.
+- pgTune: replace Bash associative arrays in `pgtune.sh` so parallel-worker recommendations also work with Bash 3 on macOS.
+
 ## [3.6.4] - 2026-08-10
 
 - LLM settings: add an explicit opt-in to bypass SSL certificate verification for trusted internal endpoints using self-signed certificates.

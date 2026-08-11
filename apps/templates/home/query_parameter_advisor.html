@@ -173,7 +173,7 @@
       <h1 class="pg-title">Parameter Advisor</h1>
       <p class="pg-subtitle">
         Runs generic plans for the pg_stat_statements workload, aggregates plan and runtime signals,
-        then highlights the pgTune parameters worth reviewing.
+        and compares active settings with a pgTune baseline using automatically detected CPU and memory.
         {% if multi_db_filter %}<span class="d-block mt-1">Database filter: <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
@@ -221,6 +221,7 @@
   </div>
 
   <div id="advisorContent" class="d-none">
+    <div id="pgtuneAdvisorStatus" class="alert alert-info" role="status"></div>
     <div class="pg-summary-grid">
       <div class="pg-summary-card is-info">
         <div class="pg-summary-label">Queries seen</div>
@@ -291,6 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const content = document.getElementById("advisorContent");
   const recommendationsBox = document.getElementById("advisorRecommendations");
   const copyAllParametersBtn = document.getElementById("copyAllParametersBtn");
+  const pgtuneStatus = document.getElementById("pgtuneAdvisorStatus");
   let proposalsCopyText = "";
 
   function setText(id, value) {
@@ -432,6 +434,20 @@ document.addEventListener("DOMContentLoaded", function () {
       const summary = data.summary || {};
       const planMetrics = summary.plan_metrics || {};
       const recommendations = data.recommendations || [];
+      const pgtune = data.pgtune || {};
+
+      if (pgtune.available) {
+        const resources = pgtune.resources || {};
+        pgtuneStatus.className = "alert alert-info";
+        pgtuneStatus.textContent =
+          `pgTune baseline: ${resources.cpu} CPU(s), ${resources.memory_mb} MB memory, ` +
+          `${resources.environment || "unknown"} environment. Assumptions: Web application and SSD. ` +
+          `Only differences greater than ${pgtune.threshold_pct || 20}% are recommended.`;
+      } else {
+        pgtuneStatus.className = "alert alert-warning";
+        pgtuneStatus.textContent =
+          `The pgTune baseline could not be generated. ${pgtune.error || "Resource detection is unavailable."}`;
+      }
       proposalsCopyText = buildProposalsText(recommendations);
 
       copyAllParametersBtn.disabled = !proposalsCopyText;

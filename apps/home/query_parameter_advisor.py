@@ -6,6 +6,8 @@ from decimal import Decimal
 from typing import Any, Dict, Iterable, List
 
 from . import database
+from . import pgtune
+from . import pgtune_resource_detector
 from . import sqlhelper
 
 
@@ -31,6 +33,23 @@ PGTUNE_PARAMETERS = [
 
 INTERNAL_SCHEMAS = {"pg_catalog", "information_schema"}
 BLOCK_SIZE_BYTES = 8192
+PGTUNE_RELATIVE_THRESHOLD = 0.20
+PGTUNE_MEMORY_PARAMETERS = {
+    "shared_buffers",
+    "effective_cache_size",
+    "maintenance_work_mem",
+    "wal_buffers",
+    "work_mem",
+    "min_wal_size",
+    "max_wal_size",
+}
+PGTUNE_RESTART_PARAMETERS = {
+    "max_connections",
+    "shared_buffers",
+    "wal_buffers",
+    "huge_pages",
+    "max_worker_processes",
+}
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -144,6 +163,115 @@ def _setting_values_equal(current_value: Any, proposed_value: Any) -> bool:
         return float(current) == float(proposed)
     except ValueError:
         return False
+
+
+def _comparable_setting_value(parameter: str, value: Any) -> float | None:
+    """Normalize a pgTune/current value for relative difference calculations."""
+    if parameter in PGTUNE_MEMORY_PARAMETERS:
+        parsed = _parse_pg_memory_bytes(value)
+        return float(parsed) if parsed is not None else None
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_pgtune_recommendation(
+    running_values: Dict[str, Any],
+    tuned_values: Dict[str, Any],
+    resources: Dict[str, Any],
+    threshold: float = PGTUNE_RELATIVE_THRESHOLD,
+) -> Dict[str, Any]:
+    """Build one pgTune recommendation containing all significant changes."""
+    changes = []
+    for parameter in PGTUNE_PARAMETERS:
+        if parameter not in running_values or parameter not in tuned_values:
+            continue
+        current = _comparable_setting_value(parameter, running_values[parameter])
+        proposed = _comparable_setting_value(parameter, tuned_values[parameter])
+        if current is None or proposed is None or proposed == 0:
+            continue
+        difference = abs(current - proposed) / abs(proposed)
+        if difference <= threshold:
+            continue
+        changes.append({
+            "parameter": parameter,
+            "current_value": running_values[parameter],
+            "proposed_value": tuned_values[parameter],
+            "difference_pct": round(difference * 100, 1),
+        })
+
+    if not changes:
+        return {}
+
+    restart_parameters = [
+        change["parameter"]
+        for change in changes
+        if change["parameter"] in PGTUNE_RESTART_PARAMETERS
+    ]
+    sql_lines = [
+        "-- Generated from pgTune estimates; review before applying.",
+        *[
+            f"ALTER SYSTEM SET {change['parameter']} = "
+            f"{_format_setting_literal(change['proposed_value'])};"
+            for change in changes
+        ],
+        "SELECT pg_reload_conf();",
+    ]
+    if restart_parameters:
+        sql_lines.append(
+            "-- Restart PostgreSQL to activate: " + ", ".join(restart_parameters)
+        )
+    evidence = [
+        "Source: pgTune (https://pgtune.leopard.in.ua/).",
+        f"Detected resources: {resources['cpu']} CPU(s), {resources['memory_mb']} MB memory.",
+        f"Detected environment: {resources['environment']}.",
+        "Assumptions: Web application workload and SSD storage.",
+        f"Only differences greater than {round(threshold * 100)}% are included.",
+    ]
+    if restart_parameters:
+        evidence.append(
+            "PostgreSQL restart required for: " + ", ".join(restart_parameters) + "."
+        )
+    evidence.extend(
+        f"{change['parameter']}: {change['current_value']} → "
+        f"{change['proposed_value']} ({change['difference_pct']}% difference)"
+        for change in changes
+    )
+    return {
+        "parameter": "pgTune configuration",
+        "source": "pgtune",
+        "current_value": f"{len(changes)} setting(s) outside tolerance",
+        "proposed_value": "Combined pgTune baseline",
+        "confidence": "review",
+        "reason": (
+            "The active PostgreSQL configuration differs significantly from a "
+            "pgTune baseline calculated from the automatically detected resources."
+        ),
+        "evidence": evidence,
+        "changes": changes,
+        "restart_required": bool(restart_parameters),
+        "restart_parameters": restart_parameters,
+        "alter_system_sql": "\n".join(sql_lines),
+    }
+
+
+def _run_pgtune_baseline(
+    connection,
+    pg_major_version: int,
+    running_values: Dict[str, Any],
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """Detect server resources and run pgTune with documented defaults."""
+    resources = pgtune_resource_detector.detect_postgresql_resources(connection)
+    tuner = pgtune.pgTune(
+        str(pg_major_version),
+        resources["cpu"],
+        f"{resources['memory_mb']}MB",
+        "ssd",
+        "web",
+        running_values.get("max_connections") or 100,
+    )
+    return resources, tuner.get_pg_tune()
 
 
 def _get_postgres_major_version(db_config: Dict[str, Any]) -> int:
@@ -524,26 +652,34 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
 
     result = {
         "success": True,
-        "supported": pg_major_version >= 16,
+        "supported": True,
+        "workload_analysis_supported": pg_major_version >= 16,
         "required_version": 16,
         "postgres_major_version": pg_major_version,
         "pg_tune_parameter_names": PGTUNE_PARAMETERS,
         "pg_tune_parameters": running_values,
         "results": [],
         "recommendations": [],
+        "pgtune": {
+            "available": False,
+            "source": "pgTune",
+            "threshold_pct": round(PGTUNE_RELATIVE_THRESHOLD * 100),
+        },
         "summary": {},
     }
 
     if pg_major_version < 16:
-        result["message"] = "Generic plans require PostgreSQL 16 or newer."
-        return result
+        result["message"] = (
+            "pgTune analysis is available, but generic workload plans require "
+            "PostgreSQL 16 or newer."
+        )
 
     plan_conn, status = database.connectdb(db_config)
     if plan_conn is None:
         raise RuntimeError(status or "Unable to connect to database.")
 
     stats_conn = plan_conn
-    if database.is_multi_db(db_config):
+    if pg_major_version >= 16 and database.is_multi_db(db_config):
         stats_conn, stats_status = database.connectdb(
             database.get_monitoring_db_config(db_config)
         )
@@ -561,6 +697,47 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
     queries_skipped_internal = 0
 
     try:
+        pgtune_recommendation = {}
+        try:
+            resources, tuned_values = _run_pgtune_baseline(
+                plan_conn,
+                pg_major_version,
+                running_values,
+            )
+            pgtune_recommendation = _build_pgtune_recommendation(
+                running_values,
+                tuned_values,
+                resources,
+            )
+            result["pgtune"] = {
+                "available": True,
+                "source": "pgTune",
+                "resources": resources,
+                "assumptions": {"database_type": "web", "storage": "ssd"},
+                "threshold_pct": round(PGTUNE_RELATIVE_THRESHOLD * 100),
+                "tuned_values": tuned_values,
+                "significant_changes": pgtune_recommendation.get("changes", []),
+                "sql": pgtune_recommendation.get("alter_system_sql"),
+            }
+        except Exception as exc:
+            result["pgtune"]["error"] = str(exc)
+
+        if pg_major_version < 16:
+            recommendations = [pgtune_recommendation] if pgtune_recommendation else []
+            result.update({
+                "recommendations": recommendations,
+                "summary": {
+                    "queries_seen": 0,
+                    "queries_planned": 0,
+                    "queries_failed": 0,
+                    "queries_skipped_internal": 0,
+                    "recommendations": len(recommendations),
+                    "plan_metrics": plan_metrics,
+                    "pg_tune_major_version": running_major,
+                },
+            })
+            return result
+
         pgss_rows = _fetch_pg_stat_statements_rows(stats_conn, db_name)
         statement_metrics = _aggregate_statement_metrics(pgss_rows)
 
@@ -599,6 +776,22 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
             statement_metrics,
             plan_metrics,
         )
+        if result["pgtune"].get("available"):
+            pgtune_parameters = {
+                change["parameter"]
+                for change in pgtune_recommendation.get("changes", [])
+            }
+            recommendations = [
+                recommendation
+                for recommendation in recommendations
+                if recommendation.get("parameter") not in pgtune_parameters
+            ]
+            # pgTune owns the single executable configuration script. Workload
+            # findings remain visible as review evidence without competing SQL.
+            for recommendation in recommendations:
+                recommendation["alter_system_sql"] = None
+            if pgtune_recommendation:
+                recommendations.insert(0, pgtune_recommendation)
 
         result.update({
             "results": planned_rows,

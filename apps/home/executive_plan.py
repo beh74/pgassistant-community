@@ -189,11 +189,12 @@ def _normalize_parameters(result: dict[str, Any], database_name: str) -> list[di
     for row in result.get("recommendations") or []:
         parameter = str(row.get("parameter") or "PostgreSQL parameters")
         confidence_label = str(row.get("confidence") or "review").lower()
+        is_pgtune = str(row.get("source") or "").lower() == "pgtune"
         normalized.append(
             _base_advice(
                 "parameter_advisor",
                 database_name,
-                advisor_id=parameter,
+                advisor_id="pgtune" if is_pgtune else parameter,
                 category_id="CONFIGURATION",
                 action_type="CONFIG_CHANGE",
                 team="OPS",
@@ -202,13 +203,21 @@ def _normalize_parameters(result: dict[str, Any], database_name: str) -> list[di
                 confidence=85 if confidence_label == "high" else 65,
                 effort=30,
                 object_name=parameter,
-                title=f"Review parameter {parameter}",
+                title=(
+                    "Review the pgTune configuration baseline"
+                    if is_pgtune
+                    else f"Review parameter {parameter}"
+                ),
                 description=str(row.get("reason") or ""),
                 evidence=list(row.get("evidence") or []),
                 sql=_clean_sql(row.get("alter_system_sql")),
                 scope="cluster",
-                requires_restart=True,
-                requires_maintenance_window=True,
+                requires_restart=(
+                    bool(row.get("restart_required")) if is_pgtune else True
+                ),
+                requires_maintenance_window=(
+                    bool(row.get("restart_required")) if is_pgtune else True
+                ),
             )
         )
     return normalized
