@@ -121,6 +121,57 @@
   .executive-team-choice-body { display: flex; align-items: flex-start; gap: .8rem; height: 100%; padding: 1rem; border: 2px solid #dbe4ef; border-radius: .85rem; background: #f8fafc; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
   .executive-team-choice input:checked + .executive-team-choice-body { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 3px rgba(79, 70, 229, .1); }
   .executive-team-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; flex: 0 0 auto; border-radius: .7rem; background: #4f46e5; color: #fff; }
+  .executive-history-shell { padding: 1.25rem; border: 1px solid var(--ga-border, #dbe4ef); border-radius: 1rem; background: #fff; box-shadow: var(--ga-shadow-sm, 0 8px 24px rgba(15, 23, 42, .06)); }
+  .history-controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 1rem; align-items: end; }
+  .history-periods { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .history-period-btn { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+  .history-period-btn.active { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+  .history-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin: 1.25rem 0; }
+  .history-kpi { padding: 1rem; border: 1px solid #e2e8f0; border-radius: .85rem; background: #f8fafc; }
+  .history-kpi-value { display: block; color: #172554; font-size: 1.65rem; font-weight: 900; line-height: 1; }
+  .history-kpi-label { display: block; margin-top: .45rem; color: #64748b; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+  .history-kpi.is-corrected { border-color: #86efac; background: #f0fdf4; }
+  .history-kpi.is-new { border-color: #fcd34d; background: #fffbeb; }
+  .history-kpi.is-rate { border-color: #a5b4fc; background: #eef2ff; }
+  .history-section { margin-top: 1rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: .85rem; }
+  .history-section-title { margin-bottom: .2rem; font-size: 1rem; font-weight: 900; color: #172554; }
+  .history-chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .history-chart-summary { color: #475569; font-size: .8rem; font-weight: 750; }
+  .history-chart-legend { display: flex; flex-wrap: wrap; gap: .75rem; margin: .7rem 0; color: #64748b; font-size: .74rem; }
+  .history-chart-legend-item { display: inline-flex; align-items: center; gap: .35rem; }
+  .history-chart-legend-dot { width: .65rem; height: .65rem; border-radius: 999px; background: #2563eb; }
+  .history-chart-legend-dot.is-increase { background: #d97706; }
+  .history-chart-legend-dot.is-decrease { background: #16a34a; }
+  .history-chart-legend-dot.is-current { background: #7c3aed; }
+  .history-chart-shell { min-height: 22rem; padding: .75rem; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: .8rem; background: #f8fafc; }
+  .history-chart { display: block; width: 100%; min-width: 44rem; height: 22rem; }
+  .history-chart-grid { stroke: #dbe4ef; stroke-width: 1; }
+  .history-chart-axis-label { fill: #64748b; font-size: 12px; }
+  .history-chart-line { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  .history-chart-area { fill: url(#recommendationHistoryGradient); opacity: .42; }
+  .history-chart-point { fill: #fff; stroke: #2563eb; stroke-width: 2.5; }
+  .history-chart-point.is-increase { fill: #fff7ed; stroke: #d97706; }
+  .history-chart-point.is-decrease { fill: #f0fdf4; stroke: #16a34a; }
+  .history-chart-point.is-current { fill: #f5f3ff; stroke: #7c3aed; }
+  .history-chart-point:hover, .history-chart-point:focus { fill: #2563eb; outline: none; }
+  .history-chart-point.is-increase:hover, .history-chart-point.is-increase:focus { fill: #d97706; }
+  .history-chart-point.is-decrease:hover, .history-chart-point.is-decrease:focus { fill: #16a34a; }
+  .history-chart-point.is-current:hover, .history-chart-point.is-current:focus { fill: #7c3aed; }
+  .history-event { display: inline-flex; padding: .2rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 850; white-space: nowrap; }
+  .history-event.corrected { background: #dcfce7; color: #166534; }
+  .history-event.new { background: #fef3c7; color: #92400e; }
+  .history-event.modified { background: #e0e7ff; color: #3730a3; }
+  .history-change-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .history-change-item { padding: .85rem 0; border-bottom: 1px solid #e2e8f0; }
+  .history-change-item:last-child { border-bottom: 0; }
+  .history-package { margin-top: .75rem; overflow: hidden; border: 1px solid #e2e8f0; border-radius: .75rem; }
+  .history-package:first-child { margin-top: 0; }
+  .history-package-header { display: flex; justify-content: space-between; gap: .75rem; padding: .7rem .85rem; background: #f8fafc; color: #172554; font-weight: 850; }
+  .history-package-body { padding: 0 .85rem; }
+  .history-change-title { color: #172554; font-weight: 850; }
+  .history-change-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; color: #64748b; font-size: .76rem; }
+  .history-empty { padding: 2rem; text-align: center; color: #64748b; }
+  .history-loading { display: flex; align-items: center; gap: .65rem; padding: 1rem; color: #475569; }
 
   @media (max-width: 575.98px) {
     .executive-phase-header {
@@ -135,6 +186,7 @@
     .executive-phase-actions .executive-copy-sql {
       margin-right: auto;
     }
+    .history-controls, .history-kpis, .history-change-grid { grid-template-columns: 1fr; }
   }
 </style>
 {% endblock stylesheets %}
@@ -168,6 +220,11 @@
       <button class="nav-link active" id="executive-plan-tab" data-bs-toggle="tab" data-bs-target="#executive-plan-pane" type="button" role="tab" aria-controls="executive-plan-pane" aria-selected="true">
         <i class="bi bi-list-check me-1" aria-hidden="true"></i>Executive Plan
       </button>
+      {% if collector_history_enabled %}
+      <button class="nav-link" id="executive-history-tab" data-bs-toggle="tab" data-bs-target="#executive-history-pane" type="button" role="tab" aria-controls="executive-history-pane" aria-selected="false">
+        <i class="bi bi-clock-history me-1" aria-hidden="true"></i>History
+      </button>
+      {% endif %}
       <button class="nav-link" id="executive-report-tab" data-bs-toggle="tab" data-bs-target="#executive-report-pane" type="button" role="tab" aria-controls="executive-report-pane" aria-selected="false">
         <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Report
       </button>
@@ -341,6 +398,97 @@
   </div>
   </div>
 
+  {% if collector_history_enabled %}
+  <div class="tab-pane fade" id="executive-history-pane" role="tabpanel" aria-labelledby="executive-history-tab" tabindex="0">
+    <section
+      class="executive-history-shell"
+      id="executive-history"
+      data-history-url="{{ url_for('home_blueprint.api_executive_plan_history') }}"
+      data-target-id="{{ session.get('target_id', '') }}"
+    >
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+          <h2 class="h5 mb-1">Executive Plan evolution</h2>
+          <p class="text-muted mb-0">Compare complete collection snapshots and see what was detected, changed, or confirmed as corrected.</p>
+        </div>
+        <span class="executive-badge"><i class="bi bi-database-check me-1" aria-hidden="true"></i>Collector history</span>
+      </div>
+
+      <div class="history-controls">
+        <div>
+          <label class="form-label" for="history-team">Team</label>
+          <select id="history-team" class="form-select">
+            <option value="ALL">All teams</option>
+            <option value="DEV">DEV</option>
+            <option value="DEV_OPS">DEV/OPS</option>
+            <option value="OPS">OPS</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label d-block">Period</label>
+          <div class="history-periods" role="group" aria-label="History period">
+            <button type="button" class="btn btn-sm history-period-btn" data-period="latest">Latest</button>
+            <button type="button" class="btn btn-sm history-period-btn" data-period="1">1 day</button>
+            <button type="button" class="btn btn-sm history-period-btn" data-period="7">7 days</button>
+            <button type="button" class="btn btn-sm history-period-btn" data-period="15">15 days</button>
+            <button type="button" class="btn btn-sm history-period-btn active" data-period="30">30 days</button>
+            <button type="button" class="btn btn-sm history-period-btn" data-period="all">All</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="history-message" class="history-loading mt-3" role="status" aria-live="polite">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>Loading Executive Plan history…</span>
+      </div>
+
+      <div id="history-results" class="d-none">
+        <div class="history-kpis">
+          <div class="history-kpi"><span class="history-kpi-value" id="history-active">0</span><span class="history-kpi-label">Currently active</span></div>
+          <div class="history-kpi is-corrected"><span class="history-kpi-value" id="history-corrected">0</span><span class="history-kpi-label">Corrected in period</span></div>
+          <div class="history-kpi is-new"><span class="history-kpi-value" id="history-new">0</span><span class="history-kpi-label">New in period</span></div>
+          <div class="history-kpi is-rate"><span class="history-kpi-value" id="history-rate">0%</span><span class="history-kpi-label">Resolution rate</span></div>
+        </div>
+
+        <div class="small text-muted" id="history-period-summary"></div>
+
+        <section class="history-section">
+          <div class="history-chart-heading">
+            <div>
+              <h3 class="history-section-title">Recommendation volume over time</h3>
+              <p class="small text-muted mb-0">Active recommendations across Collector snapshots and the current database state.</p>
+            </div>
+            <div class="history-chart-summary" id="history-chart-summary"></div>
+          </div>
+          <div class="history-chart-legend" aria-label="Recommendation change legend">
+            <span class="history-chart-legend-item"><span class="history-chart-legend-dot"></span>No change</span>
+            <span class="history-chart-legend-item"><span class="history-chart-legend-dot is-increase"></span>Increase</span>
+            <span class="history-chart-legend-item"><span class="history-chart-legend-dot is-decrease"></span>Decrease</span>
+            <span class="history-chart-legend-item"><span class="history-chart-legend-dot is-current"></span>Current state</span>
+          </div>
+          <div class="history-chart-shell" id="history-chart-shell">
+            <svg class="history-chart" id="history-recommendation-chart" role="img" aria-labelledby="history-recommendation-chart-title"></svg>
+          </div>
+          <div class="history-empty d-none" id="history-chart-empty">No comparison is available yet.</div>
+        </section>
+
+        <div class="history-change-grid">
+          <section class="history-section">
+            <h3 class="history-section-title">Corrected recommendations</h3>
+            <p class="small text-muted">A current-state correction is visible immediately and will be confirmed by the next complete collection.</p>
+            <div id="history-corrections"></div>
+          </section>
+          <section class="history-section">
+            <h3 class="history-section-title">New or changed recommendations</h3>
+            <p class="small text-muted">New findings, reopened findings, and changed implementation actions in the selected period.</p>
+            <div id="history-changes"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+  {% endif %}
+
   <div class="tab-pane fade" id="executive-report-pane" role="tabpanel" aria-labelledby="executive-report-tab" tabindex="0">
     <section class="executive-report-card">
       <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
@@ -434,7 +582,264 @@ function initializeExecutivePlanActions(root) {
   });
 }
 
+function escapeHistoryHtml(value) {
+  return String(value == null ? "" : value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatHistoryDate(value, includeTime) {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: includeTime ? "short" : undefined
+  }).format(date);
+}
+
+function historyTeamLabel(team) {
+  return team === "DEV_OPS" ? "DEV/OPS" : (team || "Unassigned");
+}
+
+function historyFindingHtml(item, eventType) {
+  const eventDate = item.corrected_at || item.detected_at || item.modified_at;
+  const reopenedBadge = item.reopened && eventType === "Corrected"
+    ? '<span class="executive-badge">Active again</span>'
+    : "";
+  return `
+    <article class="history-change-item">
+      <div class="history-change-title">${escapeHistoryHtml(item.title)}</div>
+      <div class="small text-muted mt-1">${escapeHistoryHtml(item.scope_name || item.object_name || "Database")}</div>
+      <div class="history-change-meta">
+        <span class="executive-badge ${item.team === "DEV" ? "executive-team-dev" : item.team === "OPS" ? "executive-team-ops" : "executive-team-dev-ops"}">${escapeHistoryHtml(historyTeamLabel(item.team))}</span>
+        ${item.priority ? `<span class="executive-badge">${escapeHistoryHtml(item.priority)}</span>` : ""}
+        ${reopenedBadge}
+        ${item.live_comparison ? '<span class="history-event modified">Current state</span>' : ""}
+        <span>${escapeHistoryHtml(eventType)} ${escapeHistoryHtml(formatHistoryDate(eventDate, true))}</span>
+      </div>
+    </article>`;
+}
+
+function historyPackagesHtml(packages, eventType) {
+  return (packages || []).map(pkg => `
+    <section class="history-package">
+      <div class="history-package-header">
+        <span>${escapeHistoryHtml(pkg.title)}</span>
+        <span class="executive-badge ${pkg.team === "DEV" ? "executive-team-dev" : pkg.team === "OPS" ? "executive-team-ops" : "executive-team-dev-ops"}">${escapeHistoryHtml(historyTeamLabel(pkg.team))}</span>
+      </div>
+      <div class="history-package-body">
+        ${(pkg.recommendations || []).map(item => historyFindingHtml(item, item.modified_at ? "Changed" : (item.reopened && eventType === "Detected" ? "Reopened" : eventType))).join("")}
+      </div>
+    </section>`).join("");
+}
+
+function renderRecommendationHistoryChart(timeline) {
+  const points = (timeline || []).map(function (item) {
+    return {
+      active: Number(item.active) || 0,
+      collectedAt: item.collected_at,
+      corrected: Number(item.corrected) || 0,
+      isCurrent: Boolean(item.is_current),
+      modified: Number(item.modified) || 0,
+      newCount: Number(item.new) || 0
+    };
+  });
+  const svg = document.getElementById("history-recommendation-chart");
+  const shell = document.getElementById("history-chart-shell");
+  const empty = document.getElementById("history-chart-empty");
+  const summary = document.getElementById("history-chart-summary");
+  if (!svg || !shell || !empty || !summary) return;
+  svg.replaceChildren();
+
+  if (!points.length) {
+    shell.classList.add("d-none");
+    empty.classList.remove("d-none");
+    summary.textContent = "";
+    return;
+  }
+  shell.classList.remove("d-none");
+  empty.classList.add("d-none");
+
+  const ns = "http://www.w3.org/2000/svg";
+  const width = 900;
+  const height = 360;
+  const margin = {top: 24, right: 24, bottom: 55, left: 68};
+  const chartWidth = width - margin.left - margin.right;
+  const chartHeight = height - margin.top - margin.bottom;
+  const maximum = Math.max(1, ...points.map(point => point.active));
+  const yMaximum = Math.max(1, Math.ceil(maximum * 1.1));
+  const x = index => margin.left + (points.length === 1 ? chartWidth / 2 : index * chartWidth / (points.length - 1));
+  const y = value => margin.top + (yMaximum - value) * chartHeight / yMaximum;
+  const add = function (name, attributes, text) {
+    const element = document.createElementNS(ns, name);
+    Object.entries(attributes || {}).forEach(([key, value]) => element.setAttribute(key, value));
+    if (text !== undefined) element.textContent = text;
+    svg.appendChild(element);
+    return element;
+  };
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  add("title", {id: "history-recommendation-chart-title"}, "Active recommendation history");
+  const defs = add("defs");
+  const gradient = document.createElementNS(ns, "linearGradient");
+  gradient.setAttribute("id", "recommendationHistoryGradient");
+  gradient.setAttribute("x1", "0");
+  gradient.setAttribute("y1", "0");
+  gradient.setAttribute("x2", "0");
+  gradient.setAttribute("y2", "1");
+  [["0%", "#60a5fa", ".75"], ["100%", "#dbeafe", ".1"]].forEach(function ([offset, color, opacity]) {
+    const stop = document.createElementNS(ns, "stop");
+    stop.setAttribute("offset", offset);
+    stop.setAttribute("stop-color", color);
+    stop.setAttribute("stop-opacity", opacity);
+    gradient.appendChild(stop);
+  });
+  defs.appendChild(gradient);
+
+  const yTicks = new Set();
+  for (let tick = 0; tick <= 4; tick++) yTicks.add(Math.round(yMaximum * tick / 4));
+  Array.from(yTicks).sort((left, right) => left - right).forEach(function (tickValue) {
+    const tickY = y(tickValue);
+    add("line", {x1: margin.left, x2: width - margin.right, y1: tickY, y2: tickY, class: "history-chart-grid"});
+    add("text", {x: margin.left - 10, y: tickY + 4, "text-anchor": "end", class: "history-chart-axis-label"}, String(tickValue));
+  });
+
+  const labelCount = Math.min(6, points.length);
+  const labelIndexes = new Set();
+  for (let label = 0; label < labelCount; label++) {
+    labelIndexes.add(labelCount === 1 ? 0 : Math.round(label * (points.length - 1) / (labelCount - 1)));
+  }
+  labelIndexes.forEach(function (index) {
+    const point = points[index];
+    const label = point.isCurrent ? "Current" : formatHistoryDate(point.collectedAt, false);
+    add("text", {
+      x: x(index),
+      y: height - 20,
+      "text-anchor": index === 0 ? "start" : (index === points.length - 1 ? "end" : "middle"),
+      class: "history-chart-axis-label"
+    }, label);
+  });
+
+  const line = points.map((point, index) => `${index ? "L" : "M"} ${x(index)} ${y(point.active)}`).join(" ");
+  const area = `${line} L ${x(points.length - 1)} ${margin.top + chartHeight} L ${x(0)} ${margin.top + chartHeight} Z`;
+  add("path", {d: area, class: "history-chart-area"});
+  add("path", {d: line, class: "history-chart-line"});
+
+  points.forEach(function (point, index) {
+    const netChange = point.newCount - point.corrected;
+    const changeClass = point.isCurrent
+      ? "is-current"
+      : netChange > 0 ? "is-increase" : netChange < 0 ? "is-decrease" : "";
+    const circle = add("circle", {
+      cx: x(index), cy: y(point.active), r: 5,
+      class: `history-chart-point ${changeClass}`.trim(), tabindex: "0"
+    });
+    const title = document.createElementNS(ns, "title");
+    const dateLabel = point.isCurrent ? "Current state" : formatHistoryDate(point.collectedAt, true);
+    const changes = [
+      point.newCount ? `+${point.newCount} new` : "",
+      point.corrected ? `−${point.corrected} corrected` : "",
+      point.modified ? `${point.modified} changed` : ""
+    ].filter(Boolean).join(", ") || "no change";
+    title.textContent = `${dateLabel} — ${point.active} active recommendation(s) — ${changes}`;
+    circle.appendChild(title);
+  });
+
+  const totalChange = points.at(-1).active - points[0].active;
+  const changeLabel = totalChange > 0 ? `+${totalChange}` : String(totalChange).replace("-", "−");
+  summary.textContent = `${points.length} snapshot${points.length === 1 ? "" : "s"} · ${points[0].active} → ${points.at(-1).active} active · ${changeLabel}`;
+}
+
+function initializeExecutiveHistory() {
+  const root = document.getElementById("executive-history");
+  if (!root) return;
+
+  const teamSelect = document.getElementById("history-team");
+  const message = document.getElementById("history-message");
+  const results = document.getElementById("history-results");
+  const state = {targetId: root.dataset.targetId || "", period: "30", team: "ALL", refreshCurrent: true};
+
+  function showMessage(text, isError) {
+    message.classList.remove("d-none", "alert", "alert-danger");
+    message.classList.toggle("history-loading", !isError);
+    if (isError) message.classList.add("alert", "alert-danger");
+    message.innerHTML = isError
+      ? `<i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>${escapeHistoryHtml(text)}`
+      : `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>${escapeHistoryHtml(text)}</span>`;
+  }
+
+  async function loadHistory() {
+    if (!state.targetId) {
+      results.classList.add("d-none");
+      showMessage("Select a Collector target in Database connection settings to display this history.", false);
+      message.querySelector(".spinner-border")?.classList.add("d-none");
+      return;
+    }
+
+    showMessage("Comparing complete Executive Plan snapshots…", false);
+    results.classList.add("d-none");
+    const url = new URL(root.dataset.historyUrl, window.location.origin);
+    url.searchParams.set("period", state.period);
+    url.searchParams.set("team", state.team);
+    if (state.refreshCurrent) url.searchParams.set("refresh_current", "1");
+    try {
+      const response = await fetch(url.toString(), {headers: {"Accept": "application/json"}});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to load Executive Plan history.");
+      state.refreshCurrent = false;
+      renderHistory(payload);
+      message.classList.add("d-none");
+      results.classList.remove("d-none");
+    } catch (error) {
+      showMessage(error.message || "Unable to load Executive Plan history.", true);
+    }
+  }
+
+  function renderHistory(payload) {
+    const summary = payload.summary || {};
+    document.getElementById("history-active").textContent = summary.active || 0;
+    document.getElementById("history-corrected").textContent = summary.corrected || 0;
+    document.getElementById("history-new").textContent = summary.new || 0;
+    document.getElementById("history-rate").textContent = `${summary.resolution_rate || 0}%`;
+    const currentComparison = payload.current_comparison || {};
+    const currentNote = currentComparison.status === "partial"
+      ? " The current plan is partial, so it was not used to confirm corrections."
+      : "";
+    const periodDescription = payload.days === "latest"
+      ? `Latest complete collector snapshot compared with the current situation. ${summary.resolved_now || 0} of ${summary.eligible || 0} relevant findings are currently resolved.`
+      : `${payload.collector_snapshots || 0} collector snapshot(s) plus the current situation, from ${formatHistoryDate(payload.period.from, false)} to now. ${summary.resolved_now || 0} of ${summary.eligible || 0} relevant findings are currently resolved.`;
+    document.getElementById("history-period-summary").textContent = payload.snapshots
+      ? `${periodDescription}${currentNote}`
+      : "No complete Executive Plan snapshot is available for this target and team.";
+
+    renderRecommendationHistoryChart(payload.timeline);
+
+    const corrections = document.getElementById("history-corrections");
+    corrections.innerHTML = historyPackagesHtml(payload.correction_packages, "Corrected")
+      || '<div class="history-empty">No correction was confirmed during this period.</div>';
+
+    document.getElementById("history-changes").innerHTML = historyPackagesHtml(payload.change_packages, "Detected")
+      || '<div class="history-empty">No new or changed recommendation during this period.</div>';
+  }
+
+  teamSelect.addEventListener("change", function () { state.team = teamSelect.value; loadHistory(); });
+  root.querySelectorAll(".history-period-btn").forEach(function (button) {
+    button.addEventListener("click", function () {
+      root.querySelectorAll(".history-period-btn").forEach(item => item.classList.remove("active"));
+      button.classList.add("active");
+      state.period = button.dataset.period;
+      loadHistory();
+    });
+  });
+
+  loadHistory();
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+  initializeExecutiveHistory();
   const reportForm = document.getElementById("executive-report-form");
   if (reportForm) {
     reportForm.addEventListener("submit", function (event) {

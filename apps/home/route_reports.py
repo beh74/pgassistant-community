@@ -8,6 +8,7 @@ from apps.home import blueprint
 from flask import jsonify, redirect, render_template, request, send_file, session
 
 from . import database
+from . import collector_history
 from . import executive_plan
 from . import executive_plan_pdf
 from . import global_advisor
@@ -26,6 +27,7 @@ def executive_plan_route():
             "home/executive_plan.html",
             segment="executive_plan.html",
             plan=None,
+            collector_history_enabled=collector_history.is_configured(),
         )
 
     try:
@@ -34,6 +36,7 @@ def executive_plan_route():
             "home/executive_plan.html",
             segment="executive_plan.html",
             plan=plan,
+            collector_history_enabled=collector_history.is_configured(),
         )
     except Exception as exc:
         tb = traceback.format_exc()

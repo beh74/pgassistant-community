@@ -4,6 +4,7 @@ API routes.
 
 """
 import json
+import time
 
 import requests
 from flask import Response, jsonify, request, session
@@ -12,6 +13,7 @@ from apps.home import blueprint
 from . import action
 from . import api_helper
 from . import database
+from . import executive_plan
 from . import reporting
 from . import sqlhelper
 from . import indexe_helper
@@ -22,7 +24,27 @@ from . import query_column_usage
 from . import schema_helper
 from . import fillfactor_advisor
 from . import column_statistics
+from . import collector_history
+from . import query_history
 from . import pgtune_resource_detector
+
+
+_EXECUTIVE_HISTORY_PLAN_CACHE = {}
+_EXECUTIVE_HISTORY_PLAN_CACHE_SECONDS = 300
+
+
+def _history_current_plan(db_config, *, refresh=False):
+    identity = collector_history.database_identity(db_config)
+    key = tuple(identity.get(field) for field in ("db_host", "db_port", "db_name", "db_user"))
+    cached = _EXECUTIVE_HISTORY_PLAN_CACHE.get(key)
+    if not refresh and cached and time.monotonic() - cached[0] < _EXECUTIVE_HISTORY_PLAN_CACHE_SECONDS:
+        return cached[1]
+    plan = executive_plan.build_executive_plan(db_config)
+    if len(_EXECUTIVE_HISTORY_PLAN_CACHE) >= 32:
+        oldest_key = min(_EXECUTIVE_HISTORY_PLAN_CACHE, key=lambda item: _EXECUTIVE_HISTORY_PLAN_CACHE[item][0])
+        _EXECUTIVE_HISTORY_PLAN_CACHE.pop(oldest_key, None)
+    _EXECUTIVE_HISTORY_PLAN_CACHE[key] = (time.monotonic(), plan)
+    return plan
 
 
 @blueprint.route("/execute", methods=["POST"])
@@ -206,15 +228,20 @@ def api_database_report():
         return jsonify({"error": str(e)}), 500
 
 
+@blueprint.route("/api/v1/rank_top_50_queries", methods=["GET"])
 @blueprint.route("/api/v1/rank_top_10_queries", methods=["GET"])
-def api_rank_top_10_queries():
+def api_rank_top_50_queries():
+    """Return up to 50 ranked queries.
+
+    The top-10 route is kept as a compatibility alias for deployed Collectors.
+    """
     try:
         data = request.get_json(force=True)
 
         if not data or "db_config" not in data:
             return jsonify({"error": "Missing 'db_config' in request body"}), 400
         db_config = data["db_config"]
-        result = api_helper.get_rank_top_10_queries_status(db_config)
+        result = api_helper.get_rank_top_50_queries_status(db_config)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -257,6 +284,140 @@ def api_query_parameter_advisor():
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@blueprint.route("/api/v1/executive_plan", methods=["GET", "POST"])
+def api_executive_plan():
+    """Build and return the complete Executive Plan as JSON."""
+    try:
+        data = request.get_json(silent=True) or {}
+        db_config = data.get("db_config") or session
+
+        if not db_config or not (db_config.get("db_name") or db_config.get("db_uri")):
+            return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+        return jsonify(executive_plan.build_executive_plan(db_config))
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@blueprint.route("/api/v1/collector/targets", methods=["GET"])
+def api_collector_targets():
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Collector is not configured."}), 404
+
+    try:
+        query = (request.args.get("q") or "").strip()
+        try:
+            limit = int(request.args.get("limit") or 50)
+        except ValueError:
+            return jsonify({"success": False, "error": "Target limit must be an integer."}), 400
+        result = collector_history.list_targets(session, query=query, limit=limit)
+        available_ids = {target["target_id"] for target in result["targets"]}
+        selected_target_id = session.get("target_id")
+        if selected_target_id not in available_ids:
+            selected_target_id = None
+        result["selected_target_id"] = selected_target_id
+        return jsonify(result)
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/collector/target", methods=["POST"])
+def api_collector_target():
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Collector is not configured."}), 404
+    target_id = str((request.get_json(silent=True) or {}).get("target_id") or "").strip()
+    try:
+        if target_id and not collector_history.target_exists(target_id):
+            return jsonify({"success": False, "error": "Unknown Collector target."}), 404
+        if target_id:
+            session["target_id"] = target_id
+        else:
+            session.pop("target_id", None)
+        session.modified = True
+        return jsonify({"success": True, "target_id": target_id or None})
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/executive_plan/history", methods=["GET"])
+def api_executive_plan_history():
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Executive Plan history is not configured."}), 404
+    if not session.get("db_name") and not session.get("db_uri"):
+        return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+    target_id = str(session.get("target_id") or "").strip()
+    if not target_id:
+        return jsonify({
+            "success": False,
+            "error": "Select a Collector target in Database connection settings first.",
+        }), 400
+    period = (request.args.get("period") or "30").strip().lower()
+    team = (request.args.get("team") or "ALL").strip()
+    try:
+        days = (
+            None if period in {"all", "infinite", "infinit"}
+            else "latest" if period == "latest"
+            else int(period)
+        )
+        if not collector_history.target_exists(target_id):
+            return jsonify({"success": False, "error": "Unknown collector target."}), 404
+        current_plan = _history_current_plan(
+            session,
+            refresh=request.args.get("refresh_current") == "1",
+        )
+        result = collector_history.load_history(
+            target_id,
+            days=days,
+            team=team,
+            current_plan=current_plan,
+        )
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/query_activity/history", methods=["GET"])
+def api_query_activity_history():
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Query history is not configured."}), 404
+    if not session.get("db_name") and not session.get("db_uri"):
+        return jsonify({"success": False, "error": "Database is not connected."}), 401
+
+    try:
+        target_id = str(session.get("target_id") or "").strip()
+        if not target_id:
+            raise ValueError("Select a Collector target in Database connection settings first.")
+        if not collector_history.target_exists(target_id):
+            return jsonify({"success": False, "error": "Unknown Collector target."}), 404
+        return jsonify(query_history.load_query_history(request.args.get("queryid"), target_id))
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/query_ranking/performance", methods=["GET"])
+def api_query_ranking_performance():
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Query history is not configured."}), 404
+    target_id = str(session.get("target_id") or "").strip()
+    if not target_id:
+        return jsonify({"success": False, "error": "Select a Collector target first."}), 400
+    period = str(request.args.get("period") or "30").strip().lower()
+    try:
+        days = None if period == "all" else 0 if period == "latest" else int(period)
+        if not collector_history.target_exists(target_id):
+            return jsonify({"success": False, "error": "Unknown Collector target."}), 404
+        return jsonify(query_history.load_performance_evolution(target_id, days=days))
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
 
 
 @blueprint.route("/api/v1/global_advisor", methods=["GET"])

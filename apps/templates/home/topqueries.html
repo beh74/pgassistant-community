@@ -167,6 +167,21 @@
     padding: .95rem 1rem !important;
     overflow: auto;
   }
+  .query-history-chart-shell {
+    min-height: 22rem;
+    padding: .75rem;
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: .8rem;
+    background: #f8fafc;
+  }
+  .query-history-chart { display: block; width: 100%; min-width: 44rem; height: 22rem; }
+  .query-history-grid { stroke: #dbe4ef; stroke-width: 1; }
+  .query-history-axis-label { fill: #64748b; font-size: 12px; }
+  .query-history-line { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  .query-history-area { fill: url(#queryHistoryGradient); opacity: .42; }
+  .query-history-point { fill: #fff; stroke: #2563eb; stroke-width: 2; }
+  .query-history-point:hover { fill: #2563eb; }
 </style>
 {% endblock stylesheets %}
 
@@ -496,6 +511,18 @@
                 </span>
                 {% endif %}
 
+                {% if collector_history_enabled %}
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm open-query-history-btn"
+                  data-queryid="{{ row['queryid'] }}"
+                  data-bs-toggle="modal"
+                  data-bs-target="#queryHistoryModal">
+                  <i class="bi bi-graph-up me-1" aria-hidden="true"></i>
+                  History
+                </button>
+                {% endif %}
+
                 <button
                   type="button"
                   class="btn btn-outline-secondary btn-sm open-details-btn"
@@ -713,6 +740,49 @@
     </div>
   </div>
 </div>
+
+{% if collector_history_enabled %}
+<div
+  class="modal fade"
+  id="queryHistoryModal"
+  tabindex="-1"
+  aria-labelledby="queryHistoryModalLabel"
+  aria-hidden="true"
+  data-history-url="{{ url_for('home_blueprint.api_query_activity_history') }}"
+>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="queryHistoryModalLabel">Query metric history</h5>
+          <div class="small text-muted" id="queryHistoryQueryId"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row align-items-end g-3 mb-3">
+          <div class="col-sm-6 col-lg-4">
+            <label class="form-label" for="queryHistoryMetric">Metric</label>
+            <select class="form-select" id="queryHistoryMetric" disabled></select>
+          </div>
+          <div class="col">
+            <div class="small text-muted" id="queryHistorySummary" aria-live="polite"></div>
+          </div>
+        </div>
+        <div id="queryHistoryMessage" class="alert alert-info mb-0" role="status" aria-live="polite">
+          Loading historical metrics…
+        </div>
+        <div id="queryHistoryChartShell" class="query-history-chart-shell d-none">
+          <svg id="queryHistoryChart" class="query-history-chart" role="img" aria-labelledby="queryHistoryChartTitle"></svg>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-gray-200" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <script>
 
@@ -995,6 +1065,143 @@
       }
     });
   });
+
+  const historyModal = document.getElementById('queryHistoryModal');
+  const historyMetric = document.getElementById('queryHistoryMetric');
+  const historyMessage = document.getElementById('queryHistoryMessage');
+  const historyChartShell = document.getElementById('queryHistoryChartShell');
+  const historySummary = document.getElementById('queryHistorySummary');
+  let queryHistoryData = null;
+
+  function formatHistoryValue(value, unit) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'N/A';
+    const digits = Math.abs(number) < 10 && number % 1 ? 3 : (number % 1 ? 2 : 0);
+    return `${number.toLocaleString(undefined, { maximumFractionDigits: digits })}${unit ? ` ${unit}` : ''}`;
+  }
+
+  function renderQueryHistoryChart() {
+    if (!queryHistoryData || !historyMetric) return;
+    const metric = queryHistoryData.metrics.find(item => item.key === historyMetric.value);
+    if (!metric) return;
+    const points = queryHistoryData.points
+      .map(point => ({ date: new Date(point.collected_at), value: Number(point.values[metric.key]) }))
+      .filter(point => !Number.isNaN(point.date.getTime()) && Number.isFinite(point.value));
+    const svg = document.getElementById('queryHistoryChart');
+    if (!svg) return;
+    svg.replaceChildren();
+
+    if (!points.length) {
+      historyChartShell.classList.add('d-none');
+      historyMessage.textContent = 'This metric has no historical values for the query.';
+      historyMessage.classList.remove('d-none');
+      return;
+    }
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const width = 900;
+    const height = 360;
+    const margin = { top: 24, right: 24, bottom: 55, left: 82 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    let minimum = Math.min(...points.map(point => point.value));
+    let maximum = Math.max(...points.map(point => point.value));
+    const padding = maximum === minimum ? Math.max(Math.abs(maximum) * .1, 1) : (maximum - minimum) * .08;
+    minimum -= padding;
+    maximum += padding;
+    const x = index => margin.left + (points.length === 1 ? chartWidth / 2 : index * chartWidth / (points.length - 1));
+    const y = value => margin.top + (maximum - value) * chartHeight / (maximum - minimum);
+    const add = (name, attributes, text) => {
+      const element = document.createElementNS(ns, name);
+      Object.entries(attributes || {}).forEach(([key, value]) => element.setAttribute(key, value));
+      if (text !== undefined) element.textContent = text;
+      svg.appendChild(element);
+      return element;
+    };
+
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    add('title', { id: 'queryHistoryChartTitle' }, `${metric.label} history for query ${queryHistoryData.queryid}`);
+    const defs = add('defs');
+    const gradient = document.createElementNS(ns, 'linearGradient');
+    gradient.setAttribute('id', 'queryHistoryGradient');
+    gradient.setAttribute('x1', '0'); gradient.setAttribute('y1', '0');
+    gradient.setAttribute('x2', '0'); gradient.setAttribute('y2', '1');
+    [['0%', '#60a5fa', '.75'], ['100%', '#dbeafe', '.1']].forEach(([offset, color, opacity]) => {
+      const stop = document.createElementNS(ns, 'stop');
+      stop.setAttribute('offset', offset); stop.setAttribute('stop-color', color); stop.setAttribute('stop-opacity', opacity);
+      gradient.appendChild(stop);
+    });
+    defs.appendChild(gradient);
+
+    for (let tick = 0; tick <= 4; tick++) {
+      const tickValue = minimum + (maximum - minimum) * tick / 4;
+      const tickY = y(tickValue);
+      add('line', { x1: margin.left, x2: width - margin.right, y1: tickY, y2: tickY, class: 'query-history-grid' });
+      add('text', { x: margin.left - 10, y: tickY + 4, 'text-anchor': 'end', class: 'query-history-axis-label' }, formatHistoryValue(tickValue, metric.unit));
+    }
+
+    const labelIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+    labelIndexes.forEach(index => {
+      add('text', { x: x(index), y: height - 20, 'text-anchor': index === 0 ? 'start' : (index === points.length - 1 ? 'end' : 'middle'), class: 'query-history-axis-label' }, points[index].date.toLocaleString());
+    });
+
+    const line = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.value)}`).join(' ');
+    const area = `${line} L ${x(points.length - 1)} ${margin.top + chartHeight} L ${x(0)} ${margin.top + chartHeight} Z`;
+    add('path', { d: area, class: 'query-history-area' });
+    add('path', { d: line, class: 'query-history-line' });
+    points.forEach((point, index) => {
+      const circle = add('circle', { cx: x(index), cy: y(point.value), r: 4, class: 'query-history-point', tabindex: '0' });
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `${point.date.toLocaleString()} — ${formatHistoryValue(point.value, metric.unit)}`;
+      circle.appendChild(title);
+    });
+
+    historyMessage.classList.add('d-none');
+    historyChartShell.classList.remove('d-none');
+    historySummary.textContent = `${points.length} snapshot${points.length === 1 ? '' : 's'} · ${formatHistoryValue(points.at(-1).value, metric.unit)} latest`;
+  }
+
+  historyModal?.addEventListener('show.bs.modal', async function (event) {
+    const button = event.relatedTarget;
+    const queryid = button?.dataset.queryid || '';
+    queryHistoryData = null;
+    historyMetric.replaceChildren();
+    historyMetric.disabled = true;
+    historySummary.textContent = '';
+    historyChartShell.classList.add('d-none');
+    historyMessage.textContent = 'Loading historical metrics…';
+    historyMessage.classList.remove('d-none');
+    document.getElementById('queryHistoryQueryId').textContent = `Query ID ${queryid}`;
+
+    try {
+      const url = new URL(historyModal.dataset.historyUrl, window.location.origin);
+      url.searchParams.set('queryid', queryid);
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      const payload = await response.json();
+      if (!response.ok || payload.success === false) throw new Error(payload.error || 'Unable to load query history.');
+      if (!payload.metrics?.length || !payload.points?.length) {
+        historyMessage.textContent = payload.message || 'No historical metrics were found for this query.';
+        return;
+      }
+      queryHistoryData = payload;
+      payload.metrics.forEach(metric => {
+        const option = document.createElement('option');
+        option.value = metric.key;
+        option.textContent = metric.label;
+        historyMetric.appendChild(option);
+      });
+      historyMetric.value = payload.default_metric;
+      historyMetric.disabled = false;
+      renderQueryHistoryChart();
+    } catch (error) {
+      historyMessage.textContent = error.message || 'Unable to load query history.';
+      historyMessage.className = 'alert alert-danger mb-0';
+    }
+  });
+  historyModal?.addEventListener('hidden.bs.modal', function () {
+    historyMessage.className = 'alert alert-info mb-0';
+  });
+  historyMetric?.addEventListener('change', renderQueryHistoryChart);
 
   function toggleTableOperationDetails(summaryRow) {
     const detailsId = summaryRow.dataset.detailsId;

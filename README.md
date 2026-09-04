@@ -188,6 +188,27 @@ Use a dedicated database account with only the permissions required for the anal
 
 PostgreSQL release metadata is cached for 30 days in `postgresql_versions_cache.json`. The Docker image stores it in `/home/pgassistant/data/postgresql_versions_cache.json`. Set `PGA_POSTGRESQL_VERSIONS_CACHE_FILE` to use another location or mount `/home/pgassistant/data` to preserve the cache when containers are replaced.
 
+## Executive Plan history
+
+Set the optional `COLLECTOR_URI` environment variable to connect pgAssistant to
+a pgAssistant Collector repository:
+
+```text
+COLLECTOR_URI=postgresql://collector_reader:password@collector-host:5432/pga_collector
+```
+
+When configured, the Database connection page displays a **Collector** tab where
+the user searches for and selects the target associated with the active database.
+The selection is stored in the session and shared by Executive Plan history and
+Query activity history. The Executive Plan History tab provides 7, 15, 30-day
+and complete-history comparisons, DEV/OPS team filters, and work-package-grouped
+changes. The latest collector snapshot is also compared
+with a freshly generated Executive Plan, so a correction appears immediately;
+the next complete collection confirms it. Partial live plans never confirm a
+correction. The
+collector connection is opened in read-only mode. A dedicated read-only
+PostgreSQL role is recommended.
+
 
 The demo database is reset daily. AI features are disabled: do not enter personal API keys.
 

@@ -6,6 +6,7 @@ import re
 from flask import render_template, request, session, redirect
 
 from . import config
+from . import collector_history
 from . import analyze_param
 from . import database
 from . import llm
@@ -153,13 +154,14 @@ def _connection_error_response(error_message: str, segment: str = "database.html
     session.modified = True
     connection_form = {
         key: session.get(key, "")
-        for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password", "multi_db")
+        for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password", "multi_db", "target_id")
     }
     return render_template(
         "home/database.html",
         segment=segment,
         dbinfo={"error": error_message},
         connection_form=connection_form,
+        collector_history_enabled=collector_history.is_configured(),
     )
 
 
@@ -174,6 +176,8 @@ def generic_select_session(query_id: str):
 def handle_database_post(segment: str):
     dbinfo = {}
     merged = _db_config_from_form(request.form, session)
+    connection_form = dict(merged)
+    connection_form["target_id"] = str(request.form.get("target_id") or "").strip()
     con, message = database.connectdb(merged)
 
     if con is None:
@@ -181,7 +185,8 @@ def handle_database_post(segment: str):
             f"home/{segment}",
             segment=segment,
             dbinfo={"error": message},
-            connection_form=merged,
+            connection_form=connection_form,
+            collector_history_enabled=collector_history.is_configured(),
         )
 
     session.permanent = True
@@ -190,6 +195,11 @@ def handle_database_post(segment: str):
             continue
         session[key] = val
     session["multi_db"] = request.form.get("multi_db") == "on"
+    target_id = str(request.form.get("target_id") or "").strip()
+    if target_id:
+        session["target_id"] = target_id
+    else:
+        session.pop("target_id", None)
     session["db_connected"] = True
     session.pop("cluster_databases", None)
     session.pop("active_db", None)
@@ -203,7 +213,8 @@ def handle_database_post(segment: str):
                 f"home/{segment}",
                 segment=segment,
                 dbinfo=dbinfo,
-                connection_form=merged,
+                connection_form=connection_form,
+                collector_history_enabled=collector_history.is_configured(),
             )
     finally:
         con.close()
@@ -213,7 +224,12 @@ def handle_database_post(segment: str):
     return redirect("/dashboard.html")
 
 def handle_database_get(segment: str):
-    return render_template(f"home/{segment}", segment=segment, dbinfo={})
+    return render_template(
+        f"home/{segment}",
+        segment=segment,
+        dbinfo={},
+        collector_history_enabled=collector_history.is_configured(),
+    )
 
 def handle_dashboard_get(segment: str):
     if not is_db_connected(session):
@@ -255,6 +271,7 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
                 schema_name=schema_name,
                 related_mode=bool(tablename),
                 topqueries_loading=True,
+                collector_history_enabled=collector_history.is_configured(),
                 column_descriptions=pgstat_helper.PGSS_COLUMN_DOCS,
             )
 
@@ -324,6 +341,7 @@ def handle_topqueries_get(template: str, segment: str, tablename: str = None):
             schema_name=schema_name,
             related_mode=bool(tablename),
             topqueries_loading=False,
+            collector_history_enabled=collector_history.is_configured(),
             table_stats=table_stats,
             activity_graph=activity_graph,
             activity_graph_error=activity_graph_error,
@@ -337,7 +355,13 @@ def handle_rank_queries_get(template: str, segment: str):
     if session.get("db_name"):
         rows = database.get_rank_queries(session)
         ranked_queries = ranking.rank_queries(rows)
-        return render_template(f"home/{template}", segment=segment, ranked_queries=ranked_queries)
+        return render_template(
+            f"home/{template}",
+            segment=segment,
+            ranked_queries=ranked_queries,
+            collector_history_enabled=collector_history.is_configured(),
+            performance_evolution_enabled=bool(str(session.get("target_id") or "").strip()),
+        )
     else:
         return redirect("/database.html")    
 

@@ -50,6 +50,11 @@
               <button class="nav-link" id="connection-options-tab" data-bs-toggle="tab" data-bs-target="#connection-options" type="button" role="tab" aria-controls="connection-options" aria-selected="false">
                 Options
               </button>
+              {% if collector_history_enabled %}
+              <button class="nav-link" id="connection-collector-tab" data-bs-toggle="tab" data-bs-target="#connection-collector" type="button" role="tab" aria-controls="connection-collector" aria-selected="false">
+                Collector
+              </button>
+              {% endif %}
             </div>
           </nav>
 
@@ -191,6 +196,49 @@
             </div>
           </div>
             </div>
+            {% if collector_history_enabled %}
+            <div
+              class="tab-pane fade"
+              id="connection-collector"
+              role="tabpanel"
+              aria-labelledby="connection-collector-tab"
+              tabindex="0"
+              data-targets-url="{{ url_for('home_blueprint.api_collector_targets') }}"
+              data-save-url="{{ url_for('home_blueprint.api_collector_target') }}"
+            >
+              <div class="mb-4">
+                <div class="connect-section-title">Collector target</div>
+                <div class="connect-subtle-box">
+                  <p class="text-muted mb-3">
+                    Select the Collector target associated with this database. This shared selection is used by Executive Plan history and Query activity history.
+                  </p>
+                  <div id="collector-connection-error" class="alert alert-danger d-none" role="alert" aria-live="assertive">
+                    <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>Collector connection failed</div>
+                    <div id="collector-connection-error-message" class="small mt-1"></div>
+                    <div class="small mt-1">Check <code>COLLECTOR_URI</code> and verify that the Collector database is reachable.</div>
+                  </div>
+                  <div class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-5">
+                      <label class="form-label" for="collector-target-filter">Search targets</label>
+                      <input class="form-control no-validate" id="collector-target-filter" type="search" placeholder="Target ID, name, environment or group" autocomplete="off">
+                    </div>
+                    <div class="col-12 col-lg-7">
+                      <label class="form-label" for="collector-target-id">Selected target</label>
+                      <select class="form-select no-validate" id="collector-target-id" name="target_id">
+                        <option value="">No Collector target selected</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mt-3">
+                    <div class="form-text mt-0" id="collector-target-status" role="status" aria-live="polite">Open this tab to search available Collector targets.</div>
+                    <button class="btn btn-outline-primary btn-sm" id="save-collector-target" type="button">
+                      <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Save target selection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
           </div>
 
           <div class="connect-actions">
@@ -283,6 +331,110 @@ document.addEventListener("DOMContentLoaded", function () {
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     myButtonCircle(event);
+  });
+
+  const collectorPane = document.getElementById("connection-collector");
+  const collectorTab = document.getElementById("connection-collector-tab");
+  const targetFilter = document.getElementById("collector-target-filter");
+  const targetSelect = document.getElementById("collector-target-id");
+  const targetStatus = document.getElementById("collector-target-status");
+  const saveTarget = document.getElementById("save-collector-target");
+  const collectorError = document.getElementById("collector-connection-error");
+  const collectorErrorMessage = document.getElementById("collector-connection-error-message");
+  const initialTargetId = {{ ((connection_form.get('target_id') if connection_form is defined else session.get('target_id')) or '') | tojson }};
+  let collectorLoaded = false;
+  let targetSearchTimer;
+
+  function collectorTargetLabel(target) {
+    const context = [target.environment, target.target_group].filter(Boolean).join(" · ");
+    return `${target.target_name || target.target_id}${target.target_name ? ` — ${target.target_id}` : ""}${context ? ` · ${context}` : ""}`;
+  }
+
+  function clearCollectorError() {
+    collectorError?.classList.add("d-none");
+    if (collectorErrorMessage) collectorErrorMessage.textContent = "";
+  }
+
+  function showCollectorError(error, fallback) {
+    const message = error?.message || fallback;
+    if (collectorErrorMessage) collectorErrorMessage.textContent = message;
+    collectorError?.classList.remove("d-none");
+    targetStatus.textContent = message;
+  }
+
+  async function loadCollectorTargets(query, preferredTarget) {
+    if (!collectorPane) return;
+    clearCollectorError();
+    targetStatus.textContent = "Searching Collector targets…";
+    const url = new URL(collectorPane.dataset.targetsUrl, window.location.origin);
+    url.searchParams.set("q", query || "");
+    url.searchParams.set("limit", "50");
+    const response = await fetch(url, {headers: {Accept: "application/json"}});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "Unable to load Collector targets.");
+
+    const selected = preferredTarget || targetSelect.value || payload.selected_target_id || initialTargetId;
+    targetSelect.replaceChildren();
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "No Collector target selected";
+    targetSelect.appendChild(emptyOption);
+    (payload.targets || []).forEach(target => {
+      const option = document.createElement("option");
+      option.value = target.target_id;
+      option.textContent = collectorTargetLabel(target);
+      targetSelect.appendChild(option);
+    });
+    if (selected && Array.from(targetSelect.options).some(option => option.value === selected)) {
+      targetSelect.value = selected;
+    }
+    if (!targetFilter.value) targetFilter.value = payload.query || payload.database_filter || "";
+    targetStatus.textContent = !(payload.targets || []).length
+      ? "No Collector target matches this search."
+      : payload.has_more
+        ? "Showing the first 50 targets. Refine the search for more results."
+        : `${payload.targets.length} target(s) available.`;
+    clearCollectorError();
+    collectorLoaded = true;
+  }
+
+  collectorTab?.addEventListener("shown.bs.tab", function () {
+    if (collectorLoaded) return;
+    const databaseName = document.getElementById("db_name")?.value.trim() || "";
+    loadCollectorTargets(databaseName, initialTargetId).catch(error => {
+      showCollectorError(error, "Unable to load Collector targets.");
+    });
+  });
+
+  targetFilter?.addEventListener("input", function () {
+    clearTimeout(targetSearchTimer);
+    targetSearchTimer = window.setTimeout(function () {
+      loadCollectorTargets(targetFilter.value.trim(), targetSelect.value).catch(error => {
+        showCollectorError(error, "Unable to search Collector targets.");
+      });
+    }, 250);
+  });
+
+  saveTarget?.addEventListener("click", async function () {
+    saveTarget.disabled = true;
+    clearCollectorError();
+    targetStatus.textContent = "Saving Collector target…";
+    try {
+      const response = await fetch(collectorPane.dataset.saveUrl, {
+        method: "POST",
+        headers: {"Content-Type": "application/json", Accept: "application/json"},
+        body: JSON.stringify({target_id: targetSelect.value})
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Unable to save Collector target.");
+      targetStatus.textContent = payload.target_id
+        ? `Collector target “${payload.target_id}” saved for this session.`
+        : "Collector target selection cleared.";
+    } catch (error) {
+      showCollectorError(error, "Unable to save Collector target.");
+    } finally {
+      saveTarget.disabled = false;
+    }
   });
 });
 </script>

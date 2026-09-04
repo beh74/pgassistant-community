@@ -3,24 +3,32 @@ from . import ranking
 from . import global_advisor
 
 
-def get_rank_top_10_queries (session):
-    '''Fetches the top 10 queries from the database and ranks them using the ranking module.'''        
+RANKED_QUERY_API_LIMIT = 50
+
+
+def get_rank_top_50_queries(session):
+    """Fetch and rank the queries exposed to the Collector API."""
     rows = database.get_rank_queries(session)
     ranked_queries = ranking.rank_queries(rows)
-
-    
-    return ranked_queries[:10]
+    return ranked_queries[:RANKED_QUERY_API_LIMIT]
 
 
-def get_rank_top_10_queries_status(session):
+def get_rank_top_50_queries_status(session):
     """Return ranked queries plus pg_stat_statements availability details."""
     rows, warning = database.get_rank_queries_status(session)
-    ranked_queries = ranking.rank_queries(rows)[:10]
+    ranked_queries = ranking.rank_queries(rows)[:RANKED_QUERY_API_LIMIT]
     return {
         "ranked_queries": ranked_queries,
         "pg_stat_statements_available": warning is None,
         "pg_stat_statements_warning": warning,
     }
+
+
+# Compatibility aliases: existing reports and deployed Collectors still use the
+# historical top-10 names. They now receive the same top-50 dataset; consumers
+# that only need 10 rows continue to apply their own display limit.
+get_rank_top_10_queries = get_rank_top_50_queries
+get_rank_top_10_queries_status = get_rank_top_50_queries_status
 
 
 def get_top_10_global_advisor_recommendations(session, yaml_path="advisor_enriched.yml"):
@@ -42,7 +50,7 @@ def get_postgresql_version_advisor(session):
 
 
 """
-curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
+curl -X GET http://localhost:8080/api/v1/rank_top_50_queries \
   -H "Content-Type: application/json" \
   -d '{
     "db_config": {
@@ -55,7 +63,7 @@ curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
   }'
 
   
-curl -X GET http://localhost:8080/api/v1/rank_top_10_queries \
+curl -X GET http://localhost:8080/api/v1/rank_top_50_queries \
   -H "Content-Type: application/json" \
   -d '{
     "db_config": {

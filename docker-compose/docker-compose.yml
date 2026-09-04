@@ -8,6 +8,8 @@ services:
       - LOCAL_LLM_URI=http://host.docker.internal:11434/v1/
       - LLM_SQL_GUIDELINES=https://raw.githubusercontent.com/beh74/pgassistant-blog/refs/heads/main/content/post/sql-guide.md
       - SECRET_KEY=mySecretKeyforPGAssistant
+      # if you are using pgassistant collector, you can use the following environment variable to connect to it
+      - COLLECTOR_URI=postgresql://pga_collector:pga_collector@host.docker.internal:5433/pga_collector
     ports:
       - "8080:5005"
     volumes:

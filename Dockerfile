@@ -1,9 +1,13 @@
 # Use a specific lightweight base image
 FROM python:3.12-alpine
 
-# Install only the runtime system packages. PostgreSQL 18 client tools can
-# connect to older supported servers and avoid installing several client sets.
-RUN apk add --no-cache \
+# Upgrade packages inherited from the base image before installing the runtime
+# packages. This ensures that security fixes published after the Python image
+# was built (notably OpenSSL fixes) are included in the resulting image.
+# PostgreSQL 18 client tools can connect to older supported servers and avoid
+# installing several client sets.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     bash \
     postgresql18-client
 
@@ -11,8 +15,9 @@ RUN apk add --no-cache \
 # virtualenv would duplicate pip and its metadata. Bytecode is omitted to keep
 # the runtime layer compact.
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --no-compile -r /tmp/requirements.txt && \
+RUN python -m pip install --no-cache-dir --no-compile -r /tmp/requirements.txt && \
     python -m compileall -q /usr/local/lib/python3.12/site-packages/sql_formatter && \
+    python -m pip uninstall --yes pip && \
     rm /tmp/requirements.txt
 
 # Create a non-root user for security

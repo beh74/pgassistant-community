@@ -1,9 +1,35 @@
 import unittest
+from pathlib import Path
 
 from apps.home.executive_plan import build_plan_from_results, load_rules
 
 
 class ExecutivePlanTests(unittest.TestCase):
+    def test_template_contains_history_controls(self):
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "apps"
+            / "templates"
+            / "home"
+            / "executive_plan.html"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('id="executive-history-tab"', template)
+        self.assertIn('data-period="7"', template)
+        self.assertIn('data-period="latest"', template)
+        self.assertIn('data-period="1"', template)
+        self.assertIn('data-period="15"', template)
+        self.assertIn('data-period="30"', template)
+        self.assertIn('data-period="all"', template)
+        self.assertIn('<option value="DEV_OPS">DEV/OPS</option>', template)
+        self.assertIn("data-target-id=", template)
+        self.assertIn("session.get('target_id'", template)
+        self.assertNotIn('id="history-target"', template)
+        self.assertNotIn("searchTargets", template)
+        self.assertIn('id="history-recommendation-chart"', template)
+        self.assertIn("renderRecommendationHistoryChart(payload.timeline)", template)
+        self.assertNotIn('id="history-timeline"', template)
+
     def test_pgtune_parameter_script_is_included_with_clear_provenance(self):
         pgtune_sql = (
             "-- Generated from pgTune estimates; review before applying.\n"

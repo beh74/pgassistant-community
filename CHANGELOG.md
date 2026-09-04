@@ -1,5 +1,16 @@
 # Change Log
 
+## [3.7.0] - 2026-09-02
+
+## Improvements
+
+- Add Collector-backed history for Executive Plan recommendations and per-query execution metrics.
+- Add Rank Queries workload evolution using Collector snapshots, with activity-normalized charts and call-weighted gains and regressions.
+
+## Bug fixes
+
+- Fix docker image image CVE(s)
+
 ## [3.6.5] - 2026-08-11
 
 ## Improvements
