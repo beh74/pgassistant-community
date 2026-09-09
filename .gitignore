@@ -1,6 +1,8 @@
 .DS_STORE
 /vendor
 /node_modules
+/config.json
+/postgresql_versions_cache.json
 
 # Python Byte-compiled / optimized / DLL files
 __pycache__/

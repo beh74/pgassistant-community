@@ -41,6 +41,7 @@ METRICS = (
     ("wal_fpi", "WAL full-page images", ""),
 )
 METRIC_NAMES = tuple(metric[0] for metric in METRICS)
+INTERVAL_METRIC = ("interval_mean_exec_time_ms", "Interval average time", "ms")
 
 # A relative change from a near-zero baseline can be spectacular while having no
 # practical effect.  The workload verdict therefore requires both a meaningful
@@ -76,9 +77,9 @@ def load_query_history(queryid: str, target_id: str) -> dict[str, Any]:
             columns = ", ".join(METRIC_NAMES)
             cursor.execute(
                 f"""
-                SELECT collected_at, {columns}
+                SELECT collected_at, query AS query_text, {columns}
                 FROM (
-                    SELECT collected_at, {columns}
+                    SELECT collected_at, query, {columns}
                     FROM pga_ranked_query_snapshot
                     WHERE target_id = %s AND queryid = %s
                     ORDER BY collected_at DESC
@@ -101,7 +102,21 @@ def load_query_history(queryid: str, target_id: str) -> dict[str, Any]:
         result["target_id"] = target_id
         return result
 
-    available = [
+    for previous, current in zip(rows, rows[1:]):
+        previous_calls = _number(previous.get("calls"))
+        current_calls = _number(current.get("calls"))
+        previous_time = _number(previous.get("total_exec_time_ms"))
+        current_time = _number(current.get("total_exec_time_ms"))
+        if None in (previous_calls, current_calls, previous_time, current_time):
+            continue
+        delta_calls = float(current_calls) - float(previous_calls)
+        delta_time = float(current_time) - float(previous_time)
+        if delta_calls > 0 and delta_time >= 0:
+            current[INTERVAL_METRIC[0]] = delta_time / delta_calls
+
+    available = ([{
+        "key": INTERVAL_METRIC[0], "label": INTERVAL_METRIC[1], "unit": INTERVAL_METRIC[2]
+    }] if any(row.get(INTERVAL_METRIC[0]) is not None for row in rows) else []) + [
         {"key": key, "label": label, "unit": unit}
         for key, label, unit in METRICS
         if any(row.get(key) is not None for row in rows)
@@ -109,12 +124,18 @@ def load_query_history(queryid: str, target_id: str) -> dict[str, Any]:
     points = [
         {
             "collected_at": row["collected_at"],
-            "values": {key: _number(row.get(key)) for key, _, _ in METRICS if row.get(key) is not None},
+            "values": {
+                key: _number(row.get(key))
+                for key, _, _ in (INTERVAL_METRIC,) + METRICS
+                if row.get(key) is not None
+            },
         }
         for row in rows
     ]
     default_metric = (
-        "mean_exec_time_ms"
+        INTERVAL_METRIC[0]
+        if any(metric["key"] == INTERVAL_METRIC[0] for metric in available)
+        else "mean_exec_time_ms"
         if any(metric["key"] == "mean_exec_time_ms" for metric in available)
         else available[0]["key"]
     )
@@ -125,6 +146,10 @@ def load_query_history(queryid: str, target_id: str) -> dict[str, Any]:
         "default_metric": default_metric,
         "metrics": available,
         "points": points,
+        "query_sql": next(
+            (str(row["query_text"]) for row in reversed(rows) if row.get("query_text")),
+            None,
+        ),
     }
 
 

@@ -14,7 +14,7 @@ It produces a postgresql.conf file based on supplied parameters.
 
   -h                  display this help and exit
   -v PG_VERSION       (optional) PostgreSQL version
-                      accepted values: 9.5, 9.6, 10, 11, 12, 13, 14, 15, 16, 17, 18
+                      accepted values: 9.5, 9.6, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
                       default value: 15
   -t DB_TYPE          (optional) For what type of application is PostgreSQL used
                       accepted values: web, oltp, dw, desktop, mixed
@@ -85,7 +85,7 @@ set_db_default_values() {
       max_worker_processes=8
       max_parallel_workers_per_gather=0
       ;;
-    "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17"| "18")
+    "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17"| "18"| "19")
       max_worker_processes=8
       max_parallel_workers_per_gather=2
       max_parallel_workers=8
@@ -240,9 +240,9 @@ set_effective_io_concurrency() {
 }
 
 set_parallel_settings() {
-  if [ "$cpu_num" -lt 4 ] || ( [ ${db_version%.*} -le 9 ] && [ ${db_version//./} -lt 95 ] ); then
-    return 0
-  fi
+  # Worker ceilings describe processes that may run concurrently. Keep them
+  # consistent with the CPU budget even on small instances; the defaults set
+  # above are only fallbacks until the supplied CPU count is known.
   max_worker_processes="$cpu_num"
   if [ "${db_version//./}" -ge "96" ] || [ ${db_version%.*} -ge 10 ]; then
     workers_per_gather=$(( cpu_num / 2 ))
@@ -346,7 +346,8 @@ while getopts "hv:t:m:u:c:s:" opt; do
          [ "$v" != "15" ] && \
          [ "$v" != "16" ] && \
          [ "$v" != "17" ] && \
-         [ "$v" != "18" ] ; then
+         [ "$v" != "18" ] && \
+         [ "$v" != "19" ] ; then
         _input_error "$v is not a valid PostgreSQL version number"
       fi
       db_version=$v

@@ -44,6 +44,18 @@ def executive_plan_route():
         return render_template('home/page-500.html', err=exc, traceback_text=tb), 500
 
 
+@blueprint.route('/workload-correlation.html', methods=['GET'])
+def workload_correlation_route():
+    """Display Collector-backed workload and Executive Plan correlations."""
+    if not collector_history.is_configured() or not str(session.get("target_id") or "").strip():
+        return redirect("/database.html")
+    return render_template(
+        "home/workload_correlation.html",
+        segment="workload_correlation.html",
+        target_id=session.get("target_id"),
+    )
+
+
 @blueprint.route('/executive-plan/report.pdf', methods=['POST'])
 def executive_plan_report_route():
     if not session.get("db_connected"):

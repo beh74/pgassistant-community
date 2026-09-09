@@ -28,6 +28,7 @@
 {% set is_dashboard = current_path == '/dashboard.html' or 'dashboard' in segment %}
 {% set is_global_advisor = current_path == '/global/advisor' or 'global_advisor' in segment %}
 {% set is_executive_plan = current_path == '/executive-plan.html' or 'executive_plan' in segment %}
+{% set is_workload_correlation = current_path == '/workload-correlation.html' or 'workload_correlation' in segment %}
 {% set is_tables_cards = current_path == '/tables_cards.html' or 'tables_cards' in segment %}
 {% set is_db_design = current_path == '/database_analyze_llm.html' or segment == 'database_analyze_llm.html' %}
 {% set is_topqueries = current_path == '/topqueries.html' or 'topqueries' in segment %}
@@ -145,6 +146,17 @@
           <div class="sidebar-text">Executive Plan</div>
         </a>
       </li>
+
+      {% if collector_correlation_enabled %}
+      <li class="nav-item nav-monitor {% if is_workload_correlation %}active{% endif %}">
+        <a href="/workload-correlation.html" class="nav-link" {% if is_workload_correlation %}aria-current="page"{% endif %}>
+          <div class="sidebar-icon me-2 icon-20">
+            <i class="bi bi-link-45deg"></i>
+          </div>
+          <div class="sidebar-text">Workload Insights</div>
+        </a>
+      </li>
+      {% endif %}
 
       <li class="sidebar-section-label section-query">Query tuning</li>
 

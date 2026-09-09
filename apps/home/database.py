@@ -1028,11 +1028,9 @@ def get_pg_tune_parameter(db_config):
         version_raw, _= db_query(con,'db_version')
         version=version_raw[0]['server_version']
 
-        # alter system command supported by versions >= 12
-        if '.' in version:
-            major=version.split('.',1)[0]
-        else:
-            major=version
+        # Keep pgTune image and release-independent: PostgreSQL may expose
+        # stable (18.1), beta (19beta3), RC, or vendor-suffixed versions.
+        major = str(get_pg_major_version(version))
         
         con.close()
         return running_values, major

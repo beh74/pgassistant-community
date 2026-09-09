@@ -12,6 +12,7 @@ from flask import render_template, request, redirect, session
 from jinja2 import TemplateNotFound
 
 from . import config
+from . import collector_history
 from . import database
 from . import llm
 from . import pgstat_helper
@@ -61,13 +62,20 @@ def _apply_multi_db_filter():
 
 @blueprint.context_processor
 def _inject_multi_db_context():
+    collector_context = {
+        "collector_correlation_enabled": bool(
+            collector_history.is_configured()
+            and str(session.get("target_id") or "").strip()
+        ),
+    }
     if not is_db_connected(session):
         return {
             "multi_db_filter": False,
             "cluster_databases": [],
             "active_db": "",
+            **collector_context,
         }
-    return multi_db_template_context(session)
+    return {**multi_db_template_context(session), **collector_context}
 
 
 @blueprint.route('/index')

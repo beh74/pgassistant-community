@@ -158,6 +158,84 @@ class ExecutivePlanApiTests(unittest.TestCase):
         self.assertEqual(response.get_json()["default_metric"], "mean_exec_time_ms")
         load_history.assert_called_once_with("123", "application-production")
 
+    def test_workload_correlation_uses_selected_target(self):
+        with self.client.session_transaction() as flask_session:
+            flask_session["target_id"] = "application-production"
+        payload = {"status": "ok", "correlations": []}
+        with (
+            patch.object(route_api.collector_history, "is_configured", return_value=True),
+            patch.object(route_api.collector_history, "target_exists", return_value=True),
+            patch.object(
+                route_api.collector_history, "load_workload_correlation", return_value=payload
+            ) as correlate,
+        ):
+            response = self.client.get(
+                "/api/v1/executive_plan/workload-correlation?period=90&window_hours=12"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), payload)
+        correlate.assert_called_once_with(
+            "application-production", days=90, window_hours=12
+        )
+
+    def test_workload_measurement_analysis_uses_server_side_evidence(self):
+        with self.client.session_transaction() as flask_session:
+            flask_session["target_id"] = "application-production"
+        timeline = [{
+            "run_id": "run-1",
+            "collected_at": "2026-08-24T12:00:00Z",
+            "workload": {"average_time_ms": 4},
+        }]
+        with (
+            patch.object(route_api.collector_history, "is_configured", return_value=True),
+            patch.object(route_api.collector_history, "load_workload_correlation", return_value={"workload_timeline": timeline}),
+            patch.object(route_api.collector_history, "build_workload_measurement_prompt", return_value="prompt") as prompt_builder,
+            patch.object(route_api.llm, "query_chatgpt", return_value="## Finding") as query_llm,
+            patch.object(route_api.llm, "render_markdown", return_value="<h2>Finding</h2>"),
+        ):
+            response = self.client.post(
+                "/api/v1/executive_plan/workload-measurement-analysis",
+                json={
+                    "run_id": "run-1",
+                    "collected_at": "2026-08-24T12:00:00Z",
+                    "period": "30",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["analysis_html"], "<h2>Finding</h2>")
+        prompt_builder.assert_called_once_with(timeline[0], None)
+        query_llm.assert_called_once_with("prompt", render_html=False)
+
+    def test_workload_measurement_prompt_is_scoped_and_does_not_call_llm(self):
+        with self.client.session_transaction() as flask_session:
+            flask_session["target_id"] = "application-production"
+        timeline = [
+            {"run_id": "run-1", "collected_at": "2026-08-24T10:00:00Z", "workload": {"average_time_ms": 3}},
+            {"run_id": "run-2", "collected_at": "2026-08-24T11:00:00Z", "workload": {"average_time_ms": 4}},
+            {"run_id": "run-3", "collected_at": "2026-08-24T12:00:00Z", "workload": {"average_time_ms": 5}},
+        ]
+        with (
+            patch.object(route_api.collector_history, "is_configured", return_value=True),
+            patch.object(route_api.collector_history, "load_workload_correlation", return_value={"workload_timeline": timeline}),
+            patch.object(route_api.collector_history, "build_workload_measurement_prompt", return_value="scoped prompt") as prompt_builder,
+            patch.object(route_api.llm, "query_chatgpt") as query_llm,
+        ):
+            response = self.client.post(
+                "/api/v1/executive_plan/workload-measurement-analysis",
+                json={
+                    "run_id": "run-2",
+                    "period": "30",
+                    "prompt_only": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["prompt"], "scoped prompt")
+        prompt_builder.assert_called_once_with(timeline[1], timeline[0])
+        query_llm.assert_not_called()
+
     def test_query_activity_history_is_hidden_without_collector(self):
         with patch.object(route_api.collector_history, "is_configured", return_value=False):
             response = self.client.get("/api/v1/query_activity/history?queryid=123")

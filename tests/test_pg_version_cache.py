@@ -30,6 +30,26 @@ def _payload(latest_minor="5"):
 
 
 class PostgreSQLVersionFileCacheTest(unittest.TestCase):
+    def test_parses_postgresql_beta_version_with_distribution_suffix(self):
+        self.assertEqual(
+            pg_version._parse_postgresql_version(
+                "19beta3 (Debian 19~beta3-1.pgdg13+1)"
+            ),
+            ("19.0", "19"),
+        )
+
+    def test_prerelease_missing_from_stable_list_returns_review(self):
+        with patch.object(pg_version, "_fetch_postgresql_versions", return_value=_payload()):
+            result = pg_version.get_postgresql_upgrade_recommendation(
+                "19beta3 (Debian 19~beta3-1.pgdg13+1)"
+            )
+
+        self.assertEqual(result.installed_version, "19beta3")
+        self.assertEqual(result.major_version, "19")
+        self.assertEqual(result.recommendation_level, "REVIEW")
+        self.assertFalse(result.upgrade_recommended)
+        self.assertIn("pre-release build", result.recommendation)
+
     def test_repeated_callers_share_the_file_cache(self):
         with tempfile.TemporaryDirectory() as directory:
             cache_path = Path(directory) / "versions.json"

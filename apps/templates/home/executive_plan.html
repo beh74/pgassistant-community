@@ -101,7 +101,8 @@
   .executive-recommendation { padding: 1rem 0; border-bottom: 1px solid #e2e8f0; }
   .executive-recommendation:last-child { padding-bottom: 0; border-bottom: 0; }
   .executive-recommendation-number { display: inline-flex; align-items: center; justify-content: center; min-width: 1.55rem; height: 1.55rem; margin-right: .4rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: .7rem; font-weight: 900; }
-  #executive-plan-pane pre.executive-sql {
+  #executive-plan-pane pre.executive-sql,
+  #executive-history-pane pre.executive-sql {
     max-width: 100%;
     margin: .65rem 0 0;
     padding: .85rem 1rem;
@@ -149,7 +150,7 @@
   .history-chart-axis-label { fill: #64748b; font-size: 12px; }
   .history-chart-line { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
   .history-chart-area { fill: url(#recommendationHistoryGradient); opacity: .42; }
-  .history-chart-point { fill: #fff; stroke: #2563eb; stroke-width: 2.5; }
+  .history-chart-point { fill: #fff; stroke: #2563eb; stroke-width: 2.5; cursor: pointer; }
   .history-chart-point.is-increase { fill: #fff7ed; stroke: #d97706; }
   .history-chart-point.is-decrease { fill: #f0fdf4; stroke: #16a34a; }
   .history-chart-point.is-current { fill: #f5f3ff; stroke: #7c3aed; }
@@ -157,11 +158,22 @@
   .history-chart-point.is-increase:hover, .history-chart-point.is-increase:focus { fill: #d97706; }
   .history-chart-point.is-decrease:hover, .history-chart-point.is-decrease:focus { fill: #16a34a; }
   .history-chart-point.is-current:hover, .history-chart-point.is-current:focus { fill: #7c3aed; }
+  .history-chart-point.is-selected { stroke-width: 6; }
+  .history-chart-point.is-selected:not(.is-increase):not(.is-decrease):not(.is-current) { fill: #2563eb; stroke: #bfdbfe; }
   .history-event { display: inline-flex; padding: .2rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 850; white-space: nowrap; }
   .history-event.corrected { background: #dcfce7; color: #166534; }
   .history-event.new { background: #fef3c7; color: #92400e; }
   .history-event.modified { background: #e0e7ff; color: #3730a3; }
   .history-change-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .history-change-section--gone { border-color: #86efac; background: #f0fdf4; }
+  .history-change-section--new { border-color: #fcd34d; background: #fffbeb; }
+  .history-change-heading { display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }
+  .history-change-heading i { font-size: 1.15rem; }
+  .history-change-section--gone .history-change-heading { color: #166534; }
+  .history-change-section--new .history-change-heading { color: #92400e; }
+  .history-change-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; padding: 0 .45rem; border-radius: 999px; color: #fff; font-size: .75rem; font-weight: 800; }
+  .history-change-section--gone .history-change-count { background: #15803d; }
+  .history-change-section--new .history-change-count { background: #b45309; }
   .history-change-item { padding: .85rem 0; border-bottom: 1px solid #e2e8f0; }
   .history-change-item:last-child { border-bottom: 0; }
   .history-package { margin-top: .75rem; overflow: hidden; border: 1px solid #e2e8f0; border-radius: .75rem; }
@@ -445,7 +457,7 @@
       <div id="history-results" class="d-none">
         <div class="history-kpis">
           <div class="history-kpi"><span class="history-kpi-value" id="history-active">0</span><span class="history-kpi-label">Currently active</span></div>
-          <div class="history-kpi is-corrected"><span class="history-kpi-value" id="history-corrected">0</span><span class="history-kpi-label">Corrected in period</span></div>
+          <div class="history-kpi is-corrected"><span class="history-kpi-value" id="history-corrected">0</span><span class="history-kpi-label">No longer detected in period</span></div>
           <div class="history-kpi is-new"><span class="history-kpi-value" id="history-new">0</span><span class="history-kpi-label">New in period</span></div>
           <div class="history-kpi is-rate"><span class="history-kpi-value" id="history-rate">0%</span><span class="history-kpi-label">Resolution rate</span></div>
         </div>
@@ -456,7 +468,7 @@
           <div class="history-chart-heading">
             <div>
               <h3 class="history-section-title">Recommendation volume over time</h3>
-              <p class="small text-muted mb-0">Active recommendations across Collector snapshots and the current database state.</p>
+              <p class="small text-muted mb-0">Active recommendations across Collector snapshots and the current database state. Select a point to inspect what changed since the preceding measurement.</p>
             </div>
             <div class="history-chart-summary" id="history-chart-summary"></div>
           </div>
@@ -472,15 +484,17 @@
           <div class="history-empty d-none" id="history-chart-empty">No comparison is available yet.</div>
         </section>
 
+        <div class="small text-muted mt-3" id="history-selection-summary"></div>
+
         <div class="history-change-grid">
-          <section class="history-section">
-            <h3 class="history-section-title">Corrected recommendations</h3>
-            <p class="small text-muted">A current-state correction is visible immediately and will be confirmed by the next complete collection.</p>
+          <section class="history-section history-change-section--gone">
+            <h3 class="history-section-title history-change-heading"><i class="bi bi-check-circle-fill" aria-hidden="true"></i><span>No longer detected</span><span class="history-change-count" id="history-corrections-count">0</span></h3>
+            <p class="small text-muted">Recommendations present in the preceding measurement but no longer detected at the selected point. Application is not confirmed.</p>
             <div id="history-corrections"></div>
           </section>
-          <section class="history-section">
-            <h3 class="history-section-title">New or changed recommendations</h3>
-            <p class="small text-muted">New findings, reopened findings, and changed implementation actions in the selected period.</p>
+          <section class="history-section history-change-section--new">
+            <h3 class="history-section-title history-change-heading"><i class="bi bi-stars" aria-hidden="true"></i><span>New recommendations</span><span class="history-change-count" id="history-changes-count">0</span></h3>
+            <p class="small text-muted">New or reopened findings and changed implementation actions since the preceding measurement.</p>
             <div id="history-changes"></div>
           </section>
         </div>
@@ -606,13 +620,14 @@ function historyTeamLabel(team) {
 
 function historyFindingHtml(item, eventType) {
   const eventDate = item.corrected_at || item.detected_at || item.modified_at;
-  const reopenedBadge = item.reopened && eventType === "Corrected"
+  const reopenedBadge = item.reopened && eventType === "No longer detected"
     ? '<span class="executive-badge">Active again</span>'
     : "";
   return `
     <article class="history-change-item">
       <div class="history-change-title">${escapeHistoryHtml(item.title)}</div>
       <div class="small text-muted mt-1">${escapeHistoryHtml(item.scope_name || item.object_name || "Database")}</div>
+      ${item.recommendation_sql ? `<div class="small fw-bold mt-2">Recommended SQL</div><pre class="executive-sql"><code>${escapeHistoryHtml(item.recommendation_sql)}</code></pre>` : ""}
       <div class="history-change-meta">
         <span class="executive-badge ${item.team === "DEV" ? "executive-team-dev" : item.team === "OPS" ? "executive-team-ops" : "executive-team-dev-ops"}">${escapeHistoryHtml(historyTeamLabel(item.team))}</span>
         ${item.priority ? `<span class="executive-badge">${escapeHistoryHtml(item.priority)}</span>` : ""}
@@ -636,12 +651,14 @@ function historyPackagesHtml(packages, eventType) {
     </section>`).join("");
 }
 
-function renderRecommendationHistoryChart(timeline) {
+function renderRecommendationHistoryChart(timeline, onSelect, selectedIndex) {
   const points = (timeline || []).map(function (item) {
     return {
       active: Number(item.active) || 0,
       collectedAt: item.collected_at,
       corrected: Number(item.corrected) || 0,
+      correctionPackages: item.correction_packages || [],
+      changePackages: item.change_packages || [],
       isCurrent: Boolean(item.is_current),
       modified: Number(item.modified) || 0,
       newCount: Number(item.new) || 0
@@ -733,12 +750,13 @@ function renderRecommendationHistoryChart(timeline) {
     const changeClass = point.isCurrent
       ? "is-current"
       : netChange > 0 ? "is-increase" : netChange < 0 ? "is-decrease" : "";
+    const dateLabel = point.isCurrent ? "Current state" : formatHistoryDate(point.collectedAt, true);
     const circle = add("circle", {
       cx: x(index), cy: y(point.active), r: 5,
-      class: `history-chart-point ${changeClass}`.trim(), tabindex: "0"
+      class: `history-chart-point ${changeClass} ${index === selectedIndex ? "is-selected" : ""}`.trim(),
+      tabindex: "0", role: "button", "aria-label": `Inspect ${dateLabel}`
     });
     const title = document.createElementNS(ns, "title");
-    const dateLabel = point.isCurrent ? "Current state" : formatHistoryDate(point.collectedAt, true);
     const changes = [
       point.newCount ? `+${point.newCount} new` : "",
       point.corrected ? `−${point.corrected} corrected` : "",
@@ -746,6 +764,13 @@ function renderRecommendationHistoryChart(timeline) {
     ].filter(Boolean).join(", ") || "no change";
     title.textContent = `${dateLabel} — ${point.active} active recommendation(s) — ${changes}`;
     circle.appendChild(title);
+    circle.addEventListener("click", () => onSelect(index));
+    circle.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onSelect(index);
+      }
+    });
   });
 
   const totalChange = points.at(-1).active - points[0].active;
@@ -760,7 +785,7 @@ function initializeExecutiveHistory() {
   const teamSelect = document.getElementById("history-team");
   const message = document.getElementById("history-message");
   const results = document.getElementById("history-results");
-  const state = {targetId: root.dataset.targetId || "", period: "30", team: "ALL", refreshCurrent: true};
+  const state = {targetId: root.dataset.targetId || "", period: "30", team: "ALL", refreshCurrent: true, payload: null, selectedPointIndex: 0};
 
   function showMessage(text, isError) {
     message.classList.remove("d-none", "alert", "alert-danger");
@@ -815,14 +840,36 @@ function initializeExecutiveHistory() {
       ? `${periodDescription}${currentNote}`
       : "No complete Executive Plan snapshot is available for this target and team.";
 
-    renderRecommendationHistoryChart(payload.timeline);
+    state.payload = payload;
+    state.selectedPointIndex = Math.max(0, (payload.timeline || []).length - 1);
+    renderSelectedPoint(state.selectedPointIndex);
+  }
 
-    const corrections = document.getElementById("history-corrections");
-    corrections.innerHTML = historyPackagesHtml(payload.correction_packages, "Corrected")
-      || '<div class="history-empty">No correction was confirmed during this period.</div>';
-
-    document.getElementById("history-changes").innerHTML = historyPackagesHtml(payload.change_packages, "Detected")
-      || '<div class="history-empty">No new or changed recommendation during this period.</div>';
+  function renderSelectedPoint(index) {
+    const timeline = state.payload?.timeline || [];
+    if (!timeline.length) {
+      renderRecommendationHistoryChart([], renderSelectedPoint, 0);
+      document.getElementById("history-selection-summary").textContent = "No measurement is available for comparison.";
+      document.getElementById("history-corrections").innerHTML = '<div class="history-empty">No recommendation is available.</div>';
+      document.getElementById("history-changes").innerHTML = '<div class="history-empty">No recommendation is available.</div>';
+      return;
+    }
+    state.selectedPointIndex = index;
+    const point = timeline[index];
+    const corrections = point.correction_packages || [];
+    const changes = point.change_packages || [];
+    const changedCount = Number(point.new || 0) + Number(point.modified || 0);
+    const pointLabel = point.is_current ? "Current state" : formatHistoryDate(point.collected_at, true);
+    document.getElementById("history-selection-summary").textContent = point.has_previous
+      ? `${pointLabel} — changes compared with the immediately preceding measurement.`
+      : `${pointLabel} — first available measurement; no preceding measurement is available.`;
+    document.getElementById("history-corrections-count").textContent = Number(point.corrected || 0);
+    document.getElementById("history-changes-count").textContent = changedCount;
+    document.getElementById("history-corrections").innerHTML = historyPackagesHtml(corrections, "No longer detected")
+      || '<div class="history-empty">No recommendation disappeared at this measurement.</div>';
+    document.getElementById("history-changes").innerHTML = historyPackagesHtml(changes, "Detected")
+      || '<div class="history-empty">No new or changed recommendation at this measurement.</div>';
+    renderRecommendationHistoryChart(timeline, renderSelectedPoint, index);
   }
 
   teamSelect.addEventListener("change", function () { state.team = teamSelect.value; loadHistory(); });

@@ -26,6 +26,7 @@ from . import fillfactor_advisor
 from . import column_statistics
 from . import collector_history
 from . import query_history
+from . import llm
 from . import pgtune_resource_detector
 
 
@@ -379,6 +380,79 @@ def api_executive_plan_history():
         return jsonify({"success": False, "error": str(exc)}), 400
     except collector_history.CollectorHistoryError as exc:
         return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/executive_plan/workload-correlation", methods=["GET"])
+def api_executive_plan_workload_correlation():
+    """Link historical recommendations to ranked queries and observed trends."""
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Executive Plan history is not configured."}), 404
+    target_id = str(session.get("target_id") or "").strip()
+    if not target_id:
+        return jsonify({
+            "success": False,
+            "error": "Select a Collector target in Database connection settings first.",
+        }), 400
+    try:
+        period = (request.args.get("period") or "30").strip().lower()
+        days = None if period in {"all", "infinite", "infinit"} else int(period)
+        window_hours = int(request.args.get("window_hours") or 24)
+        if not collector_history.target_exists(target_id):
+            return jsonify({"success": False, "error": "Unknown collector target."}), 404
+        return jsonify(collector_history.load_workload_correlation(
+            target_id, days=days, window_hours=window_hours
+        ))
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
+@blueprint.route("/api/v1/executive_plan/workload-measurement-analysis", methods=["POST"])
+def api_workload_measurement_analysis():
+    """Ask the configured LLM to synthesize one Collector measurement."""
+    if not collector_history.is_configured():
+        return jsonify({"success": False, "error": "Collector history is not configured."}), 404
+    target_id = str(session.get("target_id") or "").strip()
+    if not target_id:
+        return jsonify({"success": False, "error": "Select a Collector target first."}), 400
+    payload = request.get_json(silent=True) or {}
+    run_id = str(payload.get("run_id") or "").strip()
+    if not run_id:
+        return jsonify({"success": False, "error": "A measurement run_id is required."}), 400
+    try:
+        period = str(payload.get("period") or "30").strip().lower()
+        days = None if period in {"all", "infinite", "infinit"} else int(period)
+        result = collector_history.load_workload_correlation(target_id, days=days, window_hours=24)
+        timeline = result.get("workload_timeline") or []
+        index = next((
+            i for i, point in enumerate(timeline)
+            if str(point.get("run_id") or "") == run_id
+        ), None)
+        if index is None:
+            return jsonify({"success": False, "error": "The selected measurement was not found."}), 404
+        selected_point = timeline[index]
+        prompt = collector_history.build_workload_measurement_prompt(
+            selected_point, timeline[index - 1] if index > 0 else None
+        )
+        if payload.get("prompt_only") is True:
+            return jsonify({
+                "success": True,
+                "prompt": prompt,
+                "run_id": str(selected_point.get("run_id") or ""),
+            })
+        markdown_text = llm.query_chatgpt(prompt, render_html=False)
+        return jsonify({
+            "success": True,
+            "analysis_html": llm.render_markdown(markdown_text),
+            "run_id": str(selected_point.get("run_id") or ""),
+        })
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except collector_history.CollectorHistoryError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
 
 
 @blueprint.route("/api/v1/query_activity/history", methods=["GET"])

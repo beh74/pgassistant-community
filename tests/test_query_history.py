@@ -190,6 +190,7 @@ class QueryHistoryTests(unittest.TestCase):
         self.assertEqual(result["default_metric"], "mean_exec_time_ms")
         self.assertEqual([metric["key"] for metric in result["metrics"]], ["mean_exec_time_ms", "calls"])
         self.assertEqual(result["points"][0]["values"]["mean_exec_time_ms"], 12.5)
+        self.assertIn("query_sql", result)
         self.assertTrue(connection.closed)
 
     def test_returns_empty_result_when_query_was_not_collected(self):
@@ -199,6 +200,32 @@ class QueryHistoryTests(unittest.TestCase):
 
         self.assertEqual(result["points"], [])
         self.assertIn("No historical metrics", result["message"])
+
+    def test_query_history_defaults_to_counter_delta_interval_latency(self):
+        start = datetime(2026, 8, 28, tzinfo=timezone.utc)
+        empty_metrics = {
+            name: None for name in query_history.METRIC_NAMES
+            if name not in {"mean_exec_time_ms", "calls", "total_exec_time_ms"}
+        }
+        connection = FakeConnection([[
+            {"collected_at": start, "calls": 100, "total_exec_time_ms": 1000,
+             "mean_exec_time_ms": 10, **empty_metrics},
+            {"collected_at": start + timedelta(hours=1), "calls": 110,
+             "total_exec_time_ms": 1200, "mean_exec_time_ms": 10.91, **empty_metrics},
+            {"collected_at": start + timedelta(hours=2), "calls": 110,
+             "total_exec_time_ms": 1200, "mean_exec_time_ms": 10.91, **empty_metrics},
+            {"collected_at": start + timedelta(hours=3), "calls": 120,
+             "total_exec_time_ms": 1250, "mean_exec_time_ms": 10.42, **empty_metrics},
+        ]])
+        with patch.object(query_history.collector_history, "_connect", return_value=connection):
+            result = query_history.load_query_history("123", "application-production")
+
+        self.assertEqual(result["default_metric"], "interval_mean_exec_time_ms")
+        self.assertEqual(result["metrics"][0]["label"], "Interval average time")
+        interval_values = [
+            point["values"].get("interval_mean_exec_time_ms") for point in result["points"]
+        ]
+        self.assertEqual(interval_values, [None, 20, None, 5])
 
     def test_query_activity_template_contains_history_dialog(self):
         template = (
@@ -210,6 +237,26 @@ class QueryHistoryTests(unittest.TestCase):
         self.assertIn('class="form-select" id="queryHistoryMetric"', template)
         self.assertIn('data-queryid="{{ row[\'queryid\'] }}"', template)
         self.assertIn("payload.default_metric", template)
+
+    def test_workload_correlation_is_centered_on_collector_measurements(self):
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "apps" / "templates" / "home" / "workload_correlation.html"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('id="wt-timeline"', template)
+        self.assertIn('class="nav nav-tabs tune-nav-tabs"', template)
+        self.assertIn('id="wt-statement-timeline"', template)
+        self.assertIn("statement_calls", template)
+        self.assertIn("What changed at this measurement?", template)
+        self.assertIn("Queries with the largest workload impact", template)
+        self.assertIn("query.workload_share_pct", template)
+        self.assertIn("duration(query.total_time_ms)", template)
+        self.assertIn("duration(query.impact_time_ms)", template)
+        self.assertIn('id="wtPromptModal"', template)
+        self.assertIn('id="wt-prompt"', template)
+        self.assertIn("prompt_only:true", template)
+        self.assertIn("No longer detected — application not confirmed", template)
 
     def test_database_template_owns_collector_target_selection(self):
         template = (
@@ -228,20 +275,27 @@ class QueryHistoryTests(unittest.TestCase):
         self.assertIn("showCollectorError", template)
         self.assertNotIn('id="history-target"', executive_template)
 
-    def test_query_ranking_template_contains_performance_evolution_tab(self):
+    def test_sidebar_and_page_expose_workload_correlation(self):
+        root = Path(__file__).resolve().parents[1] / "apps" / "templates"
+        sidebar = (root / "includes" / "sidebar.html").read_text(encoding="utf-8")
+        page = (root / "home" / "workload_correlation.html").read_text(encoding="utf-8")
+
+        self.assertIn("{% if collector_correlation_enabled %}", sidebar)
+        self.assertIn('/workload-correlation.html', sidebar)
+        self.assertIn('/api/v1/executive_plan/workload-correlation', page)
+        self.assertIn("point.environment", page)
+        self.assertIn("recommendations.no_longer_detected", page)
+        self.assertIn("workload.query_changes", page)
+
+    def test_query_ranking_template_omits_performance_evolution_tab(self):
         template = (
             Path(__file__).resolve().parents[1]
             / "apps" / "templates" / "home" / "rankqueries.html"
         ).read_text(encoding="utf-8")
-        self.assertIn("{% if performance_evolution_enabled %}", template)
-        self.assertIn('id="performance-tab"', template)
-        self.assertIn("/api/v1/query_ranking/performance", template)
-        self.assertIn("Left Top 50", template)
-        self.assertIn('id="performance-activity-chart"', template)
-        self.assertIn("calls_per_minute", template)
-        self.assertIn('class="nav nav-tabs tune-nav-tabs"', template)
-        self.assertIn('class="btn btn-sm performance-period-btn" data-period="latest"', template)
-        self.assertIn('data-period="15"', template)
+        self.assertNotIn("{% if performance_evolution_enabled %}", template)
+        self.assertNotIn('id="performance-tab"', template)
+        self.assertNotIn('id="ranking-performance-pane"', template)
+        self.assertNotIn("/api/v1/query_ranking/performance", template)
         self.assertIn('data-bs-target="#rankQueryHistoryModal"', template)
         self.assertIn('id="rankQueryHistoryMetric"', template)
         self.assertIn("api_query_activity_history", template)

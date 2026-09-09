@@ -6,6 +6,7 @@ from apps.home.database import (
     _uri_with_database,
     apply_pgss_database_filter,
     get_resolved_database_name,
+    get_pg_major_version,
     inject_pgss_current_db_filter,
     resolve_db_config,
 )
@@ -13,6 +14,12 @@ from apps.home.routes_helpers import _db_config_from_form, get_cluster_database_
 
 
 class DatabaseMultiDbTests(unittest.TestCase):
+    def test_postgresql_beta_version_exposes_numeric_major_for_pgtune(self):
+        self.assertEqual(
+            get_pg_major_version("19beta3 (Debian 19~beta3-1.pgdg13+1)"),
+            19,
+        )
+
     def test_resolved_database_name_uses_active_database_in_multi_db_mode(self):
         config = {
             "db_name": "postgres",

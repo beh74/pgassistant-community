@@ -98,6 +98,13 @@ def _base_advice(source: str, database_name: str, **values: Any) -> dict[str, An
         "requires_maintenance_window": False,
     }
     advice.update(values)
+    raw_query_ids = advice.get("query_ids") or []
+    if isinstance(raw_query_ids, (str, int)):
+        raw_query_ids = [raw_query_ids]
+    advice["query_ids"] = sorted({
+        str(query_id).strip() for query_id in raw_query_ids
+        if query_id is not None and str(query_id).strip()
+    })
     schema_name = str(advice.get("schema_name") or "")
     table_name = str(advice.get("table_name") or "")
     advice["scope_name"] = (
@@ -512,4 +519,32 @@ def build_executive_plan(db_config: dict[str, Any]) -> dict[str, Any]:
     """Collect current advisor results and build the Executive Plan."""
     database_name = database.get_resolved_database_name(db_config)
     results, errors = collect_advisor_results(db_config)
-    return build_plan_from_results(results, database_name, errors=errors)
+    plan = build_plan_from_results(results, database_name, errors=errors)
+    plan["postgres_context"] = collect_postgres_context(db_config, results)
+    return plan
+
+
+def collect_postgres_context(
+    db_config: dict[str, Any], advisor_results: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Capture version and tuning settings in the Collector-stored plan payload."""
+    parameter_result = (advisor_results or {}).get("parameter_advisor") or {}
+    settings = dict(parameter_result.get("pg_tune_parameters") or {})
+    connection, status = database.connectdb(db_config)
+    if connection is None:
+        return {"available": False, "server_version": None, "settings": settings,
+                "error": status or "Unable to connect to database."}
+    try:
+        rows, _description = database.db_query(connection, "db_version")
+        server_version = str(rows[0].get("server_version") or "").strip() if rows else ""
+        return {
+            "available": bool(server_version or settings),
+            "server_version": server_version or None,
+            "major_version": database.get_pg_major_version(server_version) if server_version else None,
+            "settings": settings,
+        }
+    except Exception as exc:
+        return {"available": False, "server_version": None, "settings": settings,
+                "error": str(exc)}
+    finally:
+        connection.close()

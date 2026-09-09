@@ -47,6 +47,8 @@ def _parse_postgresql_version(
         "14.8 (Ubuntu 14.8-1.pgdg22.04+1)"
         "9.6.24"
         "PostgreSQL 16.3 on x86_64-pc-linux-gnu"
+        "19beta3 (Debian 19~beta3-1.pgdg13+1)"
+        "PostgreSQL 19rc1"
 
     Returns:
         A tuple containing:
@@ -67,8 +69,9 @@ def _parse_postgresql_version(
         )
 
     match = re.search(
-        r"(?<!\d)(\d+)(?:\.(\d+))(?:\.(\d+))?",
+        r"(?<!\d)(\d+)(?:(?:\.(\d+))(?:\.(\d+))?|((?:beta|rc)\d+|devel))",
         version_string,
+        flags=re.IGNORECASE,
     )
 
     if not match:
@@ -78,7 +81,7 @@ def _parse_postgresql_version(
         )
 
     first = int(match.group(1))
-    second = int(match.group(2))
+    second = int(match.group(2)) if match.group(2) is not None else 0
     third = match.group(3)
 
     if first >= 10:
@@ -97,6 +100,16 @@ def _parse_postgresql_version(
         major_version = f"{first}.{second}"
 
     return installed_version, major_version
+
+
+def _postgresql_prerelease_label(version_string: str) -> str | None:
+    """Return PostgreSQL's compact beta/RC/devel label when present."""
+    match = re.search(
+        r"(?<!\d)(\d+)((?:beta|rc)\d+|devel)",
+        version_string,
+        flags=re.IGNORECASE,
+    )
+    return f"{match.group(1)}{match.group(2).lower()}" if match else None
 
 
 def _version_sort_key(version: str) -> tuple[int, ...]:
@@ -227,6 +240,7 @@ def get_postgresql_upgrade_recommendation(
     installed_version, major_version = (
         _parse_postgresql_version(version_string)
     )
+    prerelease_label = _postgresql_prerelease_label(version_string)
 
     releases = _fetch_postgresql_versions(
         timeout_seconds=timeout_seconds,
@@ -242,6 +256,24 @@ def get_postgresql_upgrade_recommendation(
     )
 
     if release_info is None:
+        if prerelease_label:
+            return PostgreSQLUpgradeRecommendation(
+                installed_version=prerelease_label,
+                major_version=major_version,
+                latest_minor_version="not yet published",
+                latest_release_date=None,
+                supported=False,
+                end_of_life_date=None,
+                upgrade_recommended=False,
+                recommendation_level="REVIEW",
+                recommendation=(
+                    f"PostgreSQL {prerelease_label} is a pre-release build. "
+                    f"Major branch {major_version} is not yet present in the "
+                    "official stable-version list. Do not treat this as an "
+                    "unsupported-version finding; use it only for testing and "
+                    "plan an upgrade to the final release."
+                ),
+            )
         raise ValueError(
             f"PostgreSQL major version {major_version} was not found "
             "in the official PostgreSQL version list."

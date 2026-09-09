@@ -45,22 +45,6 @@
     color: #fff !important;
   }
 
-  .performance-chart { min-height: 290px; border: 1px solid #e5e7eb; border-radius: .9rem; background: #fff; padding: 1rem; }
-  .performance-chart svg { display: block; width: 100%; height: 260px; overflow: visible; }
-  .performance-verdict { border-radius: 1rem; padding: 1.15rem 1.3rem; background: #f8fafc; border-left: 5px solid #64748b; }
-  .performance-verdict.is-good { background: #ecfdf5; border-color: #10b981; }
-  .performance-verdict.is-bad { background: #fef2f2; border-color: #ef4444; }
-  .performance-verdict-value { font-size: 1.8rem; font-weight: 750; line-height: 1.1; }
-  .performance-query-list { display: grid; gap: .65rem; }
-  .performance-query-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; padding: .8rem .9rem; border: 1px solid #e5e7eb; border-radius: .75rem; }
-  .performance-query-id { font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; }
-  .performance-change { font-weight: 700; white-space: nowrap; }
-  .performance-change.is-good { color: #047857; }
-  .performance-change.is-bad { color: #b91c1c; }
-  .performance-ranking-status { color: #92400e; font-size: .75rem; }
-  .performance-periods { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .performance-period-btn { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
-  .performance-period-btn.active { border-color: #4f46e5; background: #4f46e5; color: #fff; }
   .query-history-chart-shell { min-height: 22rem; padding: .75rem; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: .8rem; background: #f8fafc; }
   .query-history-chart { display: block; width: 100%; min-width: 44rem; height: 22rem; }
   .query-history-grid { stroke: #dbe4ef; stroke-width: 1; }
@@ -69,7 +53,6 @@
   .query-history-area { fill: url(#rankQueryHistoryGradient); opacity: .42; }
   .query-history-point { fill: #fff; stroke: #2563eb; stroke-width: 2; }
   .query-history-point:hover { fill: #2563eb; }
-  @media (max-width: 767px) { .performance-query-row { grid-template-columns: 1fr; gap: .3rem; } }
 </style>
 {% endblock stylesheets %}
 
@@ -99,22 +82,6 @@
       </button>
     </div>
   </div>
-
-  {% if performance_evolution_enabled %}
-  <nav class="mb-4" aria-label="Query ranking views">
-    <div class="nav nav-tabs tune-nav-tabs" id="ranking-view-tabs" role="tablist">
-      <button class="nav-link active" id="ranking-tab" data-bs-toggle="tab" data-bs-target="#ranking-current-pane" type="button" role="tab" aria-controls="ranking-current-pane" aria-selected="true">
-        <i class="bi bi-list-ol me-1" aria-hidden="true"></i>Current ranking
-      </button>
-      <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#ranking-performance-pane" type="button" role="tab" aria-controls="ranking-performance-pane" aria-selected="false">
-        <i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Performance evolution
-      </button>
-    </div>
-  </nav>
-  {% endif %}
-
-  <div class="tab-content" id="ranking-view-tab-content">
-  <div class="tab-pane fade show active" id="ranking-current-pane" role="tabpanel" aria-labelledby="ranking-tab" tabindex="0">
 
   <section class="pg-hero query-workload-hero">
     <div>
@@ -486,69 +453,6 @@
     </div>
   {% endif %}
 
-  </div>
-
-  {% if performance_evolution_enabled %}
-  <div class="tab-pane fade" id="ranking-performance-pane" role="tabpanel" aria-labelledby="performance-tab" tabindex="0">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-      <div>
-        <h2 class="h4 mb-1">Workload performance evolution</h2>
-        <p class="text-muted mb-0">Based on execution-time and call-counter differences between consecutive collections.</p>
-      </div>
-      <div>
-        <label class="form-label d-block">Period</label>
-        <div class="performance-periods" role="group" aria-label="Performance period">
-          <button type="button" class="btn btn-sm performance-period-btn" data-period="latest">Latest</button>
-          <button type="button" class="btn btn-sm performance-period-btn" data-period="1">1 day</button>
-          <button type="button" class="btn btn-sm performance-period-btn" data-period="7">7 days</button>
-          <button type="button" class="btn btn-sm performance-period-btn" data-period="15">15 days</button>
-          <button type="button" class="btn btn-sm performance-period-btn active" data-period="30">30 days</button>
-          <button type="button" class="btn btn-sm performance-period-btn" data-period="all">All</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="performance-loading" class="pg-empty-state"><div class="spinner-border text-primary mb-3" role="status"></div><p>Loading performance history…</p></div>
-    <div id="performance-error" class="alert alert-warning" hidden></div>
-    <div id="performance-content" hidden>
-      <div class="performance-verdict mb-4" id="performance-verdict">
-        <div class="text-muted small text-uppercase">Overall verdict</div>
-        <div class="performance-verdict-value" id="performance-verdict-value">—</div>
-        <div class="small mt-1" id="performance-verdict-detail"></div>
-      </div>
-
-      <div class="pg-summary-grid mb-4">
-        <div class="pg-summary-card is-info"><span class="pg-summary-label">Comparable queries<span class="pg-summary-value" id="performance-comparable">0</span></span></div>
-        <div class="pg-summary-card" style="border-top-color:#10b981"><span class="pg-summary-label">Improved<span class="pg-summary-value" id="performance-improved">0</span></span></div>
-        <div class="pg-summary-card is-critical"><span class="pg-summary-label">Degraded<span class="pg-summary-value" id="performance-degraded">0</span></span></div>
-        <div class="pg-summary-card is-violet"><span class="pg-summary-label">Left Top 50<span class="pg-summary-value" id="performance-left-top">0</span></span></div>
-      </div>
-
-      <div class="card mb-4"><div class="card-body">
-        <h3 class="h6 mb-1">Average execution time per call</h3>
-        <p class="small text-muted">Weighted across queries observed in each comparable interval. Read it together with database activity below.</p>
-        <div class="performance-chart" id="performance-chart"></div>
-      </div></div>
-
-      <div class="card mb-4"><div class="card-body">
-        <h3 class="h6 mb-1">Observed database activity</h3>
-        <p class="small text-muted">Calls from queries present in ranked snapshots, normalized per minute so collection intervals of different lengths remain comparable.</p>
-        <div class="performance-chart" id="performance-activity-chart"></div>
-      </div></div>
-
-      <div class="row g-4">
-        <div class="col-lg-6"><div class="card h-100"><div class="card-body">
-          <h3 class="h6 text-success">Top gains</h3><div class="performance-query-list" id="performance-gains"></div>
-        </div></div></div>
-        <div class="col-lg-6"><div class="card h-100"><div class="card-body">
-          <h3 class="h6 text-danger">Top regressions</h3><div class="performance-query-list" id="performance-regressions"></div>
-        </div></div></div>
-      </div>
-      <p class="small text-muted mt-3 mb-0">A query that leaves the Top 50 remains in the comparison up to its last consecutive observation. Counter resets and intervals without calls are excluded.</p>
-    </div>
-  </div>
-  {% endif %}
-  </div>
 
 </div>
 
@@ -892,205 +796,5 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 {% endif %}
 
-{% if performance_evolution_enabled %}
-document.addEventListener("DOMContentLoaded", function () {
-  const performanceTab = document.getElementById("performance-tab");
-  const periodButtons = document.querySelectorAll(".performance-period-btn");
-  let selectedPeriod = "30";
-  let loadedPeriod = null;
-
-  function formatDuration(milliseconds) {
-    const absolute = Math.abs(Number(milliseconds) || 0);
-    if (absolute >= 3600000) return (absolute / 3600000).toFixed(1) + " h";
-    if (absolute >= 60000) return (absolute / 60000).toFixed(1) + " min";
-    if (absolute >= 1000) return (absolute / 1000).toFixed(1) + " s";
-    return absolute.toFixed(1) + " ms";
-  }
-
-  function renderChart(points) {
-    const host = document.getElementById("performance-chart");
-    host.replaceChildren();
-    if (!points || points.length < 2) {
-      host.textContent = "Not enough comparable intervals to draw a trend.";
-      host.classList.add("text-muted", "d-flex", "align-items-center", "justify-content-center");
-      return;
-    }
-    host.classList.remove("text-muted", "d-flex", "align-items-center", "justify-content-center");
-    const width = 900, height = 250, left = 62, right = 18, top = 18, bottom = 38;
-    const values = points.map(point => Number(point.avg_time_ms));
-    let min = Math.min(...values), max = Math.max(...values);
-    if (min === max) { min = Math.max(0, min * .9); max = max * 1.1 || 1; }
-    const x = index => left + index * (width - left - right) / (points.length - 1);
-    const y = value => top + (max - value) * (height - top - bottom) / (max - min);
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    for (let step = 0; step <= 4; step++) {
-      const value = min + (max - min) * step / 4;
-      const yy = y(value);
-      const line = document.createElementNS(svg.namespaceURI, "line");
-      line.setAttribute("x1", left); line.setAttribute("x2", width - right);
-      line.setAttribute("y1", yy); line.setAttribute("y2", yy);
-      line.setAttribute("stroke", "#e5e7eb"); svg.appendChild(line);
-      const label = document.createElementNS(svg.namespaceURI, "text");
-      label.setAttribute("x", left - 8); label.setAttribute("y", yy + 4);
-      label.setAttribute("text-anchor", "end"); label.setAttribute("font-size", "11");
-      label.setAttribute("fill", "#64748b"); label.textContent = value.toFixed(value >= 10 ? 1 : 2);
-      svg.appendChild(label);
-    }
-    const path = document.createElementNS(svg.namespaceURI, "path");
-    path.setAttribute("d", points.map((point, index) => `${index ? "L" : "M"}${x(index)},${y(point.avg_time_ms)}`).join(" "));
-    path.setAttribute("fill", "none"); path.setAttribute("stroke", "#6366f1");
-    path.setAttribute("stroke-width", "3"); path.setAttribute("stroke-linejoin", "round"); svg.appendChild(path);
-    points.forEach((point, index) => {
-      const circle = document.createElementNS(svg.namespaceURI, "circle");
-      circle.setAttribute("cx", x(index)); circle.setAttribute("cy", y(point.avg_time_ms));
-      circle.setAttribute("r", "4"); circle.setAttribute("fill", "#6366f1");
-      const title = document.createElementNS(svg.namespaceURI, "title");
-      title.textContent = `${new Date(point.collected_at).toLocaleString()} · ${point.avg_time_ms} ms · ${point.queries} queries`;
-      circle.appendChild(title); svg.appendChild(circle);
-    });
-    [0, points.length - 1].forEach(index => {
-      const label = document.createElementNS(svg.namespaceURI, "text");
-      label.setAttribute("x", x(index)); label.setAttribute("y", height - 8);
-      label.setAttribute("text-anchor", index ? "end" : "start"); label.setAttribute("font-size", "11");
-      label.setAttribute("fill", "#64748b"); label.textContent = new Date(points[index].collected_at).toLocaleDateString();
-      svg.appendChild(label);
-    });
-    host.appendChild(svg);
-  }
-
-  function renderActivityChart(points) {
-    const host = document.getElementById("performance-activity-chart");
-    host.replaceChildren();
-    if (!points || points.length < 2) {
-      host.textContent = "Not enough comparable intervals to draw database activity.";
-      host.classList.add("text-muted", "d-flex", "align-items-center", "justify-content-center");
-      return;
-    }
-    host.classList.remove("text-muted", "d-flex", "align-items-center", "justify-content-center");
-    const width = 900, height = 250, left = 70, right = 18, top = 18, bottom = 38;
-    const values = points.map(point => Number(point.calls_per_minute));
-    const max = Math.max(...values, 1);
-    const x = index => left + index * (width - left - right) / (points.length - 1);
-    const y = value => top + (max - value) * (height - top - bottom) / max;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    for (let step = 0; step <= 4; step++) {
-      const value = max * step / 4;
-      const yy = y(value);
-      const line = document.createElementNS(svg.namespaceURI, "line");
-      line.setAttribute("x1", left); line.setAttribute("x2", width - right);
-      line.setAttribute("y1", yy); line.setAttribute("y2", yy);
-      line.setAttribute("stroke", "#e5e7eb"); svg.appendChild(line);
-      const label = document.createElementNS(svg.namespaceURI, "text");
-      label.setAttribute("x", left - 8); label.setAttribute("y", yy + 4);
-      label.setAttribute("text-anchor", "end"); label.setAttribute("font-size", "11");
-      label.setAttribute("fill", "#64748b");
-      label.textContent = value.toLocaleString(undefined, {maximumFractionDigits: 1});
-      svg.appendChild(label);
-    }
-    const axisLabel = document.createElementNS(svg.namespaceURI, "text");
-    axisLabel.setAttribute("x", 12); axisLabel.setAttribute("y", 14);
-    axisLabel.setAttribute("font-size", "11"); axisLabel.setAttribute("fill", "#64748b");
-    axisLabel.textContent = "calls/min"; svg.appendChild(axisLabel);
-    const path = document.createElementNS(svg.namespaceURI, "path");
-    path.setAttribute("d", points.map((point, index) => `${index ? "L" : "M"}${x(index)},${y(point.calls_per_minute)}`).join(" "));
-    path.setAttribute("fill", "none"); path.setAttribute("stroke", "#0ea5e9");
-    path.setAttribute("stroke-width", "3"); path.setAttribute("stroke-linejoin", "round"); svg.appendChild(path);
-    points.forEach((point, index) => {
-      const circle = document.createElementNS(svg.namespaceURI, "circle");
-      circle.setAttribute("cx", x(index)); circle.setAttribute("cy", y(point.calls_per_minute));
-      circle.setAttribute("r", "4"); circle.setAttribute("fill", "#0ea5e9");
-      const title = document.createElementNS(svg.namespaceURI, "title");
-      const durationMinutes = Number(point.interval_seconds) / 60;
-      title.textContent = `${new Date(point.collected_at).toLocaleString()} · ${Number(point.calls_per_minute).toLocaleString()} calls/min · ${Number(point.calls).toLocaleString()} calls over ${durationMinutes.toLocaleString(undefined, {maximumFractionDigits: 1})} min`;
-      circle.appendChild(title); svg.appendChild(circle);
-    });
-    [0, points.length - 1].forEach(index => {
-      const label = document.createElementNS(svg.namespaceURI, "text");
-      label.setAttribute("x", x(index)); label.setAttribute("y", height - 8);
-      label.setAttribute("text-anchor", index ? "end" : "start"); label.setAttribute("font-size", "11");
-      label.setAttribute("fill", "#64748b"); label.textContent = new Date(points[index].collected_at).toLocaleDateString();
-      svg.appendChild(label);
-    });
-    host.appendChild(svg);
-  }
-
-  function renderQueryList(hostId, items, positive) {
-    const host = document.getElementById(hostId);
-    host.replaceChildren();
-    if (!items.length) { const empty = document.createElement("p"); empty.className = "text-muted small mb-0"; empty.textContent = positive ? "No significant gain detected." : "No significant regression detected."; host.appendChild(empty); return; }
-    items.forEach(item => {
-      const row = document.createElement("div"); row.className = "performance-query-row";
-      const main = document.createElement("div");
-      const link = document.createElement("a"); link.className = "performance-query-id";
-      link.href = "/analyze/" + encodeURIComponent(item.queryid); link.textContent = "Query " + item.queryid;
-      main.appendChild(link);
-      const metrics = document.createElement("div"); metrics.className = "small text-muted";
-      metrics.textContent = `${item.baseline_avg_time_ms} ms → ${item.current_avg_time_ms} ms/call · ${item.current_interval_calls.toLocaleString()} calls (${item.activity_share_pct}% of observed activity) · ${formatDuration(item.current_total_time_ms)} total`;
-      main.appendChild(metrics);
-      if (item.ranking_status === "left_top_50") {
-        const status = document.createElement("div"); status.className = "performance-ranking-status";
-        status.textContent = "Left Top 50 · last observed " + new Date(item.last_observed_at).toLocaleString(); main.appendChild(status);
-      }
-      const change = document.createElement("div"); change.className = "performance-change " + (positive ? "is-good" : "is-bad");
-      change.textContent = (positive ? "Saved " : "Added ") + formatDuration(item.estimated_saved_time_ms);
-      const saved = document.createElement("div"); saved.className = "small text-muted text-end";
-      saved.textContent = `${item.change_pct > 0 ? "+" : ""}${item.change_pct}% · ${item.total_time_share_pct}% of execution time`;
-      const side = document.createElement("div"); side.append(change, saved); row.append(main, side); host.appendChild(row);
-    });
-  }
-
-  function renderPerformance(payload) {
-    const summary = payload.summary;
-    document.getElementById("performance-comparable").textContent = summary.comparable;
-    document.getElementById("performance-improved").textContent = summary.improved;
-    document.getElementById("performance-degraded").textContent = summary.degraded;
-    document.getElementById("performance-left-top").textContent = summary.left_top_50;
-    const verdict = document.getElementById("performance-verdict");
-    const value = document.getElementById("performance-verdict-value");
-    const detail = document.getElementById("performance-verdict-detail");
-    verdict.classList.remove("is-good", "is-bad");
-    if (summary.global_change_pct == null) value.textContent = "Insufficient comparable data";
-    else {
-      const status = summary.global_verdict || (summary.global_change_pct < 0 ? "improved" : summary.global_change_pct > 0 ? "degraded" : "stable");
-      if (status === "improved") verdict.classList.add("is-good");
-      else if (status === "degraded") verdict.classList.add("is-bad");
-      value.textContent = status === "improved" ? `Performance improved by ${Math.abs(summary.global_change_pct)}%` : status === "degraded" ? `Performance degraded by ${summary.global_change_pct}%` : "Performance is broadly stable";
-    }
-    const saved = summary.estimated_saved_time_ms;
-    const relative = summary.global_verdict === "stable" && summary.global_change_pct ? ` · Raw activity-weighted change: ${summary.global_change_pct > 0 ? "+" : ""}${summary.global_change_pct}%` : "";
-    detail.textContent = `${summary.improved} improved · ${summary.degraded} degraded · ${summary.stable} stable` + (saved ? ` · ${saved > 0 ? "Estimated time saved" : "Estimated extra time"}: ${formatDuration(saved)}` : "") + relative;
-    renderChart(payload.timeline); renderActivityChart(payload.timeline); renderQueryList("performance-gains", payload.gains, true); renderQueryList("performance-regressions", payload.regressions, false);
-  }
-
-  async function loadPerformance() {
-    const loading = document.getElementById("performance-loading");
-    const error = document.getElementById("performance-error");
-    const content = document.getElementById("performance-content");
-    loading.hidden = false; error.hidden = true; content.hidden = true;
-    try {
-      const response = await fetch(`/api/v1/query_ranking/performance?period=${encodeURIComponent(selectedPeriod)}`);
-      const payload = await response.json();
-      if (!response.ok || payload.success === false) throw new Error(payload.error || "Unable to load performance history.");
-      renderPerformance(payload); loadedPeriod = selectedPeriod; content.hidden = false;
-      if (payload.message) { error.textContent = payload.message; error.hidden = false; }
-    } catch (exception) { error.textContent = exception.message; error.hidden = false; }
-    finally { loading.hidden = true; }
-  }
-
-  performanceTab.addEventListener("shown.bs.tab", () => {
-    if (loadedPeriod !== selectedPeriod) loadPerformance();
-  });
-  periodButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      periodButtons.forEach(item => item.classList.remove("active"));
-      button.classList.add("active");
-      selectedPeriod = button.dataset.period;
-      loadPerformance();
-    });
-  });
-});
-{% endif %}
 </script>
 {% endblock javascripts %}

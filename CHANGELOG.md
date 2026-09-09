@@ -1,4 +1,12 @@
+## [3.8.0] - 2026-09-09
+
 # Change Log
+
+- Implement **Workload Insights** !
+- Review executive plan history : let the user clik on one point to display the diffrences from previous collection.
+- Persist the detected PostgreSQL version and important tuning settings in Executive Plan payloads so Collector workload correlations can automatically flag upgrades and configuration changes.
+- Clamp pgTune worker and parallel-worker settings to the supplied CPU count, including one- and two-CPU instances.
+- Accept PostgreSQL beta, release-candidate, and development version strings such as `19beta3` across version analysis and pgTune, including PostgreSQL 19 parameter generation, and report unreleased branches as review-only instead of failing.
 
 ## [3.7.0] - 2026-09-02
 

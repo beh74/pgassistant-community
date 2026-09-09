@@ -1,10 +1,33 @@
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
-from apps.home.executive_plan import build_plan_from_results, load_rules
+from apps.home.executive_plan import build_plan_from_results, collect_postgres_context, load_rules
 
 
 class ExecutivePlanTests(unittest.TestCase):
+    def test_collects_postgres_context_for_collector_payload(self):
+        connection = Mock()
+        advisor_results = {
+            "parameter_advisor": {
+                "pg_tune_parameters": {"work_mem": "4MB", "shared_buffers": "1GB"}
+            }
+        }
+        with (
+            patch("apps.home.executive_plan.database.connectdb", return_value=(connection, "OK")),
+            patch(
+                "apps.home.executive_plan.database.db_query",
+                return_value=([{"server_version": "19beta3 (Debian 19~beta3-1)"}], {}),
+            ),
+        ):
+            context = collect_postgres_context({"db_name": "northwind"}, advisor_results)
+
+        self.assertTrue(context["available"])
+        self.assertEqual(context["server_version"], "19beta3 (Debian 19~beta3-1)")
+        self.assertEqual(context["major_version"], 19)
+        self.assertEqual(context["settings"]["work_mem"], "4MB")
+        connection.close.assert_called_once()
+
     def test_template_contains_history_controls(self):
         template = (
             Path(__file__).resolve().parents[1]
@@ -27,8 +50,16 @@ class ExecutivePlanTests(unittest.TestCase):
         self.assertNotIn('id="history-target"', template)
         self.assertNotIn("searchTargets", template)
         self.assertIn('id="history-recommendation-chart"', template)
-        self.assertIn("renderRecommendationHistoryChart(payload.timeline)", template)
+        self.assertIn("renderRecommendationHistoryChart(timeline, renderSelectedPoint, index)", template)
         self.assertNotIn('id="history-timeline"', template)
+        self.assertIn("renderSelectedPoint", template)
+        self.assertIn('id="history-selection-summary"', template)
+        self.assertIn("No longer detected", template)
+        self.assertIn("New recommendations", template)
+        self.assertIn("bi-check-circle-fill", template)
+        self.assertIn("bi-stars", template)
+        self.assertIn("Recommended SQL", template)
+        self.assertIn("item.recommendation_sql", template)
 
     def test_pgtune_parameter_script_is_included_with_clear_provenance(self):
         pgtune_sql = (
