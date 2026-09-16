@@ -8,7 +8,7 @@
 
 {% block content %}
 {% set conn = connection_form if connection_form is defined else session %}
-<div class="container-fluid py-4 pg-page connect-page">
+<div class="container-fluid py-3 pg-page connect-page">
   <div class="connect-layout">
 
     {% if dbinfo.get('error') %}
@@ -28,21 +28,12 @@
 
     <div class="card connect-section-card">
       <div class="card-body">
-        <h2 class="h5 mb-4">Database connection</h2>
+        <h2 class="h5 mb-3">Database connection</h2>
 
-        <div class="alert alert-info d-flex align-items-start connect-info-alert mb-4" role="alert">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" fill="currentColor" class="me-2 mt-1 flex-shrink-0" viewBox="0 0 20 20">
-            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-            <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-          </svg>
-          <div>
-            pgAssistant needs the <code>pg_stat_statements</code> module to be activated on the PostgreSQL database.<br>
-            You can find <a target="_blank" href="https://beh74.github.io/pgassistant-blog/doc/pg_stat_statments/" class="alert-link">here</a> a way to do it.
-          </div>
-        </div>
+        <p class="small text-muted mb-3">Enable <code>pg_stat_statements</code> for query analysis. <a href="https://beh74.github.io/pgassistant-blog/doc/pg_stat_statments/" target="_blank" rel="noopener">Setup guide</a></p>
 
         <form method="POST" id="form_connect" class="needs-validation" novalidate>
-          <nav class="mb-4" aria-label="Database connection sections">
+          <nav class="mb-3" aria-label="Database connection sections">
             <div class="nav nav-tabs tune-nav-tabs" id="connection-tabs" role="tablist">
               <button class="nav-link active" id="connection-general-tab" data-bs-toggle="tab" data-bs-target="#connection-general" type="button" role="tab" aria-controls="connection-general" aria-selected="true">
                 General
@@ -60,7 +51,7 @@
 
           <div class="tab-content" id="connection-tabs-content">
             <div class="tab-pane fade show active" id="connection-general" role="tabpanel" aria-labelledby="connection-general-tab" tabindex="0">
-          <div class="mb-4">
+          <div class="mb-3">
             <div class="connect-section-title">Connection URI</div>
             <div class="connect-subtle-box">
               <label for="db_uri" class="form-label">Connection URI (optional but used in priority)</label>
@@ -156,7 +147,7 @@
             </div>
             <div class="tab-pane fade" id="connection-options" role="tabpanel" aria-labelledby="connection-options-tab" tabindex="0">
 
-          <div class="mb-4">
+          <div class="mb-3">
             <div class="connect-section-title">Connection options</div>
             <div class="connect-subtle-box">
               <div class="form-check">
@@ -172,27 +163,7 @@
                 </div>
               </div>
 
-              <div class="connect-option-help mt-3 pt-3">
-                <div class="connect-option-help-title">Where to find it after connecting</div>
-                <ul class="connect-option-help-list mb-2">
-                  <li>
-                    <strong>Dashboard</strong> — cluster-wide KPIs and a <em>Cluster databases</em> list with size,
-                    owner, and the currently connected database.
-                  </li>
-                  <li>
-                    <strong>Left sidebar</strong> — under <em>PG Assistant</em>, the cluster host and a
-                    <em>Database</em> dropdown to switch the active database without reconnecting.
-                  </li>
-                  <li>
-                    <strong>Schema and tuning pages</strong> — scoped to the selected database on query activity,
-                    top queries, query/index advisors, and table autovacuum tuning
-                    (<code>pg_stat_statements</code> filter).
-                  </li>
-                </ul>
-                <div class="form-text mb-0">
-                  Leave this unchecked for the classic single-database workflow (one database name, no cluster filter).
-                </div>
-              </div>
+              <p class="small text-muted mb-0 mt-2">Switch databases from the navigation menu. Query and schema analysis follow the selected database.</p>
             </div>
           </div>
             </div>
@@ -204,18 +175,17 @@
               aria-labelledby="connection-collector-tab"
               tabindex="0"
               data-targets-url="{{ url_for('home_blueprint.api_collector_targets') }}"
-              data-save-url="{{ url_for('home_blueprint.api_collector_target') }}"
             >
-              <div class="mb-4">
+              <div class="mb-3">
                 <div class="connect-section-title">Collector target</div>
                 <div class="connect-subtle-box">
                   <p class="text-muted mb-3">
-                    Select the Collector target associated with this database. This shared selection is used by Executive Plan history and Query activity history.
+                    Opening this tab tests the connection entered in General and finds matching Collector targets. Your selection is saved when you connect.
                   </p>
                   <div id="collector-connection-error" class="alert alert-danger d-none" role="alert" aria-live="assertive">
-                    <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>Collector connection failed</div>
+                    <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>Connection check failed</div>
                     <div id="collector-connection-error-message" class="small mt-1"></div>
-                    <div class="small mt-1">Check <code>COLLECTOR_URI</code> and verify that the Collector database is reachable.</div>
+                    <div class="small mt-1">Check the database connection fields; if the database is reachable, check <code>COLLECTOR_URI</code>.</div>
                   </div>
                   <div class="row g-3 align-items-end">
                     <div class="col-12 col-lg-5">
@@ -231,9 +201,7 @@
                   </div>
                   <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mt-3">
                     <div class="form-text mt-0" id="collector-target-status" role="status" aria-live="polite">Open this tab to search available Collector targets.</div>
-                    <button class="btn btn-outline-primary btn-sm" id="save-collector-target" type="button">
-                      <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Save target selection
-                    </button>
+
                   </div>
                 </div>
               </div>
@@ -338,11 +306,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const targetFilter = document.getElementById("collector-target-filter");
   const targetSelect = document.getElementById("collector-target-id");
   const targetStatus = document.getElementById("collector-target-status");
-  const saveTarget = document.getElementById("save-collector-target");
+
   const collectorError = document.getElementById("collector-connection-error");
   const collectorErrorMessage = document.getElementById("collector-connection-error-message");
   const initialTargetId = {{ ((connection_form.get('target_id') if connection_form is defined else session.get('target_id')) or '') | tojson }};
-  let collectorLoaded = false;
+  let searchVersion = 0;
+  let connectionChanged = false;
   let targetSearchTimer;
 
   function collectorTargetLabel(target) {
@@ -365,15 +334,35 @@ document.addEventListener("DOMContentLoaded", function () {
   async function loadCollectorTargets(query, preferredTarget) {
     if (!collectorPane) return;
     clearCollectorError();
-    targetStatus.textContent = "Searching Collector targets…";
+    const version = ++searchVersion;
+    targetSelect.disabled = true;
+    targetStatus.textContent = "Testing database connection and finding Collector targets…";
     const url = new URL(collectorPane.dataset.targetsUrl, window.location.origin);
     url.searchParams.set("q", query || "");
     url.searchParams.set("limit", "50");
-    const response = await fetch(url, {headers: {Accept: "application/json"}});
+    const fields = Object.fromEntries(new FormData(form));
+    let response;
+    try {
+      response = await fetch(url, {
+      method: "POST",
+      headers: {Accept: "application/json", "Content-Type": "application/json"},
+      body: JSON.stringify(fields)
+      });
+    } catch (error) {
+      if (version !== searchVersion) return;
+      targetSelect.value = "";
+      throw error;
+    }
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Unable to load Collector targets.");
+    if (version !== searchVersion) return;
+    targetSelect.disabled = false;
+    if (!response.ok) {
+      targetSelect.value = "";
+      throw new Error(payload.error || "Unable to load Collector targets.");
+    }
 
-    const selected = preferredTarget || targetSelect.value || payload.selected_target_id || initialTargetId;
+    const selected = (payload.targets || []).some(target => target.target_id === preferredTarget)
+      ? preferredTarget : payload.suggested_target_id;
     targetSelect.replaceChildren();
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
@@ -395,13 +384,21 @@ document.addEventListener("DOMContentLoaded", function () {
         ? "Showing the first 50 targets. Refine the search for more results."
         : `${payload.targets.length} target(s) available.`;
     clearCollectorError();
-    collectorLoaded = true;
+
   }
 
+  form.addEventListener("input", function (event) {
+    if (!["db_uri", "db_host", "db_port", "db_name", "db_user", "db_password"].includes(event.target.name)) return;
+    connectionChanged = true;
+    searchVersion++;
+    targetSelect && (targetSelect.value = "");
+    if (targetFilter) targetFilter.value = "";
+  });
+
   collectorTab?.addEventListener("shown.bs.tab", function () {
-    if (collectorLoaded) return;
-    const databaseName = document.getElementById("db_name")?.value.trim() || "";
-    loadCollectorTargets(databaseName, initialTargetId).catch(error => {
+    clearTimeout(targetSearchTimer);
+    loadCollectorTargets("", connectionChanged ? "" : (targetSelect.value || initialTargetId)).catch(error => {
+      targetSelect.disabled = false;
       showCollectorError(error, "Unable to load Collector targets.");
     });
   });
@@ -410,32 +407,13 @@ document.addEventListener("DOMContentLoaded", function () {
     clearTimeout(targetSearchTimer);
     targetSearchTimer = window.setTimeout(function () {
       loadCollectorTargets(targetFilter.value.trim(), targetSelect.value).catch(error => {
+        targetSelect.disabled = false;
         showCollectorError(error, "Unable to search Collector targets.");
       });
     }, 250);
   });
 
-  saveTarget?.addEventListener("click", async function () {
-    saveTarget.disabled = true;
-    clearCollectorError();
-    targetStatus.textContent = "Saving Collector target…";
-    try {
-      const response = await fetch(collectorPane.dataset.saveUrl, {
-        method: "POST",
-        headers: {"Content-Type": "application/json", Accept: "application/json"},
-        body: JSON.stringify({target_id: targetSelect.value})
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Unable to save Collector target.");
-      targetStatus.textContent = payload.target_id
-        ? `Collector target “${payload.target_id}” saved for this session.`
-        : "Collector target selection cleared.";
-    } catch (error) {
-      showCollectorError(error, "Unable to save Collector target.");
-    } finally {
-      saveTarget.disabled = false;
-    }
-  });
+
 });
 </script>
 {% endblock javascripts %}

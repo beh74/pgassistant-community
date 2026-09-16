@@ -302,7 +302,7 @@ def api_executive_plan():
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
-@blueprint.route("/api/v1/collector/targets", methods=["GET"])
+@blueprint.route("/api/v1/collector/targets", methods=["GET", "POST"])
 def api_collector_targets():
     if not collector_history.is_configured():
         return jsonify({"success": False, "error": "Collector is not configured."}), 404
@@ -313,9 +313,28 @@ def api_collector_targets():
             limit = int(request.args.get("limit") or 50)
         except ValueError:
             return jsonify({"success": False, "error": "Target limit must be an integer."}), 400
-        result = collector_history.list_targets(session, query=query, limit=limit)
+        db_config = session
+        if request.method == "POST":
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"error": "Connection parameters are required."}), 400
+            db_config = {
+                key: str(payload.get(key) or "").strip()
+                for key in ("db_uri", "db_host", "db_port", "db_name", "db_user", "db_password")
+            }
+            # Preserve password whitespace and never merge an old session identity.
+            db_config["db_password"] = str(payload.get("db_password") or "")
+            if not db_config["db_uri"] and not all(
+                db_config[key] for key in ("db_host", "db_port", "db_name", "db_user")
+            ):
+                return jsonify({"error": "Enter a connection URI or complete the connection fields first."}), 400
+            connection, message = database.connectdb(db_config)
+            if connection is None:
+                return jsonify({"error": "Database connection failed. Check the connection fields and URI options."}), 400
+            connection.close()
+        result = collector_history.list_targets(db_config, query=query, limit=limit)
         available_ids = {target["target_id"] for target in result["targets"]}
-        selected_target_id = session.get("target_id")
+        selected_target_id = session.get("target_id") if request.method == "GET" else None
         if selected_target_id not in available_ids:
             selected_target_id = None
         result["selected_target_id"] = selected_target_id

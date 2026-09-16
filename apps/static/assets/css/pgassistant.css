@@ -4677,3 +4677,54 @@ body { background: var(--ga-bg); }
   .tune-nav-tabs .nav-link,
   .ddl-nav-tabs .nav-link { border-radius: .75rem !important; }
 }
+
+/* Compact, keyboard-accessible navigation disclosures. */
+#sidebarMenu .pga-nav-section { margin: .2rem 0; }
+#sidebarMenu .pga-nav-group > summary,
+.pga-db-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: .65rem;
+}
+#sidebarMenu .pga-nav-group > summary::-webkit-details-marker,
+.pga-db-disclosure > summary::-webkit-details-marker { display: none; }
+#sidebarMenu .pga-nav-group > summary {
+  min-height: 44px;
+  padding: .65rem .75rem;
+  color: #c3d3e2;
+  font-size: .85rem;
+  font-weight: 600;
+}
+#sidebarMenu .pga-nav-group > summary:hover,
+#sidebarMenu .pga-nav-group[open] > summary { background: rgba(255,255,255,.06); color: #fff; }
+.pga-disclosure-arrow { margin-left: auto; font-size: .7rem; flex-shrink: 0; transition: transform .15s ease; }
+details[open] > summary > .pga-disclosure-arrow { transform: rotate(180deg); }
+#sidebarMenu .pga-nav-children { margin: .2rem 0 .6rem .95rem; padding-left: .4rem; border-left: 1px solid rgba(148,163,184,.24); }
+#sidebarMenu .pga-nav-children .nav-link { padding: .45rem .6rem; min-height: 40px; font-size: .82rem; border-radius: .5rem; }
+#sidebarMenu .pga-nav-children .sidebar-icon { width: 17px; min-width: 17px; }
+#sidebarMenu .pga-nav-children .sidebar-text { white-space: normal; }
+#sidebarMenu .pga-sidebar-db-panel.pga-db-disclosure { display: block; padding: 0; box-shadow: none; }
+.pga-db-disclosure > .pga-db-summary { padding: .65rem .75rem; min-height: 58px; }
+.pga-db-summary-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pga-db-summary-copy strong { font-size: .87rem; }
+.pga-db-summary-copy small { font-size: .73rem; opacity: .7; }
+.pga-db-summary-copy strong, .pga-db-summary-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pga-db-details { padding: .65rem .75rem; border-top: 1px solid rgba(148,163,184,.22); }
+.pga-db-details > * + * { margin-top: .65rem; }
+.pga-mobile-db-bar.pga-db-disclosure { padding: 0; }
+#sidebarMenu summary:focus-visible, .pga-db-disclosure summary:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .pga-disclosure-arrow { transition: none; } }
+
+/* Keep connection setup within a compact reading width. */
+.connect-page .connect-layout { max-width: 920px; margin: 0 auto; }
+.connect-page .connect-section-card .card-body { padding: 1.25rem; }
+.connect-page .connect-subtle-box { padding: .85rem; }
+.connect-page .connect-section-title { margin-bottom: .4rem; font-size: .8rem; }
+.connect-page .form-label { margin-bottom: .3rem; font-size: .83rem; }
+.connect-page .form-control, .connect-page .form-select { padding: .5rem .7rem; font-size: .875rem; }
+.connect-page .connect-actions { margin-top: 1rem; padding-top: .85rem; }
+.connect-page .tune-nav-tabs { margin-bottom: 0; }
+@media (max-width: 575.98px) { .connect-page .connect-section-card .card-body { padding: .85rem; } }

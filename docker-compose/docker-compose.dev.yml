@@ -18,6 +18,7 @@ services:
       - "8080:5005"
     environment:
       DEBUG: "True"
+      PGA_API_TOKEN: ${PGA_API_TOKEN:-}
     volumes:
       - ../apps:/home/pgassistant/apps
       - ../tests:/home/pgassistant/tests

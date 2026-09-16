@@ -255,6 +255,26 @@ For persistent settings, LLM configuration, Docker Compose, and database connect
 
 For a local source installation, see the [Python installation guide](https://beh74.github.io/pgassistant-blog/doc/startup_python/).
 
+## Integration API
+
+pgAssistant provides a versioned API for integrating its analysis and planning
+capabilities with automation platforms, database portals, CI/CD workflows, and
+other operational tools. These endpoints do not depend on a browser session and
+do not change the historical `/api/v1` routes.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/v2/pgtune` | Generate a PostgreSQL configuration baseline from explicit resources or an optional database connection. |
+| `POST /api/v2/executive-plan` | Run the advisors and return a prioritized, integration-friendly Executive Plan. |
+
+Authentication is optional and controlled by `PGA_API_TOKEN`. When configured,
+clients must send `Authorization: Bearer <token>`; when it is unset or empty,
+authentication is disabled.
+
+- [API v2 integration guide](docs/api-v2.md)
+- Swagger UI: `/api/v2/docs`
+- Machine-readable Swagger specification: `/api/v2/swagger.json`
+
 ## PostgreSQL access
 
 pgAssistant accepts standard libpq-compatible PostgreSQL connection URIs, including additional connection options:

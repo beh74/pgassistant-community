@@ -1,3 +1,10 @@
+## [3.8.1] - 2026-09-16
+
+- Add session-independent `POST /api/v2/pgtune` and `POST /api/v2/executive-plan` endpoints, optional Bearer authentication via `PGA_API_TOKEN`, Swagger UI at `/api/v2/docs`, and an API integration guide.
+- Reorganize navigation into collapsible Advisors, Query activity, Database explorer, and Settings menus, with direct access to Dashboard, Executive Plan, and Workload Insights.
+- Compact the connected-database panel and connection page, including expandable connection details on desktop and mobile.
+- Collector target selection: test the connection currently entered in the form, honor the URI, refresh matching targets when opening the Collector tab, and save the selection when connecting.
+
 ## [3.8.0] - 2026-09-09
 
 # Change Log

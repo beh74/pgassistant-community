@@ -1,7 +1,18 @@
 {% set panel_layout = panel_layout|default('sidebar') %}
 {% if session.get('db_host') and session.get('db_connected') %}
 {% if panel_layout == 'mobile' %}
-<div class="pga-mobile-db-bar d-lg-none" aria-label="Database connection">
+<details class="pga-mobile-db-bar pga-db-disclosure d-lg-none" aria-label="Database connection">
+  <summary class="pga-db-summary">
+    <span class="pga-conn-dot" aria-hidden="true"></span>
+    <span class="pga-db-summary-copy">
+      <strong title="{{ active_db if multi_db_filter and cluster_databases else session['db_name'] }}">{{ active_db if multi_db_filter and cluster_databases else session['db_name'] }}</strong>
+      <small title="{{ session['db_host'] }}">{{ session['db_host'] }}</small>
+    </span>
+    <i class="bi bi-chevron-down pga-disclosure-arrow" aria-hidden="true"></i>
+    <span class="visually-hidden">Connected. Show connection details</span>
+  </summary>
+  <div class="pga-db-details">
+
   <div class="pga-mobile-db-bar-top">
     <div class="pga-mobile-db-status">
       <span class="pga-conn-dot" aria-hidden="true"></span>
@@ -45,9 +56,21 @@
   </div>
   {% endif %}
 </div>
+</details>
 {% else %}
 <li class="nav-item pga-sidebar-db-wrap d-none d-lg-block">
-  <div class="pga-sidebar-db-panel">
+  <details class="pga-sidebar-db-panel pga-db-disclosure">
+  <summary class="pga-db-summary">
+    <span class="pga-conn-dot" aria-hidden="true"></span>
+    <span class="pga-db-summary-copy">
+      <strong title="{{ active_db if multi_db_filter and cluster_databases else session['db_name'] }}">{{ active_db if multi_db_filter and cluster_databases else session['db_name'] }}</strong>
+      <small title="{{ session['db_host'] }}">{{ session['db_host'] }}</small>
+    </span>
+    <i class="bi bi-chevron-down pga-disclosure-arrow" aria-hidden="true"></i>
+    <span class="visually-hidden">Connected. Show connection details</span>
+  </summary>
+  <div class="pga-db-details">
+
     <div class="pga-sidebar-db-head">
       <div class="pga-sidebar-db-status" title="Active PostgreSQL connection">
         <span class="pga-conn-dot" aria-hidden="true"></span>
@@ -110,6 +133,7 @@
       Connection settings
     </a>
   </div>
+  </details>
 </li>
 {% endif %}
 {% endif %}

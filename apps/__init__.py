@@ -26,6 +26,10 @@ def register_blueprints(app):
         module = import_module('apps.{}.routes'.format(module_name))
         app.register_blueprint(module.blueprint)
 
+    # Keep the versioned integration API independent from historical routes.
+    from apps.api_v2 import blueprint as api_v2_blueprint
+    app.register_blueprint(api_v2_blueprint)
+
 
 def configure_database(app):
 
