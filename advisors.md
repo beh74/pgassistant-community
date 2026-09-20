@@ -38,6 +38,12 @@ The advisor also uses query context such as:
 
 ### What It Detects
 
+Heuristic thresholds are centralized in `apps/home/index_advisor_thresholds.py`,
+grouped by decision type, with units and boundary semantics documented.
+Measured and estimated filtering thresholds remain separate so they can be
+maintained independently. PostgreSQL planner cost units are distinct from
+execution times in milliseconds.
+
 The Index Advisor looks for common query-level indexing opportunities:
 
 - expensive sequential scans that could benefit from an index;
@@ -46,6 +52,43 @@ The Index Advisor looks for common query-level indexing opportunities:
 - `ORDER BY` patterns where index order can reduce sorting work;
 - simple `GROUP BY` patterns where an index may help grouping;
 - cases where an existing index is used but may not fully cover the query shape.
+
+Sequential scan runtime is evaluated cumulatively (`Actual Total Time` multiplied
+by `Actual Loops`), so a cheap scan repeated many times is not dismissed as
+already fast. Existing table-size, selectivity and workload checks still apply.
+
+Supported filter predicates include comparisons, `IS NULL`, `IS NOT NULL`,
+simple `IN` lists, and `= ANY` with literal arrays, `ARRAY[...]` values or
+parameters. Quoted identifiers are preserved and escaped in generated SQL.
+For mixed `AND` filters, supported mandatory clauses can produce a `review`
+candidate; the explanation warns that overall filter selectivity does not
+establish the benefit of those clauses alone. `OR` branches are not extracted
+as mandatory predicates. Expressions, subquery lists, same-row comparisons,
+and unsupported string escape forms remain outside this conservative parser.
+Multi-value `IN`/`ANY` predicates are not treated as single equality keys for
+ORDER BY optimization.
+
+For `Index Scan`, `Index Only Scan`, and `Bitmap Heap Scan`, a selective residual
+filter can justify an alternative index. The advisor can add filter columns or
+move a residual equality column before a range or unconstrained B-tree key
+(for example, `(created_at, status)` to `(status, created_at)`). It does not
+recommend reordering equality columns alone. At most 30% of visited rows must
+survive the filter, with at least 100 discarded rows across all execution loops,
+and at least 1 ms of cumulative scan time or a significant query workload.
+An existing index covering the candidate suppresses the proposal. These
+alternatives are marked `review`: validate the benefit with `EXPLAIN ANALYZE`
+and consider storage and write overhead before creating the index.
+
+Without execution metrics (including `Generic plan`), a non-parallel Bitmap Heap
+Scan with one direct Bitmap Index Scan child can also produce a `review`
+recommendation on a non-small table. The advisor compares the index child's
+estimated rows with the heap scan's estimated rows: at most 50% must remain,
+with at least 100 rows estimated to be filtered. The explanation explicitly
+labels this as an estimate, not a measured gain. Parallel scans, BitmapAnd/Or,
+and scans with actual execution metrics do not use this fallback.
+The bitmap child's index name is shown in the recommendation, and alternative
+index SQL uses a suffix when its generated name is already used by a known
+index on the table.
 
 It also tries to avoid noisy recommendations. For example, it should not suggest an index when the plan already uses a suitable access path, when the table is too small to justify the index, or when a sort belongs to a grouping operation rather than to a standalone `ORDER BY` optimization.
 

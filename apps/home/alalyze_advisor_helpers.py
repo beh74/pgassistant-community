@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
 
+from . import index_advisor_thresholds as thresholds
 from . import database
 
 
@@ -46,6 +47,8 @@ class ScanFinding:
     parent_node_type: Optional[str] = None
     parent_relationship: Optional[str] = None
     index_def: Optional[str] = None
+    has_actual_metrics: bool = True
+    estimated_rows_before_filter: Optional[float] = None
 
 
 @dataclass
@@ -258,14 +261,22 @@ def walk_plan_collect_findings(
     # ------------------------------------------------------------
     if node_type in {"Seq Scan", "Index Scan", "Index Only Scan", "Bitmap Heap Scan"} \
        and node.get("Relation Name") and node.get("Schema"):
+        # Only a direct, single bitmap index child provides an unambiguous
+        # index identity and pre-filter estimate. Do not sum BitmapAnd/Or rows
+        # or compare parallel per-worker output with a global bitmap estimate.
+        bitmap_child = None
+        children = node.get("Plans", []) or []
+        if node_type == "Bitmap Heap Scan" and len(children) == 1:
+            if children[0].get("Node Type") == "Bitmap Index Scan":
+                bitmap_child = children[0]
         scan_findings.append(
             ScanFinding(
                 schema=node["Schema"],
                 table=node["Relation Name"],
                 alias=node.get("Alias"),
                 node_type=node_type,
-                index_name=node.get("Index Name"),
-                index_cond=node.get("Index Cond"),
+                index_name=node.get("Index Name") or (bitmap_child or {}).get("Index Name"),
+                index_cond=node.get("Index Cond") or (bitmap_child or {}).get("Index Cond"),
                 recheck_cond=node.get("Recheck Cond"),
                 filter_expr=node.get("Filter"),
                 actual_rows=float(node.get("Actual Rows", 0) or 0),
@@ -279,6 +290,12 @@ def walk_plan_collect_findings(
                 actual_total_time=float(node.get("Actual Total Time", 0) or 0),
                 parent_node_type=parent_node_type,
                 parent_relationship=node.get("Parent Relationship"),
+                has_actual_metrics="Actual Loops" in node,
+                estimated_rows_before_filter=(
+                    float(bitmap_child["Plan Rows"])
+                    if bitmap_child is not None and "Plan Rows" in bitmap_child
+                    and not node.get("Parallel Aware") else None
+                ),
             )
         )
 
@@ -526,7 +543,7 @@ def parse_index_columns(indexdef: str) -> List[str]:
     """
     Extract column names from a simple PostgreSQL index definition.
 
-    Parse très simple :
+    Simple definition format:
     CREATE INDEX ... ON schema.table USING btree (col1, col2)
     """
     m = re.search(r"\((.+)\)", indexdef)
@@ -745,7 +762,7 @@ def build_candidate_predicates_stats_reason(
     predicates: List[Dict[str, str]],
 ) -> str:
     """
-    Version enrichie qui montre aussi l'opérateur détecté pour chaque colonne.
+    Build a statistics summary including the detected operator for each column.
     """
     parts: List[str] = []
 
@@ -885,7 +902,7 @@ def estimate_selectivity_from_stats(
                     matched_freq += freq
 
             total_mcv_freq = sum(mcv_freqs)
-            if total_mcv_freq >= 0.80:
+            if total_mcv_freq >= thresholds.RANGE_SELECTIVITY_MIN_MCV_COVERAGE:
                 return max(0.0, min(matched_freq, 1.0 - null_frac))
 
     bounds = column_stats.histogram_bounds
@@ -929,12 +946,12 @@ def estimate_selectivity_from_stats(
 def has_large_row_estimation_gap(
     actual_rows: float,
     plan_rows: float,
-    threshold: float = 5.0,
+    threshold: float = thresholds.DEFAULT_ROW_ESTIMATION_GAP_FACTOR,
 ) -> tuple[bool, Optional[str]]:
     """
-    Détecte un écart significatif entre estimation planner et exécution réelle.
+    Detect a significant gap between planner row estimates and actual execution.
 
-    threshold = facteur multiplicatif (ex: 5 => x5 ou /5)
+    The threshold is a multiplicative factor (e.g. 5 means x5 or /5).
     """
     if plan_rows <= 0:
         return False, None
@@ -975,9 +992,9 @@ def find_index_definition(indexes: List[Dict[str, Any]], index_name: Optional[st
 
 def compute_row_estimation_ratio(plan_rows: float, actual_rows: float) -> Optional[float]:
     """
-    Retourne un ratio >= 1.0 représentant l'écart absolu entre estimation et réel.
+    Return a ratio >= 1.0 measuring the mismatch between estimated and actual rows.
 
-    Exemples:
+    Examples:
       plan=100, actual=100   -> 1.0
       plan=100, actual=1000  -> 10.0
       plan=1000, actual=100  -> 10.0
@@ -999,11 +1016,11 @@ def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
 
     abs_diff = actual_rows - plan_rows
 
-    if ratio <= 1.5:
+    if ratio <= thresholds.ROW_ESTIMATION_CLOSE_MAX_FACTOR:
         quality = "Planner row estimate is close to actual rows."
-    elif ratio <= 3.0:
+    elif ratio <= thresholds.ROW_ESTIMATION_MODERATE_MAX_FACTOR:
         quality = "Planner row estimate differs moderately from actual rows."
-    elif ratio <= 10.0:
+    elif ratio <= thresholds.ROW_ESTIMATION_LARGE_MAX_FACTOR:
         quality = "Planner row estimate differs significantly from actual rows."
     else:
         quality = "Planner row estimate differs very strongly from actual rows."
@@ -1017,11 +1034,11 @@ def build_row_estimation_reason(plan_rows: float, actual_rows: float) -> str:
 
 def is_small_table(meta: TableMeta) -> bool:
     """Return True when an index recommendation is unlikely to be worthwhile."""
-    if meta.relpages <= 8:
+    if meta.relpages <= thresholds.SMALL_TABLE_MAX_PAGES:
         return True
-    if meta.reltuples > 0 and meta.reltuples <= 1000:
+    if meta.reltuples > 0 and meta.reltuples <= thresholds.SMALL_TABLE_MAX_ROWS:
         return True
-    if meta.table_bytes <= 128 * 1024:
+    if meta.table_bytes <= thresholds.SMALL_TABLE_MAX_BYTES:
         return True
     return False
 
@@ -1045,7 +1062,7 @@ def is_full_relation_scan_without_predicate(finding: ScanFinding, meta: TableMet
     if rows <= 0:
         return False
 
-    return (rows / meta.reltuples) >= 0.50
+    return (rows / meta.reltuples) >= thresholds.FULL_SCAN_MIN_TABLE_FRACTION
 
 
 def build_no_filter_seq_scan_reason(finding: ScanFinding, meta: TableMeta) -> str:
@@ -1100,11 +1117,17 @@ def is_planned_scan_potentially_expensive(finding: ScanFinding, meta: TableMeta)
     if finding.actual_loops > 0:
         return False
 
-    if finding.total_cost >= 100.0:
+    if finding.total_cost >= thresholds.PLANNED_SCAN_MIN_COST:
         return True
 
     # Relative fallback for small databases where absolute costs are low.
-    if meta.relpages > 8 and finding.total_cost >= max(10.0, meta.relpages * 0.25):
+    if (
+        meta.relpages > thresholds.SMALL_TABLE_MAX_PAGES
+        and finding.total_cost >= max(
+            thresholds.PLANNED_SCAN_MIN_RELATIVE_COST,
+            meta.relpages * thresholds.PLANNED_SCAN_COST_PER_PAGE,
+        )
+    ):
         return True
 
     return False
@@ -1118,7 +1141,7 @@ def strip_outer_parentheses(expr: str) -> str:
         depth = 0
         balanced_outer = True
 
-        for i, ch in enumerate(expr):
+        for i, ch in enumerate(mask_sql_quotes(expr)):
             if ch == "(":
                 depth += 1
             elif ch == ")":
@@ -1136,49 +1159,40 @@ def strip_outer_parentheses(expr: str) -> str:
     return expr
 
 
-def split_top_level_and(expr: str) -> List[str]:
-    """Split an expression on top-level AND operators only."""
-    parts: List[str] = []
-    current: List[str] = []
+def mask_sql_quotes(expr: str) -> str:
+    """Hide quoted contents while preserving offsets for structural parsing.
+
+    Backslash escapes and dollar-quoted strings are deliberately unsupported;
+    callers reject them rather than guessing their SQL semantics.
+    """
+    return re.sub(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"",
+                  lambda match: " " * len(match.group()), expr)
+
+
+def split_top_level_boolean(expr: str, operator: str) -> List[str]:
+    """Split boolean operators outside parentheses, brackets and quoted text."""
+    masked = mask_sql_quotes(expr)
     depth = 0
-    i = 0
-    upper_expr = expr.upper()
-
-    while i < len(expr):
-        ch = expr[i]
-
-        if ch == "(":
+    start = 0
+    parts = []
+    for match in re.finditer(r"[()\[\]]|\b" + operator + r"\b", masked, re.IGNORECASE):
+        token = match.group()
+        if token in ("(", "["):
             depth += 1
-            current.append(ch)
-            i += 1
-            continue
-
-        if ch == ")":
+        elif token in (")", "]"):
             depth -= 1
-            current.append(ch)
-            i += 1
-            continue
-
-        if depth == 0 and upper_expr[i:i + 3] == "AND":
-            prev_ok = (i == 0) or expr[i - 1].isspace() or expr[i - 1] == ")"
-            next_ok = (i + 3 >= len(expr)) or expr[i + 3].isspace() or expr[i + 3] == "("
-
-            if prev_ok and next_ok:
-                part = "".join(current).strip()
-                if part:
-                    parts.append(part)
-                current = []
-                i += 3
-                continue
-
-        current.append(ch)
-        i += 1
-
-    tail = "".join(current).strip()
-    if tail:
-        parts.append(tail)
-
+        elif depth == 0:
+            parts.append(expr[start:match.start()].strip())
+            start = match.end()
+    parts.append(expr[start:].strip())
     return parts
+
+
+def split_top_level_and(expr: str) -> List[str]:
+    """Split top-level conjunctions without splitting an OR expression."""
+    if len(split_top_level_boolean(expr, "OR")) > 1:
+        return [expr]
+    return split_top_level_boolean(expr, "AND")
 
 
 def strip_trivial_lhs_casts(expr: str) -> str:
@@ -1202,146 +1216,100 @@ def strip_trivial_lhs_casts(expr: str) -> str:
     return expr
 
 
-def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:
-    """Extract simple single-table filter columns from an AND expression."""
+_SQL_IDENTIFIER = r'(?:"(?:[^"\n]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)'
+_SQL_COLUMN = rf'(?:(?P<prefix>{_SQL_IDENTIFIER})\s*\.\s*)?(?P<col>{_SQL_IDENTIFIER})'
+_SQL_CAST = r'(?:::\s*[A-Za-z_][A-Za-z0-9_.]*(?:\[\])?)*'
+_SQL_VALUE = rf"(?:'(?:[^']|'')*'|[-+]?\d+(?:\.\d+)?|\$\d+|TRUE|FALSE|NULL){_SQL_CAST}"
+
+
+def _decode_identifier(value: str) -> str:
+    return value[1:-1].replace('""', '"') if value.startswith('"') else value.lower()
+
+
+def parse_simple_filter_predicates(
+    filter_expr: str, alias: Optional[str], table: str,
+) -> tuple[List[Dict[str, str]], bool]:
+    """Return supported conjuncts and whether the entire filter was understood.
+
+    OR branches are never treated as mandatory predicates. Unsupported AND
+    clauses may be skipped, but their selectivity cannot be attributed to the
+    retained columns. IN/ANY are multi-value searches, not single equalities.
+    """
     expr = strip_outer_parentheses(filter_expr.strip())
+    if "\\" in expr or re.search(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$", expr):
+        return [], False
+    if len(split_top_level_boolean(expr, "OR")) > 1:
+        return [], False
     clauses = split_top_level_and(expr)
+    if len(clauses) > 1:
+        predicates = []
+        complete = True
+        for clause in clauses:
+            parsed, supported = parse_simple_filter_predicates(clause, alias, table)
+            predicates = merge_simple_predicates(predicates, parsed)
+            complete = complete and supported
+        return predicates, complete
 
-    cols: List[str] = []
-    op_pattern = re.compile(r"\s*(=|>=|<=|>|<|~~|LIKE|ILIKE)\s*", flags=re.IGNORECASE)
+    # Find the operator outside quotes; validate both operands in full below.
+    match = re.search(r"\bIS\s+NOT\s+NULL\b|\bIS\s+NULL\b|\bIN\b|>=|<=|=|>|<|~~|\bLIKE\b",
+                      mask_sql_quotes(expr), re.IGNORECASE)
+    if not match:
+        return [], False
+    lhs = strip_trivial_lhs_casts(expr[:match.start()].strip())
+    column = re.fullmatch(_SQL_COLUMN, lhs)
+    if not column:
+        return [], False
+    prefix = column.group("prefix")
+    if prefix and _decode_identifier(prefix) != (alias or table):
+        return [], False
+    operator = " ".join(match.group().upper().split())
+    rhs = expr[match.end():].strip()
+    if operator in {"IS NULL", "IS NOT NULL"}:
+        supported = not rhs
+    elif operator == "IN":
+        supported = bool(re.fullmatch(rf"\(\s*{_SQL_VALUE}(?:\s*,\s*{_SQL_VALUE})*\s*\)", rhs, re.IGNORECASE))
+    elif operator == "=" and re.match(r"ANY\s*\(", rhs, re.IGNORECASE):
+        operator = "ANY"
+        array_value = rf"(?:'(?:[^']|'')*'|\$\d+|ARRAY\s*\[\s*{_SQL_VALUE}(?:\s*,\s*{_SQL_VALUE})*\s*\]){_SQL_CAST}"
+        supported = bool(re.fullmatch(rf"ANY\s*\(\s*{array_value}\s*\)", rhs, re.IGNORECASE))
+    else:
+        supported = bool(re.fullmatch(_SQL_VALUE, rhs, re.IGNORECASE))
+        # A parameterized nested-loop condition can reference an outer alias.
+        outer_column = re.fullmatch(_SQL_COLUMN, rhs)
+        if outer_column and outer_column.group("prefix"):
+            supported = _decode_identifier(outer_column.group("prefix")) != (alias or table)
+    if not supported:
+        return [], False
+    return [{"column": _decode_identifier(column.group("col")), "operator": operator}], True
 
-    for clause in clauses:
-        clause = strip_outer_parentheses(clause)
 
-        m = op_pattern.search(clause)
-        if not m:
-            return []
-
-        lhs = clause[:m.start()].strip()
-        op = m.group(1).upper()
-
-        lhs = strip_trivial_lhs_casts(lhs)
-
-        lhs_match = re.match(
-            r'^(?:(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\.)?(?P<col>[A-Za-z_][A-Za-z0-9_]*)$',
-            lhs,
-            flags=re.IGNORECASE,
-        )
-        if not lhs_match:
-            return []
-
-        found_prefix = lhs_match.group("prefix")
-        col = lhs_match.group("col")
-
-        if alias and found_prefix and found_prefix != alias:
-            return []
-
-        if not alias and found_prefix and found_prefix != table:
-            return []
-
-        if op == "ILIKE":
-            return []
-
-        cols.append(col)
-
-    deduped: List[str] = []
-    for c in cols:
-        if c not in deduped:
-            deduped.append(c)
-
-    return deduped
+def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:
+    """Return columns from supported, mandatory filter predicates."""
+    return [p["column"] for p in extract_simple_filter_predicates(filter_expr, alias, table)]
 
 
 def extract_simple_filter_predicates(
-    filter_expr: str,
-    alias: Optional[str],
-    table: str,
+    filter_expr: str, alias: Optional[str], table: str,
 ) -> List[Dict[str, str]]:
-    """
-    Extrait des prédicats simples de type:
-      col = ...
-      col > ...
-      col >= ...
-      col < ...
-      col <= ...
-      col LIKE ...
-      col ~~ ...
-
-    Retourne une liste ordonnée:
-      [{"column": "a", "operator": "="}, {"column": "b", "operator": ">"}]
-    """
-    expr = strip_outer_parentheses(filter_expr.strip())
-    clauses = split_top_level_and(expr)
-
-    predicates: List[Dict[str, str]] = []
-    op_pattern = re.compile(r"\s*(=|>=|<=|>|<|~~|LIKE|ILIKE)\s*", flags=re.IGNORECASE)
-
-    for clause in clauses:
-        clause = strip_outer_parentheses(clause)
-
-        m = op_pattern.search(clause)
-        if not m:
-            return []
-
-        lhs = clause[:m.start()].strip()
-        op = m.group(1).upper()
-
-        lhs = strip_trivial_lhs_casts(lhs)
-
-        lhs_match = re.match(
-            r'^(?:(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\.)?(?P<col>[A-Za-z_][A-Za-z0-9_]*)$',
-            lhs,
-            flags=re.IGNORECASE,
-        )
-        if not lhs_match:
-            return []
-
-        found_prefix = lhs_match.group("prefix")
-        col = lhs_match.group("col")
-
-        if alias and found_prefix and found_prefix != alias:
-            return []
-
-        if not alias and found_prefix and found_prefix != table:
-            return []
-
-        if op == "ILIKE":
-            return []
-
-        predicates.append(
-            {
-                "column": col,
-                "operator": op,
-            }
-        )
-
-    deduped: List[Dict[str, str]] = []
-    seen = set()
-
-    for pred in predicates:
-        col = pred["column"]
-        if col not in seen:
-            deduped.append(pred)
-            seen.add(col)
-
-    return deduped
+    """Extract comparisons, null checks and simple IN/ANY searches from ANDs."""
+    return parse_simple_filter_predicates(filter_expr, alias, table)[0]
 
 
 def _operator_rank_for_btree(op: str) -> int:
     """
-    Heuristique simple d'ordre dans un index B-tree composite:
-    0 -> égalité
-    1 -> prefix LIKE / ~~ (conditionnelle)
-    2 -> range
+    Rank operators to order columns in a composite B-tree index:
+    0 -> equality or IS NULL
+    1 -> multi-value IN/ANY or prefix LIKE / ~~ (conditional)
+    2 -> range or IS NOT NULL
     9 -> fallback
     """
     op = (op or "").upper()
 
-    if op == "=":
+    if op in {"=", "IS NULL"}:
         return 0
-    if op in {"LIKE", "~~"}:
+    if op in {"LIKE", "~~", "IN", "ANY"}:
         return 1
-    if op in {">", ">=", "<", "<="}:
+    if op in {">", ">=", "<", "<=", "IS NOT NULL"}:
         return 2
     return 9
 
@@ -1351,10 +1319,10 @@ def _column_cardinality_score(
     table_rows: Optional[float] = None,
 ) -> float:
     """
-    Score plus grand = colonne plus discriminante.
-    Heuristique:
-    - n_distinct > 0 : cardinalité absolue estimée
-    - n_distinct < 0 : fraction de lignes distinctes (pg_stats convention)
+    Higher scores indicate more discriminating columns.
+    Heuristic:
+    - n_distinct > 0: estimated absolute cardinality
+    - n_distinct < 0: fraction of distinct rows (pg_stats convention)
     """
     if stats is None:
         return 0.0
@@ -1382,9 +1350,9 @@ def reorder_index_candidate_columns(
 ) -> List[str]:
     """
     Reorders candidate columns for a composite index:
-    - equality columns first
-    - then LIKE / ~~ prefix predicates
-    - then range predicates
+    - equality and IS NULL columns first
+    - then IN/ANY searches and LIKE / ~~ prefix predicates
+    - then range and IS NOT NULL predicates
     - within each group: descending estimated cardinality
     """
     if not predicates:
@@ -1400,7 +1368,7 @@ def reorder_index_candidate_columns(
         op_rank = _operator_rank_for_btree(op)
         cardinality = _column_cardinality_score(stats, table_rows)
 
-        # tri: operator asc, cardinality desc, original position asc
+        # Sort by operator ascending, cardinality descending, then original position.
         scored.append((op_rank, -cardinality, pos, col))
 
     scored.sort()
@@ -1489,11 +1457,32 @@ def candidate_adds_columns_to_used_index(
     return any(c not in used for c in candidate)
 
 
+def candidate_improves_index_key_order(
+    used_columns: List[str],
+    candidate_columns: List[str],
+    predicates: List[Dict[str, str]],
+    filter_predicates: List[Dict[str, str]],
+) -> bool:
+    """Recognize useful equality promotion, not arbitrary cardinality reordering."""
+    equality_columns = {p["column"] for p in predicates if p["operator"] == "="}
+    for predicate in filter_predicates:
+        column = predicate["column"]
+        if predicate["operator"] != "=" or column not in used_columns or column not in candidate_columns:
+            continue
+        old_prefix = used_columns[:used_columns.index(column)]
+        new_prefix = candidate_columns[:candidate_columns.index(column)]
+        if any(key not in equality_columns for key in old_prefix) and all(
+            key in equality_columns for key in new_prefix
+        ):
+            return True
+    return False
+
+
 def estimate_post_index_filter_fraction(finding: ScanFinding) -> Optional[float]:
     """
-    Fraction de lignes conservées après le Filter résiduel d'un accès indexé.
-    Plus la valeur est basse, plus l'index courant ramène des tuples qui sont
-    ensuite jetés par l'executor.
+    Return the fraction of rows kept after residual filtering on an indexed path.
+    Lower values mean that more tuples retrieved through the current index
+    are subsequently discarded by the executor.
     """
     visited_after_index = finding.actual_rows + finding.rows_removed_by_filter
     if visited_after_index <= 0:
@@ -1632,7 +1621,7 @@ def build_create_index_sql_with_order(
 
     for col in filter_columns or []:
         if col not in name_parts:
-            index_parts.append(f'"{col}"')
+            index_parts.append(quote_identifier(col))
             name_parts.append(col)
 
     for item in order_columns or []:
@@ -1644,12 +1633,12 @@ def build_create_index_sql_with_order(
         if direction not in {"ASC", "DESC"}:
             direction = "ASC"
 
-        index_parts.append(f'"{col}" {direction}')
+        index_parts.append(f'{quote_identifier(col)} {direction}')
         name_parts.append(f"{col}_{direction.lower()}")
 
     idx_name = f"pga_idx_{table}_{'_'.join(name_parts)}"
     cols_sql = ", ".join(index_parts)
-    return f'CREATE INDEX CONCURRENTLY "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
+    return f'CREATE INDEX CONCURRENTLY {quote_identifier(idx_name)} ON {quote_identifier(schema)}.{quote_identifier(table)} ({cols_sql});'
 
 
 def sort_spilled_to_disk(finding: OrderByFinding) -> bool:
@@ -1719,11 +1708,28 @@ def find_equivalent_index(indexes: List[Dict[str, Any]], candidate_columns: List
     return None
 
 
-def build_create_index_sql(schema: str, table: str, columns: List[str]) -> str:
+def quote_identifier(value: str) -> str:
+    """Quote a PostgreSQL identifier, including embedded double quotes."""
+    return '"' + value.replace('"', '""') + '"'
+
+
+def build_create_index_sql(
+    schema: str, table: str, columns: List[str],
+    existing_indexes: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     """Build a simple concurrent B-tree index creation statement."""
-    idx_name = f"pga_idx_{table}_{'_'.join(columns)}"
-    cols_sql = ", ".join(f'"{c}"' for c in columns)
-    return f'CREATE INDEX CONCURRENTLY "{idx_name}" ON "{schema}"."{table}" ({cols_sql});'
+    base_name = f"pga_idx_{table}_{'_'.join(columns)}"
+    # PostgreSQL identifiers are limited to 63 bytes. Keep the suffix within
+    # that limit, including when multibyte identifiers are used.
+    idx_name = base_name.encode("utf-8")[:63].decode("utf-8", errors="ignore")
+    existing_names = {idx.get("index_name") for idx in existing_indexes or []}
+    suffix_number = 2
+    while idx_name in existing_names:
+        suffix = f"_{suffix_number}"
+        idx_name = base_name.encode("utf-8")[:63 - len(suffix)].decode("utf-8", errors="ignore") + suffix
+        suffix_number += 1
+    cols_sql = ", ".join(quote_identifier(c) for c in columns)
+    return f'CREATE INDEX CONCURRENTLY {quote_identifier(idx_name)} ON {quote_identifier(schema)}.{quote_identifier(table)} ({cols_sql});'
 
 
 def is_high_workload(query_stats: Optional[QueryStats]) -> bool:
@@ -1731,7 +1737,7 @@ def is_high_workload(query_stats: Optional[QueryStats]) -> bool:
     if not query_stats:
         return False
     return (
-        query_stats.calls >= 1000
-        or query_stats.total_exec_time >= 5000
-        or query_stats.mean_exec_time >= 5
+        query_stats.calls >= thresholds.HIGH_WORKLOAD_MIN_CALLS
+        or query_stats.total_exec_time >= thresholds.HIGH_WORKLOAD_MIN_TOTAL_EXEC_TIME_MS
+        or query_stats.mean_exec_time >= thresholds.HIGH_WORKLOAD_MIN_MEAN_EXEC_TIME_MS
     )

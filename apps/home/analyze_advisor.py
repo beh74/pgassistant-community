@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
 
+from . import index_advisor_thresholds as thresholds
 from . import database
 from . import alalyze_advisor_helpers as helpers
 
@@ -224,10 +225,31 @@ def evaluate_scan_candidate(
 ) -> helpers.Recommendation:
     """Dispatch scan analysis to the Seq Scan or indexed-path evaluator."""
     if finding.node_type == "Seq Scan":
-        return evaluate_seq_scan_candidate(con, finding, meta, query_stats)
+        rec = evaluate_seq_scan_candidate(con, finding, meta, query_stats)
+    elif finding.node_type in {"Index Scan", "Index Only Scan", "Bitmap Heap Scan"}:
+        rec = evaluate_indexed_scan_candidate(con, finding, meta, query_stats)
+    else:
+        rec = None
 
-    if finding.node_type in {"Index Scan", "Index Only Scan", "Bitmap Heap Scan"}:
-        return evaluate_indexed_scan_candidate(con, finding, meta, query_stats)
+    if rec is not None:
+        if rec.create_index_sql and finding.filter_expr:
+            _, complete = helpers.parse_simple_filter_predicates(
+                finding.filter_expr, finding.alias, finding.table,
+            )
+            if not complete:
+                rec.confidence = "review"
+                rec.reason = (
+                    " A candidate index was identified from supported AND predicates."
+                    " The measured or estimated selectivity applies to the whole filter,"
+                    " including unsupported clauses; validate the candidate's benefit separately."
+                ).strip()
+        if rec.create_index_sql and finding.node_type == "Seq Scan" and finding.actual_loops > 1:
+            rec.reason += (
+                f" The sequential scan ran {finding.actual_loops:g} times:"
+                f" {finding.actual_total_time:g} ms per loop,"
+                f" {finding.actual_total_time * finding.actual_loops:g} ms cumulative node time."
+            )
+        return rec
 
     return helpers.Recommendation(
         schema=finding.schema,
@@ -272,7 +294,7 @@ def evaluate_indexed_scan_candidate(
             table=finding.table,
         )
 
-    # Bitmap Heap Scan peut porter la condition indexée dans Recheck Cond.
+    # Bitmap Heap Scan may expose the index condition in Recheck Cond.
     if not index_predicates and finding.recheck_cond:
         index_predicates = helpers.extract_simple_filter_predicates(
             finding.recheck_cond,
@@ -313,8 +335,10 @@ def evaluate_indexed_scan_candidate(
     row_gap_flag, row_gap_reason = helpers.has_large_row_estimation_gap(
         finding.actual_rows,
         finding.plan_rows,
-        threshold=3.0,
+        threshold=thresholds.INDEXED_ROW_ESTIMATION_GAP_FACTOR,
     )
+    if not finding.has_actual_metrics or finding.actual_loops <= 0:
+        row_gap_flag, row_gap_reason = False, None
 
     if finding.index_name:
         reason = f'{finding.node_type} already in use via index "{finding.index_name}".'
@@ -416,27 +440,62 @@ def evaluate_indexed_scan_candidate(
         used_index_columns,
         candidate_columns,
     )
+    improves_key_order = helpers.candidate_improves_index_key_order(
+        used_index_columns, candidate_columns, all_predicates, filter_predicates,
+    ) and bool(used_index_def and "USING btree" in used_index_def)
 
+    # EXPLAIN ANALYZE reports rows and time per loop. A cheap inner scan can
+    # still discard many tuples over the whole execution of a nested loop.
+    loops = finding.actual_loops
     filter_is_selective = (
-        post_index_filter_fraction is not None
-        and post_index_filter_fraction <= 0.30
-        and finding.rows_removed_by_filter >= max(100.0, finding.actual_rows * 2.0)
+        loops > 0
+        and post_index_filter_fraction is not None
+        and post_index_filter_fraction <= thresholds.INDEXED_FILTER_MAX_ACTUAL_KEPT_FRACTION
+        and finding.rows_removed_by_filter * loops >= thresholds.INDEXED_FILTER_MIN_REMOVED_ROWS
     )
 
-    meaningful_runtime = finding.actual_total_time >= 1.0 or helpers.is_high_workload(query_stats)
+    meaningful_runtime = (
+        finding.actual_total_time * loops >= thresholds.INDEXED_SCAN_MIN_TOTAL_TIME_MS
+        or helpers.is_high_workload(query_stats)
+    )
 
-    if adds_filter_columns and filter_is_selective and meaningful_runtime:
+    estimated_before = finding.estimated_rows_before_filter
+    estimated_filter_is_selective = (
+        not finding.has_actual_metrics
+        and estimated_before is not None
+        and estimated_before > 0
+        and 0 <= finding.plan_rows <= estimated_before * thresholds.INDEXED_FILTER_MAX_ESTIMATED_KEPT_FRACTION
+        and estimated_before - finding.plan_rows >= thresholds.INDEXED_FILTER_MIN_REMOVED_ROWS
+        and not helpers.is_small_table(meta)
+    )
+
+    if (adds_filter_columns or improves_key_order) and (
+        (filter_is_selective and meaningful_runtime) or estimated_filter_is_selective
+    ):
+        if estimated_filter_is_selective:
+            reason += (
+                f" The planner estimates {estimated_before:g} rows from the bitmap index "
+                f"but only {finding.plan_rows:g} rows after the residual Filter "
+                f"({finding.plan_rows / estimated_before:.1%} kept). "
+                "A composite index including the filter column(s) may reduce heap visits. "
+                "This recommendation is based on estimates only; the query was not executed."
+            )
+        else:
+            reason += (
+                " The current index is useful, but the residual Filter is still highly selective after "
+                "the index access; a composite index that includes the filter column(s) may reduce heap "
+                "visits and improve the execution plan."
+            )
+            if post_index_filter_reason:
+                reason += " " + post_index_filter_reason
+            reason += f" Across {loops:g} loop(s), {finding.rows_removed_by_filter * loops:g} tuples were filtered out."
+        if improves_key_order:
+            reason += " The candidate moves a residual equality column ahead of a range or unconstrained key in the current index."
         reason += (
-            " The current index is useful, but the residual Filter is still highly selective after "
-            "the index access; a composite index that includes the filter column(s) may reduce heap "
-            "visits and improve the execution plan."
+            " Validate the gain with EXPLAIN ANALYZE and account for extra storage and write cost before creating this index."
         )
-        if post_index_filter_reason:
-            reason += " " + post_index_filter_reason
 
         confidence = "review"
-        if len(candidate_columns) == 1:
-            confidence = "safe"
 
         return helpers.Recommendation(
             schema=finding.schema,
@@ -455,12 +514,16 @@ def evaluate_indexed_scan_candidate(
                 finding.schema,
                 finding.table,
                 candidate_columns,
+                existing_indexes=meta.indexes,
             ),
             stats_reason=stats_reason,
             row_estimation_reason=row_gap_reason,
         )
 
-    reason += " Existing indexed access path does not show enough residual-filter waste for a better-index recommendation."
+    if not finding.has_actual_metrics:
+        reason += " No execution metrics are available, and the plan estimates do not establish enough residual-filter waste for an alternative index."
+    else:
+        reason += " Existing indexed access path does not show enough residual-filter waste for a better-index recommendation."
     if post_index_filter_reason:
         reason += " " + post_index_filter_reason
     if row_gap_flag:
@@ -569,7 +632,7 @@ def evaluate_seq_scan_candidate(
     # can still reveal a poor access path that would hurt as soon as the outer
     # side returns rows. Do not classify it as "already very fast".
     if (
-        finding.actual_total_time < 1.0
+        finding.actual_total_time * finding.actual_loops < thresholds.SEQ_SCAN_MIN_TOTAL_TIME_MS
         and not planned_but_not_executed
         and not helpers.is_high_workload(query_stats)
     ):
@@ -633,7 +696,7 @@ def evaluate_seq_scan_candidate(
             row_estimation_reason=row_gap_reason,
         )
 
-    if selected_fraction >= 0.50:
+    if selected_fraction >= thresholds.SEQ_SCAN_MAX_SELECTED_FRACTION:
         return helpers.Recommendation(
             schema=finding.schema,
             table=finding.table,
@@ -794,7 +857,7 @@ def evaluate_seq_scan_candidate(
                 row_estimation_reason=row_gap_reason,
             )
 
-        if estimated_selectivity >= 0.20:
+        if estimated_selectivity >= thresholds.SINGLE_COLUMN_MAX_ESTIMATED_SELECTIVITY:
             return helpers.Recommendation(
                 schema=finding.schema,
                 table=finding.table,
@@ -1017,7 +1080,7 @@ def evaluate_order_by_candidate(
     sort_is_meaningful = (
         finding.has_limit
         or helpers.sort_spilled_to_disk(finding)
-        or finding.actual_total_time >= 1.0
+        or finding.actual_total_time >= thresholds.SORT_MIN_TIME_MS
         or helpers.is_high_workload(query_stats)
     )
 
@@ -1189,7 +1252,7 @@ def evaluate_group_by_candidate(
     group_is_meaningful = (
         finding.sort_method is not None
         or helpers.group_by_spilled_to_disk(finding)
-        or finding.actual_total_time >= 1.0
+        or finding.actual_total_time >= thresholds.GROUP_BY_MIN_TIME_MS
         or helpers.is_high_workload(query_stats)
     )
 

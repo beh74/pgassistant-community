@@ -1,3 +1,10 @@
+## [3.8.2] - 2026-09-20
+
+- Index Advisor: improve alternative index recommendations for existing indexed paths, including generic bitmap plans and cumulative scan costs across execution loops.
+- Support null checks, simple `IN`/`ANY` filters, quoted identifiers, and partial `AND` analysis with review-only recommendations.
+- Report the index used by bitmap scans and avoid generated index-name collisions with known table indexes.
+- Centralize index advisor thresholds
+
 ## [3.8.1] - 2026-09-16
 
 - Add session-independent `POST /api/v2/pgtune` and `POST /api/v2/executive-plan` endpoints, optional Bearer authentication via `PGA_API_TOKEN`, Swagger UI at `/api/v2/docs`, and an API integration guide.
