@@ -57,14 +57,20 @@ Sequential scan runtime is evaluated cumulatively (`Actual Total Time` multiplie
 by `Actual Loops`), so a cheap scan repeated many times is not dismissed as
 already fast. Existing table-size, selectivity and workload checks still apply.
 
-Supported filter predicates include comparisons, `IS NULL`, `IS NOT NULL`,
+Filter fragments are parsed with `pglast` inside a synthetic `SELECT ... WHERE`
+statement; no SQL is executed. Supported filter predicates include comparisons, `IS NULL`, `IS NOT NULL`,
 simple `IN` lists, and `= ANY` with literal arrays, `ARRAY[...]` values or
 parameters. Quoted identifiers are preserved and escaped in generated SQL.
 For mixed `AND` filters, supported mandatory clauses can produce a `review`
 candidate; the explanation warns that overall filter selectivity does not
 establish the benefit of those clauses alone. `OR` branches are not extracted
-as mandatory predicates. Expressions, subquery lists, same-row comparisons,
-and unsupported string escape forms remain outside this conservative parser.
+as mandatory predicates. Expression-index candidates, subquery lists and
+same-row comparisons remain unsupported. PostgreSQL string literals, quoted
+identifiers, casts and comments are handled by the native grammar.
+Internal EXPLAIN references such as `SubPlan` and `InitPlan` are not SQL:
+on a parse error, a conservative lexer-based fallback recovers independent
+`AND` clauses and marks the result as partial. Ambiguous boolean structures
+are skipped rather than interpreted approximately.
 Multi-value `IN`/`ANY` predicates are not treated as single equality keys for
 ORDER BY optimization.
 

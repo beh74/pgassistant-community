@@ -5,6 +5,9 @@ import re
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
 
+from pglast import ast, enums, parse_sql, scan
+from pglast.parser import ParseError
+
 from . import index_advisor_thresholds as thresholds
 from . import database
 
@@ -1169,32 +1172,6 @@ def mask_sql_quotes(expr: str) -> str:
                   lambda match: " " * len(match.group()), expr)
 
 
-def split_top_level_boolean(expr: str, operator: str) -> List[str]:
-    """Split boolean operators outside parentheses, brackets and quoted text."""
-    masked = mask_sql_quotes(expr)
-    depth = 0
-    start = 0
-    parts = []
-    for match in re.finditer(r"[()\[\]]|\b" + operator + r"\b", masked, re.IGNORECASE):
-        token = match.group()
-        if token in ("(", "["):
-            depth += 1
-        elif token in (")", "]"):
-            depth -= 1
-        elif depth == 0:
-            parts.append(expr[start:match.start()].strip())
-            start = match.end()
-    parts.append(expr[start:].strip())
-    return parts
-
-
-def split_top_level_and(expr: str) -> List[str]:
-    """Split top-level conjunctions without splitting an OR expression."""
-    if len(split_top_level_boolean(expr, "OR")) > 1:
-        return [expr]
-    return split_top_level_boolean(expr, "AND")
-
-
 def strip_trivial_lhs_casts(expr: str) -> str:
     """Remove simple casts around the left side of a predicate."""
     expr = expr.strip()
@@ -1216,71 +1193,185 @@ def strip_trivial_lhs_casts(expr: str) -> str:
     return expr
 
 
-_SQL_IDENTIFIER = r'(?:"(?:[^"\n]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)'
-_SQL_COLUMN = rf'(?:(?P<prefix>{_SQL_IDENTIFIER})\s*\.\s*)?(?P<col>{_SQL_IDENTIFIER})'
-_SQL_CAST = r'(?:::\s*[A-Za-z_][A-Za-z0-9_.]*(?:\[\])?)*'
-_SQL_VALUE = rf"(?:'(?:[^']|'')*'|[-+]?\d+(?:\.\d+)?|\$\d+|TRUE|FALSE|NULL){_SQL_CAST}"
+def _unwrap_filter_cast(node):
+    """Preserve existing handling of explicit casts around simple operands."""
+    while isinstance(node, ast.TypeCast):
+        node = node.arg
+    return node
 
 
-def _decode_identifier(value: str) -> str:
-    return value[1:-1].replace('""', '"') if value.startswith('"') else value.lower()
+def _filter_column_parts(node) -> Optional[List[str]]:
+    node = _unwrap_filter_cast(node)
+    if not isinstance(node, ast.ColumnRef) or len(node.fields) not in (1, 2):
+        return None
+    if not all(isinstance(field, ast.String) for field in node.fields):
+        return None
+    return [field.sval for field in node.fields]
+
+
+def _is_filter_value(node) -> bool:
+    """Accept literals and parameters, not functions or same-row expressions."""
+    node = _unwrap_filter_cast(node)
+    # A sign outside a cast is represented as a unary operator, not A_Const.
+    if isinstance(node, ast.A_Expr) and node.kind == enums.A_Expr_Kind.AEXPR_OP:
+        return (
+            node.lexpr is None and len(node.name or ()) == 1
+            and isinstance(node.name[0], ast.String) and node.name[0].sval in {"+", "-"}
+            and _is_filter_value(node.rexpr)
+        )
+    return isinstance(node, (ast.A_Const, ast.ParamRef))
+
+
+def _filter_predicates_from_ast(node, relation: str) -> tuple[List[Dict[str, str]], bool]:
+    """Extract only mandatory predicates; retain the existing output contract."""
+    if isinstance(node, ast.BoolExpr):
+        if node.boolop != enums.BoolExprType.AND_EXPR:
+            return [], False
+        predicates = []
+        complete = True
+        for child in node.args:
+            parsed, supported = _filter_predicates_from_ast(child, relation)
+            predicates = merge_simple_predicates(predicates, parsed)
+            complete = complete and supported
+        return predicates, complete
+
+    if isinstance(node, ast.NullTest):
+        if node.argisrow:
+            return [], False
+        column = _filter_column_parts(node.arg)
+        operator = "IS NULL" if node.nulltesttype == enums.NullTestType.IS_NULL else "IS NOT NULL"
+    elif isinstance(node, ast.A_Expr):
+        if len(node.name or ()) != 1 or not isinstance(node.name[0], ast.String):
+            return [], False
+        operator = node.name[0].sval
+        column = _filter_column_parts(node.lexpr)
+        if node.kind == enums.A_Expr_Kind.AEXPR_IN and operator == "=":
+            if not isinstance(node.rexpr, tuple) or not node.rexpr or not all(
+                _is_filter_value(value) for value in node.rexpr
+            ):
+                return [], False
+            operator = "IN"
+        elif node.kind == enums.A_Expr_Kind.AEXPR_OP_ANY and operator == "=":
+            value = _unwrap_filter_cast(node.rexpr)
+            if isinstance(value, ast.A_ArrayExpr):
+                supported = all(_is_filter_value(item) for item in value.elements or ())
+            else:
+                supported = isinstance(value, ast.ParamRef) or (
+                    isinstance(value, ast.A_Const) and isinstance(value.val, ast.String)
+                )
+            if not supported:
+                return [], False
+            operator = "ANY"
+        elif node.kind in (enums.A_Expr_Kind.AEXPR_OP, enums.A_Expr_Kind.AEXPR_LIKE):
+            if operator not in {"=", ">", ">=", "<", "<=", "~~"}:
+                return [], False
+            outer_column = _filter_column_parts(node.rexpr)
+            if not _is_filter_value(node.rexpr) and not (
+                outer_column and len(outer_column) == 2 and outer_column[0] != relation
+            ):
+                return [], False
+        else:
+            return [], False
+    else:
+        return [], False
+
+    if not column or (len(column) == 2 and column[0] != relation):
+        return [], False
+    return [{"column": column[-1], "operator": operator}], True
+
+
+def _split_explain_subplan_conjuncts(expr: str) -> List[str]:
+    """Recover AND clauses only after a parse failure involving a subplan.
+
+    PostgreSQL's lexer protects literals, quoted names and comments. Reject
+    ambiguous top-level constructs rather than inventing an expression tree.
+    Token offsets from pglast.scan refer to Python string character positions.
+    """
+    try:
+        tokens = [token for token in scan(expr) if token.name not in {"SQL_COMMENT", "C_COMMENT"}]
+    except ParseError:
+        return []
+    if any(token.name == "ASCII_59" for token in tokens):
+        return []
+    has_subplan = any(
+        token.name == "IDENT"
+        and expr[token.start:token.end + 1].lower() in {"subplan", "initplan"}
+        and tokens[pos + 1].name == "ICONST"
+        for pos, token in enumerate(tokens[:-1])
+    )
+    if not has_subplan:
+        return []
+
+    # Strip only parentheses that enclose the entire token stream.
+    while tokens and tokens[0].name == "ASCII_40" and tokens[-1].name == "ASCII_41":
+        depth = 0
+        for pos, token in enumerate(tokens):
+            if token.name == "ASCII_40":
+                depth += 1
+            elif token.name == "ASCII_41":
+                depth -= 1
+            if depth == 0:
+                break
+        if pos != len(tokens) - 1:
+            break
+        tokens = tokens[1:-1]
+    if not tokens:
+        return []
+
+    stack = []
+    separators = []
+    pairs = {"ASCII_41": "ASCII_40", "ASCII_93": "ASCII_91"}
+    for token in tokens:
+        if token.name in {"ASCII_40", "ASCII_91"}:
+            stack.append(token.name)
+        elif token.name in pairs:
+            if not stack or stack.pop() != pairs[token.name]:
+                return []
+        elif not stack:
+            if token.name in {"OR", "CASE", "BETWEEN"}:
+                return []
+            if token.name == "AND":
+                separators.append(token)
+    if stack or not separators:
+        return []
+    parts = []
+    start = tokens[0].start
+    for separator in separators:
+        parts.append(expr[start:separator.start].strip())
+        start = separator.end + 1
+    parts.append(expr[start:tokens[-1].end + 1].strip())
+    return parts if all(parts) else []
 
 
 def parse_simple_filter_predicates(
     filter_expr: str, alias: Optional[str], table: str,
 ) -> tuple[List[Dict[str, str]], bool]:
-    """Return supported conjuncts and whether the entire filter was understood.
+    """Parse an EXPLAIN filter with PostgreSQL's grammar without executing SQL.
 
-    OR branches are never treated as mandatory predicates. Unsupported AND
-    clauses may be skipped, but their selectivity cannot be attributed to the
-    retained columns. IN/ANY are multi-value searches, not single equalities.
+    Wrapping the fragment provides statement syntax, not catalog resolution.
+    Unsupported AST nodes are ignored only within mandatory AND conjuncts.
+    Internal SubPlan/InitPlan displays are not SQL; a lexer-based fallback can
+    recover their independent AND siblings, always marking the result partial.
     """
-    expr = strip_outer_parentheses(filter_expr.strip())
-    if "\\" in expr or re.search(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$", expr):
-        return [], False
-    if len(split_top_level_boolean(expr, "OR")) > 1:
-        return [], False
-    clauses = split_top_level_and(expr)
-    if len(clauses) > 1:
+    try:
+        statements = parse_sql(f"SELECT 1 WHERE ({filter_expr})")
+    except ParseError:
         predicates = []
-        complete = True
-        for clause in clauses:
-            parsed, supported = parse_simple_filter_predicates(clause, alias, table)
+        for clause in _split_explain_subplan_conjuncts(filter_expr):
+            parsed, _ = parse_simple_filter_predicates(clause, alias, table)
             predicates = merge_simple_predicates(predicates, parsed)
-            complete = complete and supported
-        return predicates, complete
-
-    # Find the operator outside quotes; validate both operands in full below.
-    match = re.search(r"\bIS\s+NOT\s+NULL\b|\bIS\s+NULL\b|\bIN\b|>=|<=|=|>|<|~~|\bLIKE\b",
-                      mask_sql_quotes(expr), re.IGNORECASE)
-    if not match:
+        return predicates, False
+    if len(statements) != 1 or not isinstance(statements[0].stmt, ast.SelectStmt):
         return [], False
-    lhs = strip_trivial_lhs_casts(expr[:match.start()].strip())
-    column = re.fullmatch(_SQL_COLUMN, lhs)
-    if not column:
+    statement = statements[0].stmt
+    # Reject fragments that escape the WHERE wrapper and add statement clauses.
+    if any(getattr(statement, field, None) for field in (
+        "fromClause", "intoClause", "groupClause", "havingClause", "windowClause",
+        "sortClause", "limitOffset", "limitCount", "lockingClause", "withClause",
+        "larg", "rarg", "valuesLists",
+    )) or len(statement.targetList or ()) != 1:
         return [], False
-    prefix = column.group("prefix")
-    if prefix and _decode_identifier(prefix) != (alias or table):
-        return [], False
-    operator = " ".join(match.group().upper().split())
-    rhs = expr[match.end():].strip()
-    if operator in {"IS NULL", "IS NOT NULL"}:
-        supported = not rhs
-    elif operator == "IN":
-        supported = bool(re.fullmatch(rf"\(\s*{_SQL_VALUE}(?:\s*,\s*{_SQL_VALUE})*\s*\)", rhs, re.IGNORECASE))
-    elif operator == "=" and re.match(r"ANY\s*\(", rhs, re.IGNORECASE):
-        operator = "ANY"
-        array_value = rf"(?:'(?:[^']|'')*'|\$\d+|ARRAY\s*\[\s*{_SQL_VALUE}(?:\s*,\s*{_SQL_VALUE})*\s*\]){_SQL_CAST}"
-        supported = bool(re.fullmatch(rf"ANY\s*\(\s*{array_value}\s*\)", rhs, re.IGNORECASE))
-    else:
-        supported = bool(re.fullmatch(_SQL_VALUE, rhs, re.IGNORECASE))
-        # A parameterized nested-loop condition can reference an outer alias.
-        outer_column = re.fullmatch(_SQL_COLUMN, rhs)
-        if outer_column and outer_column.group("prefix"):
-            supported = _decode_identifier(outer_column.group("prefix")) != (alias or table)
-    if not supported:
-        return [], False
-    return [{"column": _decode_identifier(column.group("col")), "operator": operator}], True
+    return _filter_predicates_from_ast(statement.whereClause, alias or table)
 
 
 def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:

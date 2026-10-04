@@ -1,3 +1,10 @@
+## [3.8.3] - 2026-10-04
+
+- Index Advisor : use pg_last in fuction parse_simple_filter_predicates for better filter parsing.
+- Correct Issue 22 : https://github.com/beh74/pgassistant-community/issues/22
+- DB Design : add Generate PDF Report
+- api v2 : add a route to generate the executive plan PDF Report (/api/v2/executive-plan/report.pdf) 
+
 ## [3.8.2] - 2026-09-20
 
 - Index Advisor: improve alternative index recommendations for existing indexed paths, including generic bitmap plans and cumulative scan costs across execution loops.

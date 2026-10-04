@@ -266,6 +266,7 @@ do not change the historical `/api/v1` routes.
 | --- | --- |
 | `POST /api/v2/pgtune` | Generate a PostgreSQL configuration baseline from explicit resources or an optional database connection. |
 | `POST /api/v2/executive-plan` | Run the advisors and return a prioritized, integration-friendly Executive Plan. |
+| `POST /api/v2/executive-plan/report.pdf` | Download the Workload Insight PDF for DEV, OPS, or both, optionally including AI DB Design analysis. |
 
 Authentication is optional and controlled by `PGA_API_TOKEN`. When configured,
 clients must send `Authorization: Bearer <token>`; when it is unset or empty,

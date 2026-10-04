@@ -103,6 +103,70 @@ class SimpleFilterParsingTest(unittest.TestCase):
         self.assertIn('("a""b")', sql)
         self.assertIn('"pga_idx_orders_a""b"', sql)
 
+    def test_postgresql_literals_casts_and_comments(self):
+        for expression in (
+            "o.id = -1.25::numeric(10,2)",
+            "o.id = DATE '2026-09-23'",
+            "o.id = E'it\\'s AND (OR)'",
+            "o.id = $value$AND ' OR ($value$",
+            "o.id /* OR o.code = 3 */ = $1",
+        ):
+            with self.subTest(expression=expression):
+                self.assertEqual(self.parse(expression),
+                                 ([{"column": "id", "operator": "="}], True))
+
+    def test_subplan_conjuncts_preserve_supported_siblings(self):
+        for fragment in (
+            "(NOT (hashed SubPlan 1))",
+            "(ALL (o.code < (SubPlan 1).col1))",
+            "(o.code = (InitPlan 1).col1)",
+            "(NOT (ANY (o.code = (hashed SubPlan 1).col1)))",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertEqual(self.parse(fragment), ([], False))
+                self.assertEqual(self.parse(f"((o.id = 1) AND {fragment})"),
+                                 ([{"column": "id", "operator": "="}], False))
+
+    def test_subplan_fallback_uses_lexer_for_quotes_comments_and_unicode(self):
+        for expression in (
+            '"o"."café" = $$AND (OR)$$ AND (SubPlan 1)',
+            '"o"."café" = 1 /* OR */ AND (SubPlan 1)',
+            '"o"."café" = E\'a\\\' AND b\' AND (SubPlan 1)',
+        ):
+            with self.subTest(expression=expression):
+                self.assertEqual(self.parse(expression),
+                                 ([{"column": "café", "operator": "="}], False))
+
+    def test_subplan_fallback_never_extracts_optional_branches(self):
+        for expression in (
+            "o.id = 1 OR (SubPlan 1)",
+            "NOT (o.id = 1 AND (SubPlan 1))",
+            "CASE WHEN o.id = 1 AND (SubPlan 1) THEN true ELSE false END",
+            "o.id BETWEEN 1 AND 3 AND (SubPlan 1)",
+            "(o.id = 1 AND (SubPlan 1)",
+        ):
+            with self.subTest(expression=expression):
+                self.assertEqual(self.parse(expression), ([], False))
+        self.assertEqual(self.parse("o.id=1 AND (o.code=2 OR (SubPlan 1))"),
+                         ([{"column": "id", "operator": "="}], False))
+        self.assertEqual(self.parse("o.id=1 AND (o.code=2 AND (SubPlan 1))"),
+                         ([{"column": "id", "operator": "="},
+                           {"column": "code", "operator": "="}], False))
+
+    def test_rejects_statement_fragments_and_invalid_sql(self):
+        for expression in ("", "o.id =", "o.id=1); SELECT 2; --",
+                           "o.id=1) ORDER BY 1 --", "o.id=1 AND ("):
+            with self.subTest(expression=expression):
+                self.assertEqual(self.parse(expression), ([], False))
+
+    def test_preserves_outer_alias_and_rejects_expression_indexes(self):
+        self.assertEqual(self.parse("o.id = other.id"),
+                         ([{"column": "id", "operator": "="}], True))
+        for expression in ("lower(o.name) = 'x'", "o.id + 1 = 2",
+                           "o.id = random()", "o.id = ANY(ARRAY[o.code])"):
+            with self.subTest(expression=expression):
+                self.assertEqual(self.parse(expression), ([], False))
+
 
 def _stats(column, n_distinct):
     return helpers.ColumnStats(

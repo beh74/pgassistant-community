@@ -297,6 +297,41 @@ The `errors` array contains advisor-level failures. pgAssistant can return
 `status: "ok"` with a useful partial plan when one advisor is unavailable, so
 integrations should inspect both `status` and `errors`.
 
+## Workload Insight PDF report
+
+`POST /api/v2/executive-plan/report.pdf` generates the same PDF as the web
+report form, without requiring a browser session. It runs the advisors against
+the supplied database and uses the shared Executive Plan PDF renderer.
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `database_uri` | Yes | PostgreSQL connection URI. |
+| `teams` | Yes | Non-empty array containing `"DEV"`, `"OPS"`, or both. Shared `DEV_OPS` tasks are included for either selection. |
+| `include_db_design` | No | JSON boolean, default `false`. Adds **Include AI DB Design analysis**, using the server's configured LLM and the current database schema/workload. |
+
+```bash
+curl --fail-with-body --request POST \
+  'http://localhost:8080/api/v2/executive-plan/report.pdf' \
+  --header 'Authorization: Bearer YOUR_API_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "database_uri": "postgresql://user:password@postgres:5432/application",
+    "teams": ["DEV", "OPS"],
+    "include_db_design": true
+  }' \
+  --output executive-plan.pdf
+```
+
+Omit the Authorization header when `PGA_API_TOKEN` is not configured. Success
+returns `200`, `Content-Type: application/pdf`, and an attachment filename such
+as `pgassistant-executive-plan-application.pdf`. Errors return JSON with the
+status codes below, rather than a PDF; check the status before opening the file.
+
+Generation is synchronous and can take several minutes. The AI option makes an
+additional LLM request; if it fails or returns empty output, the request fails
+instead of silently omitting the requested analysis. Use `false` to generate a
+report without any LLM call.
+
 ## HTTP status codes
 
 | Status | Meaning |

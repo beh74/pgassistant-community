@@ -441,6 +441,34 @@
   box-shadow: 0 9px 18px rgba(15, 23, 42, .15);
 }
 
+.table-card-footer .table-action-btn:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.table-action-tooltip .tooltip-inner {
+  max-width: 260px;
+  padding: .65rem .85rem;
+  border-radius: .65rem;
+  background-color: #0f172a;
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 500;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .2);
+}
+
+.table-action-tooltip.bs-tooltip-top .tooltip-arrow::before {
+  border-top-color: #0f172a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-card-footer .table-action-btn {
+    transition: none;
+    transform: none;
+  }
+}
+
 .table-action-rfc { color: #fff; background: #2563eb; border-color: #2563eb; }
 .table-action-rfc:hover, .table-action-rfc:focus-visible { background: #1d4ed8; border-color: #1d4ed8; }
 .table-action-conventions { color: #0f766e; background: #ecfdf5; border-color: #99f6e4; }
@@ -1065,7 +1093,7 @@
                 <a
                   class="btn table-action-btn table-action-rfc"
                   href="/table_llm/{{ schema|urlencode }}/{{ table|urlencode }}"
-                  title="Check RFC"
+                  title="Check RFC — Review table design against PostgreSQL best practices"
                   aria-label="Check RFC for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-check2-circle" aria-hidden="true"></i>
@@ -1074,7 +1102,7 @@
                 <a
                   class="btn table-action-btn table-action-conventions"
                   href="/table_llm_guidelines/{{ schema|urlencode }}/{{ table|urlencode }}"
-                  title="Check conventions"
+                  title="Check conventions — Review naming and design conventions"
                   aria-label="Check conventions for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-list-check" aria-hidden="true"></i>
@@ -1089,7 +1117,7 @@
                   data-bs-target="#tableIndexStatsModal"
                   data-schema-name="{{ schema|e }}"
                   data-table-name="{{ table|e }}"
-                  title="Index stats"
+                  title="Index statistics — Inspect index usage, size, and definitions"
                   aria-label="Show index statistics for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
@@ -1098,7 +1126,7 @@
                 <a
                   class="btn table-action-btn table-action-queries table-relative-queries-btn"
                   href="/topqueries.html?schema={{ schema|urlencode }}&amp;tablename={{ table|urlencode }}"
-                  title="Relative queries"
+                  title="Related queries — Explore queries that use this table"
                   aria-label="Show relative queries for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-code-square" aria-hidden="true"></i>
@@ -1111,7 +1139,7 @@
                   data-bs-target="#tableColumnUsageModal"
                   data-schema-name="{{ schema|e }}"
                   data-table-name="{{ table|e }}"
-                  title="Column usage"
+                  title="Column usage — See how queries use each column"
                   aria-label="Show column usage for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-columns-gap" aria-hidden="true"></i>
@@ -1124,7 +1152,7 @@
                   data-bs-target="#tableColumnStatsModal"
                   data-schema-name="{{ schema|e }}"
                   data-table-name="{{ table|e }}"
-                  title="Column statistics"
+                  title="Column statistics — Inspect nulls, distinct values, and value distribution"
                   aria-label="Show pg_stats column statistics for {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-distribute-vertical" aria-hidden="true"></i>
@@ -1133,7 +1161,7 @@
                 <a
                   class="btn table-action-btn table-action-tetris table-tetris-btn"
                   href="/table_tetris/{{ schema|urlencode }}/{{ table|urlencode }}"
-                  title="Play Tetris"
+                  title="Play Tetris — Explore column ordering and row storage"
                   aria-label="Play Tetris with {{ schema|e }}.{{ table|e }}"
                 >
                   <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
@@ -1449,6 +1477,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
   tooltipTriggerList.forEach(function (tooltipTriggerEl) {
     new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+
+  // Initialize separately to preserve data-bs-toggle="modal" on action buttons.
+  document.querySelectorAll(".table-card-footer .table-action-btn").forEach(function (button) {
+    const tooltip = new bootstrap.Tooltip(button, {
+      container: "body",
+      placement: "top",
+      trigger: "hover focus",
+      delay: { show: 150, hide: 100 },
+      customClass: "table-action-tooltip"
+    });
+    button.addEventListener("click", function () { tooltip.hide(); });
+    button.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") tooltip.hide();
+    });
   });
 
   const searchInput = document.getElementById("table-search");

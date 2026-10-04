@@ -113,6 +113,14 @@ class IndexedScanTests(unittest.TestCase):
         self.assertIn("whole filter", rec.reason)
         self.assertIsNotNone(rec.create_index_sql)
 
+    def test_internal_subplan_keeps_partial_candidate_as_review(self):
+        rec = self.evaluate(node_type="Seq Scan", index_name=None, index_cond=None,
+                            filter_expr="b = 7 AND (NOT (hashed SubPlan 1))")
+        self.assertEqual(rec.confidence, "review")
+        self.assertEqual(rec.candidate_columns, ["b"])
+        self.assertIn("whole filter", rec.reason)
+        self.assertIsNotNone(rec.create_index_sql)
+
     def test_or_filter_does_not_produce_a_scan_candidate(self):
         rec = self.evaluate(node_type="Seq Scan", index_name=None, index_cond=None,
                             filter_expr="b = 7 OR c = 8")

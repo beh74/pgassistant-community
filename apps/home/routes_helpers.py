@@ -9,6 +9,7 @@ from . import config
 from . import collector_history
 from . import analyze_param
 from . import database
+from . import database_design
 from . import llm
 from . import pgstat_helper
 from . import pgtune
@@ -235,6 +236,8 @@ def handle_dashboard_get(segment: str):
     if not is_db_connected(session):
         return redirect("/database.html")
     dbinfo = database.get_db_info(session)
+    if dbinfo.get("error"):
+        return _connection_error_response(dbinfo["error"])
     architecture_conn, architecture_status = database.connectdb(session)
     if architecture_conn is not None and architecture_status == "OK":
         try:
@@ -460,26 +463,10 @@ def handle_database_analyze_llm_post(template: str, segment: str):
     if not session.get("db_name"):
         return redirect("/database.html")
 
-    llm_prompt = request.form.get("llm_prompt", "").strip()
-
-    if not llm_prompt:
-        conn, status = database.connectdb(session)
-        if conn is None or status != "OK":
-            return render_template("home/page-500.html", err=status, traceback_text=status), 500
-        try:
-            table_workload = query_table_stats.load_top_table_workload(
-                session,
-                limit=None,
-            )
-            result = schema_helper.get_database_schema_llm_context(
-                conn,
-                table_workload=table_workload,
-            )
-            llm_prompt = result.get("llm_prompt", "")
-        finally:
-            conn.close()
-
     try:
+        llm_prompt = database_design.get_analysis_prompt(
+            session, request.form.get("llm_prompt", ""),
+        )
         chatgpt_response = llm.query_chatgpt(llm_prompt)
     except Exception as e1:
         return render_template("home/page-500.html", err=e1, traceback_text=str(e1)), 500

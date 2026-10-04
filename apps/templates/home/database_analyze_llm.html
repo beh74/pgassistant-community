@@ -268,9 +268,16 @@
               <i class="bi bi-stars me-1"></i>Analyze with LLM
             </button>
           </form>
+          <form method="POST" action="{{ url_for('home_blueprint.database_design_report_route') }}" target="_blank" id="schemaReportForm" class="d-inline">
+            <input type="hidden" name="llm_prompt" id="schemaReportPrompt">
+            <button type="submit" class="btn btn-outline-primary" aria-describedby="schemaReportHelp">
+              <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generate PDF Report
+            </button>
+          </form>
         </div>
       </div>
       <div class="schema-llm-card-body">
+        <p class="small text-muted" id="schemaReportHelp">The PDF contains only the LLM analysis, using the current prompt. Generation opens in a new tab and may take a few minutes.</p>
         <pre id="mermaidSource" class="d-none"></pre>
         <div class="schema-mermaid-toolbar">
           <div class="schema-size-legend">
@@ -362,6 +369,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const graph = document.getElementById("schemaMermaidGraph");
   const promptInput = document.getElementById("llmPromptInput");
   const promptTextarea = document.getElementById("schemaPromptTextarea");
+  const reportForm = document.getElementById("schemaReportForm");
   const contextPreview = document.getElementById("schemaContextPreview");
   const copyPromptBtn = document.getElementById("copyPromptBtn");
   const copyMermaidBtn = document.getElementById("copyMermaidBtn");
@@ -487,6 +495,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   promptTextarea.addEventListener("input", function () {
     promptInput.value = promptTextarea.value;
+  });
+
+  reportForm.addEventListener("submit", function () {
+    document.getElementById("schemaReportPrompt").value = promptTextarea.value;
   });
 
   analyzeForm.addEventListener("submit", function () {

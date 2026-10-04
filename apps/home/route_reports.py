@@ -8,14 +8,14 @@ from apps.home import blueprint
 from flask import jsonify, redirect, render_template, request, send_file, session
 
 from . import database
+from . import database_design
 from . import collector_history
 from . import executive_plan
-from . import executive_plan_pdf
+from . import executive_plan_report
 from . import global_advisor
 from . import llm
-from . import query_table_stats
+from . import report_pdf
 from . import reporting
-from . import schema_helper
 
 @blueprint.route('/executive-plan.html', methods=['GET'])
 def executive_plan_route():
@@ -66,44 +66,42 @@ def executive_plan_report_route():
         return jsonify({"error": "Select at least one team."}), 400
 
     try:
-        plan = executive_plan.build_executive_plan(session)
-        db_design_markdown = None
-        if request.form.get("include_db_design") == "1":
-            conn, status = database.connectdb(session)
-            if conn is None or status != "OK":
-                raise RuntimeError(status or "Unable to connect to the database.")
-            try:
-                table_workload = query_table_stats.load_top_table_workload(
-                    session,
-                    limit=None,
-                )
-                schema_context = schema_helper.get_database_schema_llm_context(
-                    conn,
-                    table_workload=table_workload,
-                )
-            finally:
-                conn.close()
-            db_design_markdown = llm.query_chatgpt(
-                schema_context.get("llm_prompt", ""),
-                render_html=False,
-            )
+        pdf = executive_plan_report.build_report(
+            session, teams, include_db_design=request.form.get("include_db_design") == "1",
+        )
+        return _download_pdf(pdf, "executive-plan")
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print(tb)
+        return render_template('home/page-500.html', err=exc, traceback_text=tb), 500
 
-        pdf = executive_plan_pdf.build_executive_plan_pdf(
-            plan,
-            teams,
-            db_design_markdown=db_design_markdown,
+
+def _download_pdf(pdf, report_name):
+    database_name = database.get_resolved_database_name(session) or "database"
+    safe_database_name = "".join(
+        character if character.isalnum() or character in {"-", "_"} else "-"
+        for character in database_name
+    )
+    return send_file(
+        pdf, mimetype="application/pdf", as_attachment=True,
+        download_name=f"pgassistant-{report_name}-{safe_database_name}.pdf",
+    )
+
+
+@blueprint.route('/database-analyze/report.pdf', methods=['POST'])
+def database_design_report_route():
+    if not session.get("db_connected"):
+        return redirect("/database.html")
+
+    try:
+        prompt = database_design.get_analysis_prompt(
+            session, request.form.get("llm_prompt", ""),
         )
-        database_name = database.get_resolved_database_name(session) or "database"
-        safe_database_name = "".join(
-            character if character.isalnum() or character in {"-", "_"} else "-"
-            for character in database_name
+        analysis = llm.query_chatgpt(prompt, render_html=False)
+        pdf = report_pdf.build_database_design_pdf(
+            database.get_resolved_database_name(session), analysis,
         )
-        return send_file(
-            pdf,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name=f"pgassistant-executive-plan-{safe_database_name}.pdf",
-        )
+        return _download_pdf(pdf, "database-design")
     except Exception as exc:
         tb = traceback.format_exc()
         print(tb)
