@@ -1,3 +1,11 @@
+## [3.8.4] - 2026-10-05
+
+## Bug fixes
+
+- pgTune: align the maximum memory accepted in MB with the existing 9999 GB limit (10,238,976 MB), allowing automatically detected Docker/host memory above 9999 MB while preserving the 512 MB minimum.
+
+- Workload Insights: measure calls and call-weighted execution time between consecutive collections, excluding new, missing, ambiguous and reset counters. Compare intervals on a shared query population, expose coverage, duration and calls/minute, and preserve comparisons across period filters. First collections are baselines, not historical activity. The Collector API is unchanged.
+
 ## [3.8.3] - 2026-10-04
 
 - Index Advisor : use pg_last in fuction parse_simple_filter_predicates for better filter parsing.

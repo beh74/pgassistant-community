@@ -311,10 +311,19 @@ correction.
 
 Workload Insights compares consecutive periodic measurements—not a real-time
 monitoring stream. It correlates recommendation changes with execution time,
-call volume, query type, PostgreSQL version and settings changes, and the queries
+interval call counts, query type, PostgreSQL version and settings changes, and the queries
 with the largest workload impact. This provides evidence about what changed after
 a decision while preserving the distinction between correlation, a
 no-longer-detected finding, and a confirmed deployment.
+
+Workload Insights measures calls and call-weighted execution time between consecutive
+collections using comparable query counters in the collected top 50. New, missing,
+ambiguous and visibly reset counters are excluded. The first collection is a baseline;
+two measured intervals are needed for a percentage comparison. Percentages compare
+only queries shared by both intervals. Coverage, interval duration and calls/minute
+are displayed alongside the measurements. These are observed ranking statistics,
+not database-wide totals; resets whose counters have already caught up cannot be
+detected from the available snapshots alone.
 
 The collector connection is opened in read-only mode. A dedicated read-only
 PostgreSQL role is recommended.

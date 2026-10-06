@@ -4,6 +4,8 @@
 KB_IN_KB=1
 MB_IN_KB=1024
 GB_IN_KB=$((1024*1024))
+MAX_MEMORY_GB=9999
+MAX_MEMORY_MB=$((MAX_MEMORY_GB * 1024))
 
 show_help() {
 cat << EOF
@@ -20,7 +22,7 @@ It produces a postgresql.conf file based on supplied parameters.
                       accepted values: web, oltp, dw, desktop, mixed
                       default value: web
   -m TOTAL_MEM        (optional) how much memory can PostgreSQL use
-                      accepted values: integer with unit ("MB" or "GB") between 1 and 9999 and greater than 512MB
+                      accepted values: integer from 512 to ${MAX_MEMORY_MB} MB or 1 to ${MAX_MEMORY_GB} GB (e.g. 512MB, 16GB)
                       default value: this script will try to determine the total memory and exit in case of failure
   -u CPU_COUNT        (optional) number of CPUs, which PostgreSQL can use
                       accepted values: integer between 1 and 9999
@@ -367,14 +369,14 @@ while getopts "hv:t:m:u:c:s:" opt; do
       m=$OPTARG
       if [[ $m == *"MB"* ]]; then
         ram=${m%"MB"}
-        if [ "$ram" -lt "512" ] || [ "$ram" -gt "9999" ]; then
-          _input_error "total memory in MB must be >= 512MB and <= 9999MB"
+        if [ "$ram" -lt "512" ] || [ "$ram" -gt "$MAX_MEMORY_MB" ]; then
+          _input_error "total memory in MB must be >= 512MB and <= ${MAX_MEMORY_MB}MB"
         fi
         ram=$(( ram * MB_IN_KB ))
       elif [[ $m == *"GB"* ]]; then
         ram=${m%"GB"}
-        if [ "$ram" -lt "1" ] || [ "$ram" -gt "9999" ]; then
-          _input_error "total memory in GB must be >= 1GB and <= 9999GB"
+        if [ "$ram" -lt "1" ] || [ "$ram" -gt "$MAX_MEMORY_GB" ]; then
+          _input_error "total memory in GB must be >= 1GB and <= ${MAX_MEMORY_GB}GB"
         fi
         ram=$(( ram * GB_IN_KB ))
       else

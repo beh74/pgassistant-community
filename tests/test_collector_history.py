@@ -70,41 +70,80 @@ class CollectorHistoryTests(unittest.TestCase):
         self.assertEqual(_query_statement_type("VACUUM orders"), "OTHERS")
         self.assertEqual(_query_statement_type("not valid sql"), "OTHERS")
 
-    def test_collection_timeline_uses_workload_as_primary_axis(self):
-        start = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
-        workload = [
-            {"run_id": "run-1", "collected_at": start, "queryid": "42",
-             "calls": 100, "total_exec_time_ms": 1000, "query": "select 42"},
-            {"run_id": "run-2", "collected_at": start + timedelta(hours=1),
-             "queryid": "42", "calls": 110, "total_exec_time_ms": 1200,
-             "query": "select 42"},
-            {"run_id": "run-3", "collected_at": start + timedelta(hours=2),
-             "queryid": "42", "calls": 120, "total_exec_time_ms": 1250,
-             "query": "select 42"},
-        ]
-        recommendations = [
-            {"run_id": "run-1", "finding_fingerprint": "finding", "title": "Tune query",
-             "query_ids": ["42"]},
-            {"run_id": "run-2", "finding_fingerprint": "finding", "title": "Tune query",
-             "query_ids": ["42"]},
-        ]
+    def timeline(self, samples, hours=None, days=None):
+        start = datetime(2026, 10, 6, tzinfo=timezone.utc)
+        rows = []
+        for i, sample in enumerate(samples):
+            for key, calls, time in sample:
+                rows.append({"run_id": str(i), "collected_at": start + timedelta(hours=hours[i] if hours else i),
+                             "queryid": key, "calls": calls, "total_exec_time_ms": time, "query": "SELECT 1"})
+        return _build_collection_timeline(rows, [], [], days=days)
 
-        result = _build_collection_timeline(
-            workload, recommendations, [], days=None
-        )
+    def test_seven_active_queries_do_not_get_diluted_by_43_idle_queries(self):
+        samples = [[(str(k), 10000 + (500*i if k < 7 else 0),
+                     100000 + (500*i*2 if k < 7 else 0)) for k in range(50)] for i in range(3)]
+        points = self.timeline(samples)
+        self.assertIsNone(points[0]["workload"]["calls"])
+        self.assertIsNone(points[0]["workload"]["statement_calls"])
+        self.assertIsNone(points[1]["workload"]["calls_change_pct"])
+        value = points[2]["workload"]
+        self.assertEqual(value["calls"], 3500)
+        self.assertEqual(value["average_time_ms"], 2)
+        self.assertEqual(value["active_queries"], 7)
+        self.assertEqual(value["coverage"]["comparable_queries"], 50)
+        self.assertEqual(value["statement_calls"]["SELECT"], 3500)
+        self.assertEqual(value["calls_change_pct"], 0)
+        self.assertEqual(value["change_pct"], 0)
 
-        self.assertEqual([point["run_id"] for point in result], ["run-1", "run-2", "run-3"])
-        self.assertEqual(result[0]["workload"]["average_time_ms"], 10)
-        self.assertEqual(result[1]["workload"]["average_time_ms"], 20)
-        self.assertEqual(result[2]["workload"]["average_time_ms"], 5)
-        self.assertEqual(result[2]["workload"]["change_pct"], -75)
-        self.assertEqual(result[1]["workload"]["calls_change_pct"], -90)
-        self.assertEqual(result[1]["workload"]["active_queries_change_pct"], 0)
-        self.assertEqual(result[0]["workload"]["statement_calls"]["SELECT"], 100)
-        self.assertEqual(result[1]["workload"]["statement_calls"]["SELECT"], 10)
-        resolved = result[2]["recommendations"]["no_longer_detected"][0]
-        self.assertEqual(resolved["status"], "no_longer_detected")
-        self.assertEqual(resolved["query_impacts"][0]["change_pct"], -75)
+    def test_comparison_uses_shared_queries_not_changed_ranking(self):
+        points = self.timeline([
+            [("a", 100, 1000), ("b", 100, 1000)],
+            [("a", 110, 1020), ("b", 200, 1900), ("c", 10000, 90000)],
+            [("a", 120, 1060), ("c", 11000, 100000)],
+        ])
+        value = points[2]["workload"]
+        self.assertEqual(value["calls"], 1010)
+        self.assertEqual(value["comparison"]["query_count"], 1)
+        self.assertEqual(value["comparison"]["calls"], 10)
+        self.assertEqual(value["comparison"]["previous_calls"], 10)
+        self.assertEqual(value["calls_change_pct"], 0)
+        self.assertEqual(value["change_pct"], 100)
+        self.assertEqual(value["coverage"]["exclusions"]["missing"], 1)
+
+    def test_reset_gap_and_returning_queries_are_excluded(self):
+        points = self.timeline([
+            [("a", 100, 1000)], [("a", 5, 50)],
+            [("b", 50, 500)], [("a", 20, 200)], [("a", 30, 220)],
+        ])
+        self.assertIsNone(points[1]["workload"]["calls"])
+        self.assertEqual(points[1]["workload"]["coverage"]["exclusions"]["reset_or_invalid"], 1)
+        self.assertIsNone(points[3]["workload"]["calls"])
+        self.assertEqual(points[4]["workload"]["calls"], 10)
+        self.assertIsNone(points[4]["workload"]["calls_change_pct"])
+
+    def test_zero_activity_and_unequal_durations(self):
+        points = self.timeline([[('a', 10, 100)], [('a', 20, 120)], [('a', 30, 140)]], hours=[0, 1, 3])
+        self.assertEqual(points[2]['workload']['calls_change_pct'], 0)
+        self.assertEqual(points[2]['workload']['calls_per_minute_change_pct'], -50)
+        idle = self.timeline([[('a', 10, 100)], [('a', 10, 100)], [('a', 20, 120)]])
+        self.assertEqual(idle[1]['workload']['calls'], 0)
+        self.assertIsNone(idle[1]['workload']['average_time_ms'])
+        self.assertIsNone(idle[2]['workload']['calls_change_pct'])
+        self.assertIsNone(idle[2]['workload']['change_pct'])
+
+    def test_collection_period_filter_preserves_comparisons(self):
+        samples = [[('a', 100+i*10, 1000+i*20)] for i in range(5)]
+        complete = self.timeline(samples, hours=[0, 24, 48, 72, 96])
+        filtered = self.timeline(samples, hours=[0, 24, 48, 72, 96], days=1)
+        self.assertEqual(filtered, complete[2:])
+
+    def test_duplicate_ids_and_invalid_counters_are_not_measured(self):
+        points = self.timeline([[('a', 10, 100), ('b', 10, 100)],
+                                [('a', 20, 200), ('a', 30, 300), ('b', 10, 150)]])
+        value = points[1]['workload']
+        self.assertIsNone(value['calls'])
+        self.assertEqual(value['coverage']['exclusions']['ambiguous'], 2)
+        self.assertEqual(value['coverage']['exclusions']['reset_or_invalid'], 1)
 
     def test_collection_timeline_exposes_recommendation_details(self):
         collected_at = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
@@ -123,27 +162,16 @@ class CollectorHistoryTests(unittest.TestCase):
         self.assertIn("CREATE INDEX", recommendation["recommendation_sql"])
 
     def test_collection_timeline_ranks_query_changes_by_weighted_workload_impact(self):
-        start = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
-        workload = [
-            {"run_id": "run-1", "collected_at": start, "queryid": "small",
-             "calls": 100, "total_exec_time_ms": 1000, "query": "select 1"},
-            {"run_id": "run-1", "collected_at": start, "queryid": "large",
-             "calls": 100, "total_exec_time_ms": 1000, "query": "select 2"},
-            {"run_id": "run-2", "collected_at": start + timedelta(hours=1),
-             "queryid": "small", "calls": 101, "total_exec_time_ms": 1020,
-             "query": "select 1"},
-            {"run_id": "run-2", "collected_at": start + timedelta(hours=1),
-             "queryid": "large", "calls": 1100, "total_exec_time_ms": 12000,
-             "query": "select 2"},
-        ]
-
-        result = _build_collection_timeline(workload, [], [], days=None)
-
-        changes = result[1]["workload"]["query_changes"]
-        self.assertEqual([item["queryid"] for item in changes], ["large"])
-        self.assertEqual(changes[0]["impact_time_ms"], 1000)
-        self.assertEqual(changes[0]["total_time_ms"], 11000)
-        self.assertAlmostEqual(changes[0]["workload_share_pct"], 99.82, places=2)
+        points = self.timeline([
+            [('small', 100, 1000), ('large', 100, 1000)],
+            [('small', 101, 1010), ('large', 1100, 11000)],
+            [('small', 102, 1030), ('large', 2100, 22000)],
+        ])
+        changes = points[2]['workload']['query_changes']
+        self.assertEqual([item['queryid'] for item in changes], ['large'])
+        self.assertEqual(changes[0]['impact_time_ms'], 1000)
+        self.assertEqual(changes[0]['total_time_ms'], 11000)
+        self.assertEqual(changes[0]['workload_share_pct'], 99.82)
 
     def test_correlates_exact_run_before_temporal_and_builds_trend(self):
         now = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)

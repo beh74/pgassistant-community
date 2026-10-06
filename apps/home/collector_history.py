@@ -1180,12 +1180,80 @@ def _query_statement_type(query_sql: Any) -> str:
     }.get(type(statement), "OTHERS")
 
 
+def _workload_interval(current, previous, previous_interval, elapsed, previous_elapsed):
+    """Measure consecutive snapshots and compare only a shared query population."""
+    from math import isfinite
+
+    def counters(rows):
+        result, duplicates = {}, set()
+        for row in rows:
+            key = str(row.get("queryid") or "")
+            if key in result:
+                duplicates.add(key)
+            result[key] = row
+        return {key: row for key, row in result.items() if key and key not in duplicates}
+
+    def change(now, before):
+        return round((now - before) * 100 / before, 2) if now is not None and before not in (None, 0) else None
+
+    now, before = counters(current), counters(previous)
+    intervals = {}
+    excluded = {"new_or_returning": 0, "reset_or_invalid": 0, "missing": len(before.keys() - now.keys()),
+                "ambiguous": len(current) - len(now)}
+    for key, row in now.items():
+        if key not in before:
+            excluded["new_or_returning"] += 1
+            continue
+        values = [row.get("calls"), row.get("total_exec_time_ms"),
+                  before[key].get("calls"), before[key].get("total_exec_time_ms")]
+        if any(v is None or not isfinite(float(v)) or v < 0 for v in values):
+            excluded["reset_or_invalid"] += 1
+            continue
+        calls, time = values[0] - values[2], float(values[1] - values[3])
+        if calls < 0 or time < 0 or (calls == 0 and time != 0):
+            excluded["reset_or_invalid"] += 1
+            continue
+        intervals[key] = {"calls": calls, "time": time, "row": row}
+    available = bool(previous) and bool(intervals) and elapsed > 0
+    calls = sum(item["calls"] for item in intervals.values())
+    total = sum(item["time"] for item in intervals.values())
+    shared = intervals.keys() & previous_interval.keys()
+    current_calls = sum(intervals[k]["calls"] for k in shared)
+    prior_calls = sum(previous_interval[k]["calls"] for k in shared)
+    current_time = sum(intervals[k]["time"] for k in shared)
+    prior_time = sum(previous_interval[k]["time"] for k in shared)
+    current_average = current_time / current_calls if current_calls else None
+    prior_average = prior_time / prior_calls if prior_calls else None
+    current_rate = current_calls * 60 / elapsed if available else None
+    prior_rate = prior_calls * 60 / previous_elapsed if previous_elapsed else None
+    metrics = {
+        "calls": calls if available else None,
+        "total_time_ms": round(total, 2) if available else None,
+        "average_time_ms": round(total / calls, 4) if available and calls else None,
+        "calls_per_minute": round(calls * 60 / elapsed, 2) if available else None,
+        "calls_change_pct": change(current_calls, prior_calls) if shared else None,
+        "change_pct": change(current_average, prior_average) if shared else None,
+        "calls_per_minute_change_pct": change(current_rate, prior_rate) if shared else None,
+        "active_queries": sum(item["calls"] > 0 for item in intervals.values()) if available else None,
+        "active_queries_change_pct": None,
+        "interval_seconds": elapsed,
+        "status": "baseline" if not previous else "partial" if sum(excluded.values()) else "ok",
+        "coverage": {"ranked_queries": len(current), "comparable_queries": len(intervals),
+                     "excluded_queries": sum(excluded.values()), "exclusions": excluded},
+        "comparison": {"query_count": len(shared), "calls": current_calls if shared else None,
+                       "previous_calls": prior_calls if shared else None,
+                       "average_time_ms": current_average, "previous_average_time_ms": prior_average},
+    }
+    return metrics, intervals
+
+
 def _build_collection_timeline(
     workload_rows: Iterable[dict[str, Any]],
     recommendation_rows: Iterable[dict[str, Any]],
     environment_history: Iterable[dict[str, Any]],
     *, days: int | None,
 ) -> list[dict[str, Any]]:
+    """Aggregate valid consecutive query deltas before applying the display period."""
     workload = sorted(
         (dict(row) for row in workload_rows),
         key=lambda row: (row.get("collected_at"), str(row.get("queryid") or "")),
@@ -1193,14 +1261,9 @@ def _build_collection_timeline(
     timestamps = sorted({row.get("collected_at") for row in workload if row.get("collected_at")})
     if not timestamps:
         return []
-    if days is not None:
-        cutoff = timestamps[-1] - timedelta(days=days)
-        first_visible = next((index for index, stamp in enumerate(timestamps) if stamp >= cutoff), 0)
-        timestamps = timestamps[max(0, first_visible - 1):]
-    visible = set(timestamps)
     rows_by_time: dict[Any, list[dict[str, Any]]] = {}
     for row in workload:
-        if row.get("collected_at") in visible:
+        if row.get("collected_at"):
             rows_by_time.setdefault(row["collected_at"], []).append(row)
 
     recommendations_by_run: dict[str, dict[str, dict[str, Any]]] = {}
@@ -1213,84 +1276,39 @@ def _build_collection_timeline(
         str(item.get("run_id") or ""): item for item in environment_history
     }
 
-    previous_counters: dict[str, dict[str, Any]] = {}
-    previous_intervals: dict[str, float] = {}
-    previous_recommendations: dict[str, dict[str, Any]] = {}
-    previous_global_average = None
-    previous_global_calls = None
-    previous_active_queries = None
+    previous_rows = []
+    previous_interval = {}
+    previous_stamp = None
+    previous_elapsed = None
+    previous_recommendations = {}
     timeline = []
     for stamp in timestamps:
         snapshot_rows = rows_by_time.get(stamp, [])
         run_id = str(snapshot_rows[0].get("run_id") or "") if snapshot_rows else ""
-        interval_queries = {}
-        interval_calls = interval_time = 0.0
-        statement_calls = {
-            "SELECT": 0.0, "INSERT": 0.0, "UPDATE": 0.0,
-            "DELETE": 0.0, "OTHERS": 0.0,
-        }
-        for row in snapshot_rows:
-            queryid = str(row.get("queryid") or "")
-            calls = _number_or_none(row.get("calls"))
-            total_time = _number_or_none(row.get("total_exec_time_ms"))
-            previous = previous_counters.get(queryid)
-            average = None
-            interval_query_calls = None
-            if previous is None and calls is not None and total_time is not None and calls > 0:
-                average = float(total_time) / float(calls)
-                interval_query_calls = float(calls)
-                interval_calls += float(calls)
-                interval_time += float(total_time)
-            if previous and None not in (calls, total_time, previous.get("calls"), previous.get("time")):
-                delta_calls = float(calls) - float(previous["calls"])
-                delta_time = float(total_time) - float(previous["time"])
-                if delta_calls > 0 and delta_time >= 0:
-                    average = delta_time / delta_calls
-                    interval_query_calls = delta_calls
-                    interval_calls += delta_calls
-                    interval_time += delta_time
-            if average is not None:
-                statement_type = _query_statement_type(
-                    row.get("query_sql") if "query_sql" in row else row.get("query")
-                )
-                statement_calls[statement_type] += float(interval_query_calls)
-                prior_average = previous_intervals.get(queryid)
-                change_pct = (
-                    (average - prior_average) * 100 / prior_average
-                    if prior_average is not None and prior_average > 0 else None
-                )
-                interval_queries[queryid] = {
-                    "queryid": queryid,
-                    "sql": row.get("query_sql") if "query_sql" in row else row.get("query"),
-                    "average_time_ms": round(average, 4),
-                    "calls": round(interval_query_calls, 2),
-                    "total_time_ms": round(average * interval_query_calls, 2),
-                    "change_pct": round(change_pct, 2) if change_pct is not None else None,
-                    "impact_time_ms": (
-                        round(abs(average - prior_average) * interval_query_calls, 2)
-                        if prior_average is not None else None
-                    ),
-                }
-                previous_intervals[queryid] = average
-            if calls is not None and total_time is not None:
-                previous_counters[queryid] = {"calls": calls, "time": total_time}
-
-        global_average = interval_time / interval_calls if interval_calls > 0 else None
-        global_change = (
-            (global_average - previous_global_average) * 100 / previous_global_average
-            if global_average is not None and previous_global_average not in (None, 0) else None
+        elapsed = (stamp - previous_stamp).total_seconds() if previous_stamp else None
+        metrics, intervals = _workload_interval(
+            snapshot_rows, previous_rows, previous_interval, elapsed, previous_elapsed
         )
-        if global_average is not None:
-            previous_global_average = global_average
-        active_query_count = len(interval_queries)
-        calls_change = (
-            (interval_calls - previous_global_calls) * 100 / previous_global_calls
-            if previous_global_calls not in (None, 0) else None
-        )
-        active_queries_change = (
-            (active_query_count - previous_active_queries) * 100 / previous_active_queries
-            if previous_active_queries not in (None, 0) else None
-        )
+        metrics["interval_start"] = previous_stamp
+        metrics["interval_end"] = stamp
+        snapshot_time = sum(item["time"] for item in intervals.values())
+        snapshot_queries = {}
+        statement_calls = dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE", "OTHERS"), 0)
+        for queryid, item in intervals.items():
+            calls, total, row = item["calls"], item["time"], item["row"]
+            if not calls:
+                continue
+            average = total / calls
+            prior = previous_interval.get(queryid)
+            prior_average = prior["time"] / prior["calls"] if prior and prior["calls"] else None
+            sql = row.get("query_sql", row.get("query"))
+            statement_calls[_query_statement_type(sql)] += calls
+            snapshot_queries[queryid] = {
+                "queryid": queryid, "sql": sql, "calls": calls,
+                "total_time_ms": round(total, 2), "average_time_ms": round(average, 4),
+                "change_pct": round((average - prior_average) * 100 / prior_average, 2) if prior_average else None,
+                "impact_time_ms": round(abs(average - prior_average) * calls, 2) if prior_average is not None else None,
+            }
 
         current_recommendations = recommendations_by_run.get(run_id, {})
         new_fingerprints = current_recommendations.keys() - previous_recommendations.keys()
@@ -1298,7 +1316,7 @@ def _build_collection_timeline(
         def recommendation_event(row: dict[str, Any], status: str) -> dict[str, Any]:
             query_impacts = []
             for queryid in _normalize_query_ids(row.get("query_ids")):
-                impact = interval_queries.get(queryid)
+                impact = snapshot_queries.get(queryid)
                 query_impacts.append({
                     "queryid": queryid,
                     "average_time_ms": impact.get("average_time_ms") if impact else None,
@@ -1317,14 +1335,14 @@ def _build_collection_timeline(
             recommendation_event(previous_recommendations[key], "no_longer_detected")
             for key in resolved_fingerprints
         ]
-        for item in interval_queries.values():
+        for item in snapshot_queries.values():
             item["workload_share_pct"] = (
-                round(item["total_time_ms"] * 100 / interval_time, 2)
-                if interval_time > 0 else None
+                round(item["total_time_ms"] * 100 / snapshot_time, 2)
+                if snapshot_time > 0 else None
             )
         ranked_changes = sorted(
             (
-                item for item in interval_queries.values()
+                item for item in snapshot_queries.values()
                 if item["impact_time_ms"] is not None
                 and item["workload_share_pct"] is not None
                 and item["workload_share_pct"] >= 1
@@ -1334,17 +1352,8 @@ def _build_collection_timeline(
         timeline.append({
             "run_id": run_id, "collected_at": stamp,
             "workload": {
-                "average_time_ms": round(global_average, 4) if global_average is not None else None,
-                "calls": round(interval_calls, 2), "total_time_ms": round(interval_time, 2),
-                "change_pct": round(global_change, 2) if global_change is not None else None,
-                "calls_change_pct": round(calls_change, 2) if calls_change is not None else None,
-                "active_queries": active_query_count,
-                "active_queries_change_pct": (
-                    round(active_queries_change, 2) if active_queries_change is not None else None
-                ),
-                "statement_calls": {
-                    key: round(value, 2) for key, value in statement_calls.items()
-                },
+                **metrics,
+                "statement_calls": statement_calls if metrics["calls"] is not None else None,
                 "query_changes": ranked_changes,
             },
             "recommendations": {
@@ -1353,9 +1362,17 @@ def _build_collection_timeline(
             },
             "environment": environment_by_run.get(run_id),
         })
-        previous_global_calls = interval_calls
-        previous_active_queries = active_query_count
+        previous_rows = snapshot_rows
+        previous_interval = intervals
+        previous_stamp = stamp
+        previous_elapsed = elapsed
         previous_recommendations = current_recommendations
+    if days is not None:
+        cutoff = timestamps[-1] - timedelta(days=days)
+        first_visible = next(index for index, point in enumerate(timeline) if point["collected_at"] >= cutoff)
+        # Keep the preceding point for the selected-measurement LLM context, but
+        # compute all comparisons before filtering so changing periods is stable.
+        timeline = timeline[max(0, first_visible - 1):]
     return timeline
 
 
@@ -1391,10 +1408,15 @@ def build_workload_measurement_prompt(point: dict[str, Any], previous: dict[str,
         "Analyze only the selected pgAssistant Collector workload measurement as a PostgreSQL "
         "expert. Use the immediately preceding measurement only as its comparison baseline; "
         "do not infer broader trends beyond these two measurements. "
+        "Workload values measure activity between consecutive top-50 snapshots. "
+        "Unchanged queries contribute zero calls. Missing, new, ambiguous and reset counters "
+        "are excluded: inspect coverage before drawing conclusions. Percentages compare only "
+        "the shared queries across both intervals; comparison contains the matching totals. "
+        "Use calls_per_minute for unequal interval durations. These are not database-wide totals. "
         "Start by explicitly identifying every selected-measurement environment change, "
         "especially PostgreSQL version upgrades and setting changes, before discussing workload. "
         "Write a concise operational synthesis in Markdown with: (1) executive summary, "
-        "(2) workload changes in execution time, calls and active queries, (3) environment "
+        "(2) workload changes in execution time, calls and ranked queries with calls, (3) environment "
         "changes that may explain them, (4) new and no-longer-detected advisor recommendations "
         "including concrete SQL where supplied, and (5) prioritized next checks. Do not claim "
         "that a recommendation was applied merely because it is no longer detected. Treat all "
