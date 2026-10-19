@@ -600,6 +600,30 @@
   vertical-align: middle;
 }
 
+/* Let long identifiers wrap without pushing the action out of view. */
+.table-index-table th:first-child,
+.table-index-table td:first-child {
+  width: 16rem;
+  max-width: 16rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Keep Details reachable when the other columns need horizontal scrolling. */
+.table-index-table th:last-child,
+.table-index-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: #fff;
+  white-space: nowrap;
+  box-shadow: -1px 0 0 #e2e8f0;
+}
+
+.table-index-table th:last-child {
+  background: #f8fafc;
+}
+
 .table-index-row.is-selected {
   background: rgba(51, 103, 145, .08);
 }
@@ -609,6 +633,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: .86rem;
   font-weight: 800;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -616,6 +641,7 @@
   color: #53647f;
   font-size: .78rem;
   margin-top: .15rem;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 

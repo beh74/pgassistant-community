@@ -1,3 +1,13 @@
+## [3.8.5] - 2026-10-19
+
+## Bug fixes
+
+- Collector API: filter ranked queries by the database specified in `db_uri`, preventing cross-database results.
+- Rank Queries / Workload Insights: exclude invalid chart values, keep axes non-negative, and show percentage changes in query history tooltips.
+- Workload Insights: preserve gaps in timeline charts and support keyboard selection of measurements.
+- Database explorer: wrap long index names and keep the Details action visible while scrolling.
+
+
 ## [3.8.4] - 2026-10-05
 
 ## Bug fixes

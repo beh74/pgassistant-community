@@ -693,8 +693,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const metric = historyData.metrics.find(item => item.key === historyMetric.value);
     if (!metric) return;
     const points = historyData.points
-      .map(point => ({date: new Date(point.collected_at), value: Number(point.values[metric.key])}))
-      .filter(point => !Number.isNaN(point.date.getTime()) && Number.isFinite(point.value));
+      .map(point => ({
+        date: new Date(point.collected_at),
+        value: point.values[metric.key] == null ? NaN : Number(point.values[metric.key])
+      }))
+      .filter(point => !Number.isNaN(point.date.getTime()) && Number.isFinite(point.value) && point.value >= 0)
+      .map((point, index, visible) => {
+        const previous = index ? visible[index - 1].value : null;
+        const change = previous > 0 ? (point.value - previous) * 100 / previous : null;
+        return {...point, change: Number.isFinite(change) ? change : null};
+      });
     const svg = document.getElementById("rankQueryHistoryChart");
     if (!svg) return;
     svg.replaceChildren();
@@ -713,7 +721,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let minimum = Math.min(...points.map(point => point.value));
     let maximum = Math.max(...points.map(point => point.value));
     const padding = maximum === minimum ? Math.max(Math.abs(maximum) * .1, 1) : (maximum - minimum) * .08;
-    minimum -= padding; maximum += padding;
+    minimum = Math.max(0, minimum - padding); maximum += padding;
     const x = index => margin.left + (points.length === 1 ? chartWidth / 2 : index * chartWidth / (points.length - 1));
     const y = value => margin.top + (maximum - value) * chartHeight / (maximum - minimum);
     const add = (name, attributes, content) => {
@@ -754,7 +762,8 @@ document.addEventListener("DOMContentLoaded", function () {
     points.forEach((point, index) => {
       const circle = add("circle", {cx: x(index), cy: y(point.value), r: 4, class: "query-history-point", tabindex: "0"});
       const title = document.createElementNS(ns, "title");
-      title.textContent = `${point.date.toLocaleString()} — ${formatHistoryValue(point.value, metric.unit)}`;
+      const comparison = point.change == null ? "No comparable previous value" : `${point.change > 0 ? "+" : ""}${formatHistoryValue(point.change, "%")} vs previous measurement`;
+      title.textContent = `${point.date.toLocaleString()} — ${metric.label}: ${formatHistoryValue(point.value, metric.unit)}\n${comparison}`;
       circle.appendChild(title);
     });
     historyMessage.classList.add("d-none");

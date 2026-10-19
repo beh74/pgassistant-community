@@ -11,7 +11,7 @@ services:
       # Optional bearer token protecting /api/v2 endpoints. Empty disables authentication.
       #- PGA_API_TOKEN=${PGA_API_TOKEN:-}
       # if you are using pgassistant collector, you can use the following environment variable to connect to it
-      #- COLLECTOR_URI=postgresql://pga_collector:pga_collector@host.docker.internal:5433/pga_collector
+      - COLLECTOR_URI=postgresql://pga_collector:pga_collector@host.docker.internal:5433/pga_collector
     ports:
       - "8080:5005"
     volumes:

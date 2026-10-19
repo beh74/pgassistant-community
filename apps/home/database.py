@@ -86,8 +86,11 @@ def normalize_db_config(db_config) -> dict:
 
 
 def get_resolved_database_name(db_config) -> str:
-    """Database name after multi-db active_db resolution."""
+    """Return the target database, honoring the URI used by connectdb."""
     cfg = resolve_db_config(normalize_db_config(db_config))
+    uri = (cfg.get("db_uri") or "").strip()
+    if uri:
+        return (parse_dsn(uri).get("dbname") or "").strip()
     return (cfg.get("db_name") or "").strip()
 
 

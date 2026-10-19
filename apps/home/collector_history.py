@@ -1235,7 +1235,10 @@ def _workload_interval(current, previous, previous_interval, elapsed, previous_e
         "change_pct": change(current_average, prior_average) if shared else None,
         "calls_per_minute_change_pct": change(current_rate, prior_rate) if shared else None,
         "active_queries": sum(item["calls"] > 0 for item in intervals.values()) if available else None,
-        "active_queries_change_pct": None,
+        "active_queries_change_pct": change(
+            sum(intervals[k]["calls"] > 0 for k in shared),
+            sum(previous_interval[k]["calls"] > 0 for k in shared),
+        ) if available and shared else None,
         "interval_seconds": elapsed,
         "status": "baseline" if not previous else "partial" if sum(excluded.values()) else "ok",
         "coverage": {"ranked_queries": len(current), "comparable_queries": len(intervals),

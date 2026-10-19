@@ -110,6 +110,22 @@ class CollectorHistoryTests(unittest.TestCase):
         self.assertEqual(value["change_pct"], 100)
         self.assertEqual(value["coverage"]["exclusions"]["missing"], 1)
 
+    def test_active_query_comparison_uses_shared_population(self):
+        points = self.timeline([
+            [("a", 10, 100), ("b", 10, 100), ("c", 10, 100)],
+            [("a", 20, 200), ("b", 10, 100), ("c", 20, 200)],
+            [("a", 30, 300), ("b", 20, 200), ("d", 10, 100)],
+            [("a", 30, 300), ("b", 20, 200), ("d", 20, 200)],
+        ])
+        self.assertIsNone(points[0]["workload"]["active_queries_change_pct"])
+        self.assertIsNone(points[1]["workload"]["active_queries_change_pct"])
+        self.assertEqual(points[2]["workload"]["active_queries_change_pct"], 100)
+        self.assertEqual(points[3]["workload"]["active_queries_change_pct"], -100)
+        idle = self.timeline([
+            [("a", 10, 100)], [("a", 10, 100)], [("a", 20, 200)],
+        ])
+        self.assertIsNone(idle[2]["workload"]["active_queries_change_pct"])
+
     def test_reset_gap_and_returning_queries_are_excluded(self):
         points = self.timeline([
             [("a", 100, 1000)], [("a", 5, 50)],

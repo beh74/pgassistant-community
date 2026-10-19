@@ -1,7 +1,9 @@
 import importlib.util
+import json
 import sys
 import types
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -54,6 +56,38 @@ class _Connection:
 
 
 class EnsurePgStatStatementsTest(unittest.TestCase):
+    def test_uri_database_resolution_matches_connection(self):
+        for config, expected in [
+            ({"db_uri": "postgresql://user@localhost/application"}, "application"),
+            ({"db_uri": "postgres://user@localhost/app%20db"}, "app db"),
+            ({"db_uri": "postgresql://user@localhost/postgres?dbname=application"}, "application"),
+            ({"db_uri": "postgresql://user@localhost/application", "db_name": "stale"}, "application"),
+            ({"db_uri": "postgresql://user@localhost/postgres", "multi_db": True,
+              "active_db": "application"}, "application"),
+            ({"db_name": "application"}, "application"),
+        ]:
+            with self.subTest(config=config):
+                self.assertEqual(database.get_resolved_database_name(config), expected)
+
+    def test_rank_queries_filter_uri_database_before_limit(self):
+        # Exercise the same catalog-query path for both supported ranking SQLs.
+        catalog = json.loads((Path(__file__).resolve().parents[1] / "queries.json").read_text())
+        for query_id in ("top_ranking", "top_ranking_18"):
+            with self.subTest(query_id=query_id):
+                connection = _Connection([("public", True, True, True), (True,)])
+                with (
+                    patch.object(database, "get_queries"),
+                    patch.object(database, "PGA_QUERIES", catalog),
+                    patch.object(database, "db_fetch_json", return_value="[]") as fetch,
+                ):
+                    database._db_query_pgss(
+                        connection, query_id,
+                        {"db_uri": "postgresql://user@localhost/application"},
+                    )
+                sql = fetch.call_args.args[1]
+                self.assertIn("dbid = (SELECT oid FROM pg_database WHERE datname = 'application')", sql)
+                self.assertLess(sql.index("datname = 'application'"), sql.upper().index("LIMIT"))
+
     def test_monitoring_config_keeps_original_database_in_multi_db_mode(self):
         config = {
             "db_name": "postgres",

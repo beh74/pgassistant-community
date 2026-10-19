@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from math import isfinite
 from typing import Any
 
 import psycopg2
@@ -107,12 +108,15 @@ def load_query_history(queryid: str, target_id: str) -> dict[str, Any]:
         current_calls = _number(current.get("calls"))
         previous_time = _number(previous.get("total_exec_time_ms"))
         current_time = _number(current.get("total_exec_time_ms"))
-        if None in (previous_calls, current_calls, previous_time, current_time):
+        if any(value is None or not isfinite(value) or value < 0
+               for value in (previous_calls, current_calls, previous_time, current_time)):
             continue
         delta_calls = float(current_calls) - float(previous_calls)
         delta_time = float(current_time) - float(previous_time)
         if delta_calls > 0 and delta_time >= 0:
-            current[INTERVAL_METRIC[0]] = delta_time / delta_calls
+            average = delta_time / delta_calls
+            if isfinite(average):
+                current[INTERVAL_METRIC[0]] = average
 
     available = ([{
         "key": INTERVAL_METRIC[0], "label": INTERVAL_METRIC[1], "unit": INTERVAL_METRIC[2]

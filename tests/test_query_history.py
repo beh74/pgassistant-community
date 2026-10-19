@@ -227,6 +227,22 @@ class QueryHistoryTests(unittest.TestCase):
         ]
         self.assertEqual(interval_values, [None, 20, None, 5])
 
+    def test_interval_latency_excludes_resets_and_invalid_counters(self):
+        start = datetime(2026, 8, 28, tzinfo=timezone.utc)
+        counters = [(100, 1000), (110, 1200), (5, 50), (10, 75),
+                    (20, 70), (30, 70), (40, float("inf")),
+                    (50, 100), (-1, -10), (5, 50)]
+        connection = FakeConnection([[
+            {"collected_at": start + timedelta(hours=index), "calls": calls,
+             "total_exec_time_ms": total}
+            for index, (calls, total) in enumerate(counters)
+        ]])
+        with patch.object(query_history.collector_history, "_connect", return_value=connection):
+            result = query_history.load_query_history("123", "application-production")
+        values = [point["values"].get("interval_mean_exec_time_ms")
+                  for point in result["points"]]
+        self.assertEqual(values, [None, 20, None, 5, None, 0, None, None, None, None])
+
     def test_query_activity_template_contains_history_dialog(self):
         template = (
             Path(__file__).resolve().parents[1]
