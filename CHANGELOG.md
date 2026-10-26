@@ -1,3 +1,9 @@
+## [3.8.6] - 2026-10-26
+
+### Bug fixes
+
+- Automatically initialize `pg_stat_statements` when an advisor needs statistics and the extension is missing from the database used to read them. Loading the module through `shared_preload_libraries` does not create the extension in each database; pgAssistant now runs `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;` before retrying the catalog lookup. This fixes Executive Plan / Parameter Advisor failures during Collector runs when the module is loaded but the extension has not been initialized. Existing installations are left unchanged. If the connection is read-only or the role lacks permission to create the extension, pgAssistant returns an explicit error so an administrator can initialize it manually.
+
 ## [3.8.5] - 2026-10-19
 
 ## Bug fixes

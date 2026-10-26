@@ -524,12 +524,11 @@ def pg_stat_statements_has_dbid(con) -> bool:
 
 
 def get_pg_stat_statements_relation(con) -> Tuple[Optional[str], Optional[str]]:
-    """Return the schema-qualified pg_stat_statements view when it is usable."""
+    """Enable pg_stat_statements if missing and return its usable qualified view."""
     cursor = None
     try:
         cursor = con.cursor()
-        cursor.execute(
-            """
+        relation_sql = """
             SELECT
                 n.nspname,
                 c.oid IS NOT NULL AS relation_exists,
@@ -547,10 +546,18 @@ def get_pg_stat_statements_relation(con) -> Tuple[Optional[str], Optional[str]]:
             WHERE e.extname = 'pg_stat_statements'
             LIMIT 1
             """
-        )
+        cursor.execute(relation_sql)
         row = cursor.fetchone()
         if not row:
-            return None, "pg_stat_statements is not installed in the monitoring database."
+            available, error = ensure_pg_stat_statements(con)
+            if not available:
+                return None, error
+            # Re-read the catalog after creation to resolve the actual schema
+            # and validate privileges in the same way as existing installations.
+            cursor.execute(relation_sql)
+            row = cursor.fetchone()
+            if not row:
+                return None, "pg_stat_statements is not installed in the monitoring database."
 
         schema_name, relation_exists, schema_usage, can_select = row
         if not relation_exists:

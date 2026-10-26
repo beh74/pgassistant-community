@@ -118,10 +118,26 @@ class EnsurePgStatStatementsTest(unittest.TestCase):
     def test_pgss_relation_reports_missing_extension(self):
         connection = _Connection([None])
 
-        relation, error = database.get_pg_stat_statements_relation(connection)
+        with patch.object(database, "ensure_pg_stat_statements", return_value=(
+            False, "pg_stat_statements is not installed; administrator must run CREATE EXTENSION."
+        )) as ensure:
+            relation, error = database.get_pg_stat_statements_relation(connection)
 
+        ensure.assert_called_once_with(connection)
         self.assertIsNone(relation)
-        self.assertIn("not installed", error)
+        self.assertIn("administrator must run", error)
+
+    def test_pgss_relation_initializes_missing_extension(self):
+        connection = _Connection([None, ("public", True, True, True)])
+
+        with patch.object(database, "ensure_pg_stat_statements", return_value=(True, None)) as ensure:
+            relation, error = database.get_pg_stat_statements_relation(connection)
+
+        ensure.assert_called_once_with(connection)
+        self.assertEqual(relation, '\"public\".\"pg_stat_statements\"')
+        self.assertIsNone(error)
+        self.assertEqual(len(connection.cursor_instance.executed), 2)
+        self.assertTrue(connection.cursor_instance.closed)
 
     def test_pgss_relation_reports_missing_permissions(self):
         connection = _Connection([("monitoring", True, False, False)])
