@@ -7,13 +7,18 @@
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid py-4 pgtune-page">
 
-  {% set ns = namespace(changed_count=0) %}
-  {% for header in running_values %}
-    {% if running_values[header] != tuned_values[header] %}
-      {% set ns.changed_count = ns.changed_count + 1 %}
-    {% endif %}
+  {% set ns = namespace(changed_count=0, restart_count=0, manual_count=0, rows=[]) %}
+  {% set restart_parameters = ['max_connections', 'shared_buffers', 'wal_buffers', 'max_worker_processes', 'huge_pages', 'io_method', 'wal_level', 'max_wal_senders'] %}
+  {% for name, value in tuned_values.items() %}
+    {% set changed = running_values.get(name) != value %}
+    {% set manual = name == 'io_method' or (name == 'wal_compression' and value == 'lz4') %}
+    {% set restart = name in restart_parameters or (name == 'autovacuum_max_workers' and major_version < 18) %}
+    {% if changed %}{% set ns.changed_count = ns.changed_count + 1 %}{% endif %}
+    {% if changed and restart %}{% set ns.restart_count = ns.restart_count + 1 %}{% endif %}
+    {% if manual %}{% set ns.manual_count = ns.manual_count + 1 %}{% endif %}
+    {% set ns.rows = ns.rows + [dict(name=name, value=value, changed=changed, manual=manual, restart=restart)] %}
   {% endfor %}
 
   {% set form_db_type = request.form.get('db_type', db_type|default('web')) %}
@@ -28,24 +33,22 @@
       <div>
         <h1 class="h4 mb-1">pgTune</h1>
         <p class="tune-muted mb-0">
-          Review the generated recommendations, then adjust the workload profile or server resources and generate again.
+          Review the changes below. Open Configuration inputs to refine your recommendations.
         </p>
       </div>
     </div>
   </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-xl-8">
-      <div class="card tune-form-card h-100">
-        <div class="card-body p-4">
-          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
-            <div>
-              <h2 class="h5 mb-1">Tuning inputs</h2>
-              <p class="tune-muted mb-0">The form remains available so you can quickly refine the generated configuration.</p>
-            </div>
-            <span class="badge bg-primary-subtle text-primary">Result generated</span>
-          </div>
-
+  <details class="card tune-form-card tune-inputs mb-4">
+    <summary class="p-3 p-md-4">
+      <span class="tune-inputs-heading">
+        <span class="fw-semibold">Configuration inputs</span>
+        <span class="tune-inputs-summary">PostgreSQL {{ major_version }} · {{ form_db_cpu }} CPU(s) · {{ form_db_memory }} {{ form_db_memory_unity }} · {{ {'web': 'Web', 'oltp': 'OLTP', 'dw': 'Data warehouse'}.get(form_db_type, form_db_type) }} · {{ form_db_storage|upper }}</span>
+        <span class="tune-muted small">{{ form_db_maxconn }} connections · Data size: {{ {'less_ram': 'less than RAM', 'mid_ram': '1–3× RAM', 'greater_ram': 'more than 3× RAM'}.get(request.form.get('data_size_class', 'mid_ram')) }}</span>
+      </span>
+      <span class="tune-edit-label text-primary">Edit inputs <span aria-hidden="true">⌄</span></span>
+    </summary>
+    <div class="px-3 px-md-4 pb-4">
           <form method="POST">
             <div class="mb-4">
               <div class="tune-section-title">Workload profile</div>
@@ -88,6 +91,8 @@
                     </div>
                   </div>
 
+                  {% include "home/includes/pgtune_data_size.html" %}
+
                   <div class="col-12 col-md-4">
                     <label for="db_cpu" class="form-label">
                       <span class="label-with-help">
@@ -95,7 +100,7 @@
                         <span class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of CPU cores available to PostgreSQL. This can influence planner and parallelism-related recommendations.">?</span>
                       </span>
                     </label>
-                    <input class="form-control" value="{{ form_db_cpu }}" id="db_cpu" name="db_cpu" type="number" min="1" max="200" required>
+                    <input class="form-control" value="{{ form_db_cpu }}" id="db_cpu" name="db_cpu" type="number" min="1" max="9999" required>
                   </div>
 
                   <div class="col-12 col-md-4">
@@ -134,59 +139,13 @@
               </button>
             </div>
           </form>
-        </div>
-      </div>
     </div>
+  </details>
 
-    <div class="col-12 col-xl-4">
-      <div class="card tune-summary-card mb-4">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">Result summary</h2>
-          <div class="row g-3">
-            <div class="col-12">
-              <div class="tune-kpi">
-                <div class="tune-kpi-label">PostgreSQL version</div>
-                <p class="tune-kpi-value mb-0">{{ major_version }}</p>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="tune-kpi">
-                <div class="tune-kpi-label">Reviewed</div>
-                <p class="tune-kpi-value mb-0">{{ running_values|length }}</p>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="tune-kpi">
-                <div class="tune-kpi-label">Changed</div>
-                <p class="tune-kpi-value mb-0">{{ ns.changed_count }}</p>
-              </div>
-            </div>
-          </div>
-
-          {% if major_version >= 12 %}
-          <div class="tune-callout mt-4">
-            <div class="fw-semibold mb-1">ALTER SYSTEM support</div>
-            <div class="tune-muted mb-0">
-              Since PostgreSQL 12, <code>ALTER SYSTEM</code> can be used to update cluster-wide configuration parameters.
-              A restart or reload may still be required depending on the parameter.
-            </div>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="card tune-help-card">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">How it works</h2>
-          <p class="tune-helper-text mb-3">
-            pgAssistant uses the well-known <strong>pgTune</strong> algorithm to estimate a sensible PostgreSQL configuration based on your workload and server resources.
-          </p>
-          <p class="tune-helper-text mb-0">
-            Review generated settings carefully before applying them in production, especially <code>shared_buffers</code>, <code>work_mem</code>, <code>effective_cache_size</code>, and <code>max_connections</code>.
-          </p>
-        </div>
-      </div>
-    </div>
+  <div class="row g-3 mb-4" aria-label="Recommendation summary">
+    <div class="col-12 col-sm-4"><div class="tune-kpi h-100"><div class="tune-kpi-label">Changed parameters</div><p class="tune-kpi-value">{{ ns.changed_count }} <span class="tune-muted small fw-normal">/ {{ tuned_values|length }}</span></p></div></div>
+    <div class="col-12 col-sm-4"><div class="tune-kpi h-100"><div class="tune-kpi-label">Changes requiring restart</div><p class="tune-kpi-value">{{ ns.restart_count }}</p></div></div>
+    <div class="col-12 col-sm-4"><div class="tune-kpi h-100"><div class="tune-kpi-label">Options to verify manually</div><p class="tune-kpi-value">{{ ns.manual_count }}</p></div></div>
   </div>
 
   <div class="row">
@@ -194,13 +153,19 @@
       <nav class="mb-4">
         <div class="nav nav-tabs tune-nav-tabs" id="nav-tab" role="tablist">
           <button class="nav-link active" id="nav-home-tab" data-bs-toggle="tab" data-bs-target="#nav-home" type="button" role="tab" aria-controls="nav-home" aria-selected="true">Parameters</button>
+          <button class="nav-link" id="nav-conf-tab" data-bs-toggle="tab" data-bs-target="#nav-conf" type="button" role="tab" aria-controls="nav-conf" aria-selected="false">postgresql.conf</button>
           <button class="nav-link" id="nav-apply-tab" data-bs-toggle="tab" data-bs-target="#nav-apply" type="button" role="tab" aria-controls="nav-apply" aria-selected="false">Apply parameters</button>
           <button class="nav-link" id="nav-docker-tab" data-bs-toggle="tab" data-bs-target="#nav-docker" type="button" role="tab" aria-controls="nav-docker" aria-selected="false">Docker</button>
           <button class="nav-link" id="nav-kube-tab" data-bs-toggle="tab" data-bs-target="#nav-kube" type="button" role="tab" aria-controls="nav-kube" aria-selected="false">Kubernetes</button>
+          <button class="nav-link" id="huge-pages-tab" data-bs-toggle="tab" data-bs-target="#huge-pages-panel" type="button" role="tab" aria-controls="huge-pages-panel" aria-selected="false">Huge Pages</button>
         </div>
       </nav>
 
+      <span class="visually-hidden" id="tune-copy-status" role="status" aria-live="polite"></span>
       <div class="tab-content" id="nav-tabContent">
+        <div class="tab-pane fade" id="huge-pages-panel" role="tabpanel" aria-labelledby="huge-pages-tab">
+          {% include "home/includes/pgtune_huge_pages.html" %}
+        </div>
         <div class="tab-pane fade show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">
           <div class="card tune-section-card">
             <div class="card-body p-4">
@@ -208,10 +173,13 @@
                 <div>
                   <div class="tune-tab-card-title">Recommended parameter changes</div>
                   <div class="tune-tab-card-text">
-                    Settings highlighted in blue differ from the current running values.
+                    Changed parameters appear first. Review-only options remain commented out in SQL and Docker Compose.
                   </div>
                 </div>
-                <div class="tune-badge-changed">{{ ns.changed_count }} changed</div>
+                <div class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="tune-changed-only" aria-controls="tune-parameter-rows">
+                  <label class="form-check-label" for="tune-changed-only">Changed only</label>
+                </div>
               </div>
 
               <div class="table-responsive">
@@ -224,19 +192,22 @@
                       <th class="text-end">Status</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {% for header in running_values %}
-                    {% set has_changed = running_values[header] != tuned_values[header] %}
-                    <tr>
-                      <td class="tune-cell-wrap"><div class="tune-param-name">{{ header }}</div></td>
-                      <td class="tune-cell-wrap">{{ running_values[header] }}</td>
-                      <td class="tune-cell-wrap {% if has_changed %}tune-value-changed{% endif %}">{{ tuned_values[header] }}</td>
+                  <tbody id="tune-parameter-rows">
+                    {% for row in ns.rows|sort(attribute='changed', reverse=true) %}
+                    <tr data-changed="{{ 'true' if row.changed else 'false' }}">
+                      <th scope="row" class="tune-cell-wrap"><code class="tune-param-name">{{ row.name }}</code></th>
+                      <td class="tune-cell-wrap tune-setting-value">{{ running_values.get(row.name, 'Unavailable on this server') }}</td>
+                      <td class="tune-cell-wrap tune-setting-value {% if row.changed %}tune-value-changed{% endif %}">{{ row.value }}</td>
                       <td class="text-end">
-                        {% if has_changed %}
+                        <div class="tune-row-status">
+                          {% if row.manual %}<span class="badge bg-warning-subtle text-dark">Manual verification</span>{% endif %}
+                          {% if row.changed %}
                           <span class="badge bg-primary-subtle text-primary">Changed</span>
-                        {% else %}
+                          {% else %}
                           <span class="badge bg-light text-muted">Unchanged</span>
-                        {% endif %}
+                          {% endif %}
+                          {% if row.changed and row.restart %}<span class="badge bg-light text-muted">Restart required</span>{% endif %}
+                        </div>
                       </td>
                     </tr>
                     {% endfor %}
@@ -244,6 +215,37 @@
                 </table>
               </div>
 
+              <p class="small tune-muted mt-3 mb-0" id="tune-filter-status" role="status" aria-live="polite">Showing {{ tuned_values|length }} parameters.</p>
+              <p class="tune-muted mt-3 mb-0" id="tune-no-changes" hidden>No parameters differ from the current configuration.</p>
+
+              {% if tuned_values.get('wal_compression') == 'lz4' or tuned_values.get('io_method') == 'io_uring' %}
+              <div class="alert alert-warning mt-4 mb-0" role="alert">
+                <h3 class="h6 mb-2">Options to verify manually</h3><p>Check build and host support before applying these recommendations.</p>
+                {% if tuned_values.get('wal_compression') == 'lz4' %}
+                <p class="mb-1"><code>wal_compression = lz4</code> requires LZ4 support in PostgreSQL. Check <code>SELECT enumvals FROM pg_settings WHERE name = 'wal_compression';</code> and use <code>on</code> if LZ4 is unavailable.</p>
+                {% endif %}
+                {% if tuned_values.get('io_method') == 'io_uring' %}
+                <p class="mb-0"><code>io_method = io_uring</code> targets Linux and requires liburing support, kernel permission and container seccomp permission. Check <code>SELECT enumvals FROM pg_settings WHERE name = 'io_method';</code>; build support alone does not establish host access. Docker's default seccomp profile may block it. Keep <code>io_method = worker</code> until verified. Restart PostgreSQL after changing this setting.</p>
+                {% endif %}
+              </div>
+              {% endif %}
+
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="nav-conf" role="tabpanel" aria-labelledby="nav-conf-tab">
+          <div class="card tune-section-card">
+            <div class="card-body p-4">
+              <div class="tune-tab-card-title">postgresql.conf</div>
+              <div class="tune-tab-card-text">
+                Copy these tuning settings into your existing configuration. Options requiring manual verification remain commented out. Some settings require a restart.
+              </div>
+              <div class="tune-code-toolbar">
+                <div class="tune-code-label"><span class="tune-code-dot"></span>CONF</div>
+                <button class="tune-copy-btn" type="button" data-copy-target="postgresql_conf" aria-label="Copy postgresql.conf settings">Copy</button>
+              </div>
+              <textarea class="tune-code-block" name="postgresql_conf" id="postgresql_conf" aria-label="postgresql.conf tuning settings" rows="18" readonly spellcheck="false">{{ postgresql_conf }}</textarea>
             </div>
           </div>
         </div>
@@ -261,7 +263,7 @@
                   Copy
                 </button>
               </div>
-              <textarea class="tune-code-block" name="sqlalter" id="sqlalter" rows="10" readonly spellcheck="false">{{ sqlalter }}</textarea>
+              <textarea class="tune-code-block" name="sqlalter" id="sqlalter" aria-label="PostgreSQL configuration SQL" rows="10" readonly spellcheck="false">{{ sqlalter }}</textarea>
             </div>
           </div>
         </div>
@@ -279,7 +281,7 @@
                   Copy
                 </button>
               </div>
-              <textarea class="tune-code-block" name="docker_cmd" id="docker_cmd" rows="18" readonly spellcheck="false">{{ docker_cmd }}</textarea>
+              <textarea class="tune-code-block" name="docker_cmd" id="docker_cmd" aria-label="Docker Compose configuration" rows="18" readonly spellcheck="false">{{ docker_cmd }}</textarea>
             </div>
           </div>
         </div>
@@ -287,7 +289,7 @@
         <div class="tab-pane fade" id="nav-kube" role="tabpanel" aria-labelledby="nav-kube-tab">
           <div class="card tune-section-card">
             <div class="card-body p-4">
-              <div class="tune-tab-card-title">Kubernetes StatefulSet snippet</div>
+              <div class="tune-tab-card-title">Kubernetes deployment snippet</div>
               <div class="tune-tab-card-text">
                 Use this example to inject the recommended PostgreSQL settings into your Kubernetes deployment.
               </div>
@@ -297,7 +299,7 @@
                   Copy
                 </button>
               </div>
-              <textarea class="tune-code-block" name="kubernetes_cmd" id="kubernetes_cmd" rows="18" readonly spellcheck="false">{{ kubernetes_cmd }}</textarea>
+              <textarea class="tune-code-block" name="kubernetes_cmd" id="kubernetes_cmd" aria-label="Kubernetes deployment configuration" rows="18" readonly spellcheck="false">{{ kubernetes_cmd }}</textarea>
             </div>
           </div>
         </div>
@@ -309,12 +311,38 @@
 {% endblock content %}
 
 {% block javascripts %}
+{% include "home/includes/pgtune_huge_pages_script.html" %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
       new bootstrap.Tooltip(tooltipTriggerEl);
     });
+
+    const filter = document.getElementById('tune-changed-only');
+    const rows = Array.from(document.querySelectorAll('#tune-parameter-rows tr'));
+    filter.addEventListener('change', function () {
+      let visible = 0;
+      rows.forEach(function (row) {
+        row.hidden = filter.checked && row.dataset.changed !== 'true';
+        if (!row.hidden) visible += 1;
+      });
+      document.getElementById('tune-filter-status').textContent = `Showing ${visible} of ${rows.length} parameters.`;
+      document.getElementById('tune-no-changes').hidden = visible !== 0;
+    });
+
+    function fitCodeBlocks() {
+      document.querySelectorAll('.tune-code-block').forEach(function (block) {
+        if (!block.getClientRects().length) return;
+        block.style.height = 'auto';
+        block.style.height = `${Math.min(560, Math.max(160, block.scrollHeight + 4))}px`;
+      });
+    }
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tab) {
+      tab.addEventListener('shown.bs.tab', fitCodeBlocks);
+    });
+    window.addEventListener('resize', fitCodeBlocks);
+    fitCodeBlocks();
 
     document.querySelectorAll('[data-copy-target]').forEach(function (button) {
       const initialLabel = button.textContent.trim();
@@ -335,10 +363,11 @@
           } else {
             target.focus();
             target.select();
-            document.execCommand('copy');
+            if (!document.execCommand('copy')) throw new Error('Copy unavailable');
             target.setSelectionRange(0, 0);
           }
 
+          document.getElementById('tune-copy-status').textContent = 'Configuration copied.';
           button.textContent = 'Copied';
           button.classList.add('btn-success');
 
@@ -347,6 +376,7 @@
             button.classList.remove('btn-success');
           }, 1600);
         } catch (error) {
+          document.getElementById('tune-copy-status').textContent = 'Copy failed. Select the configuration and copy it manually.';
           button.textContent = 'Copy failed';
 
           window.setTimeout(function () {

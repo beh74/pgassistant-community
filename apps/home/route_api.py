@@ -27,7 +27,9 @@ from . import column_statistics
 from . import collector_history
 from . import query_history
 from . import llm
+from . import pgtune
 from . import pgtune_resource_detector
+from . import pgtune_hugepages
 
 
 _EXECUTIVE_HISTORY_PLAN_CACHE = {}
@@ -65,6 +67,24 @@ def execute_sql():
     finally:
         if con is not None:
             con.close()
+
+
+@blueprint.route("/api/v1/pgtune/huge-pages", methods=["GET"])
+def api_pgtune_huge_pages():
+    """Inspect current settings only; never change the database or its host."""
+    if not session.get("db_name") and not session.get("db_uri"):
+        return jsonify({"error": "Database is not connected."}), 401
+    connection = None
+    try:
+        connection, _ = database.connectdb(session)
+        if connection is None:
+            return jsonify({"error": "Unable to connect to database."}), 500
+        return jsonify(pgtune_hugepages.inspect_huge_pages(connection))
+    except Exception:
+        return jsonify({"error": "Unable to read Huge Pages settings from PostgreSQL."}), 500
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 @blueprint.route("/api/v1/pgtune/resources", methods=["GET"])
@@ -274,14 +294,26 @@ def api_query_index_advisor():
 
 @blueprint.route("/api/v1/query_parameter_advisor", methods=["GET", "POST"])
 def api_query_parameter_advisor():
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "The request body must be a JSON object."}), 400
     try:
-        data = request.get_json(silent=True) or {}
+        data_size_class = pgtune.validate_data_size_class(
+            data.get("data_size_class", request.args.get("data_size_class"))
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    try:
         db_config = data.get("db_config") or session
 
         if not db_config or not (db_config.get("db_name") or db_config.get("db_uri")):
             return jsonify({"success": False, "error": "Database is not connected."}), 401
 
-        result = query_parameter_advisor.analyze_query_parameter_workload(db_config)
+        result = query_parameter_advisor.analyze_query_parameter_workload(
+            db_config, data_size_class=data_size_class,
+        )
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

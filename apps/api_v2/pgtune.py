@@ -42,6 +42,11 @@ request_model = namespace.model(
             default="web",
             description="Workload profile.",
         ),
+        "data_size_class": fields.String(
+            enum=["less_ram", "mid_ram", "greater_ram"],
+            default="mid_ram",
+            description="Total data size relative to available RAM: less than RAM, 1x-3x RAM, or more than 3x RAM.",
+        ),
         "storage": fields.String(
             enum=["ssd", "san", "hdd"],
             default="ssd",
@@ -121,6 +126,7 @@ class PgTuneResource(Resource):
             return _error("The request body must be a JSON object.", 400)
 
         try:
+            data_size_class = pgtune.validate_data_size_class(payload.get("data_size_class"))
             database_uri = validate_database_uri(payload.get("database_uri"))
             cpu = _positive_integer(payload, "cpu", required=not database_uri)
             memory_mb = _positive_integer(payload, "memory_mb", required=not database_uri)
@@ -165,6 +171,7 @@ class PgTuneResource(Resource):
             storage,
             database_type,
             max_connections,
+            data_size_class=data_size_class,
         )
         recommendations = tuner.get_pg_tune()
         response = {
@@ -176,6 +183,7 @@ class PgTuneResource(Resource):
                 "postgresql_version": version,
                 "database_type": database_type,
                 "storage": storage,
+                "data_size_class": data_size_class,
                 "max_connections": max_connections,
             },
             "recommendations": recommendations,

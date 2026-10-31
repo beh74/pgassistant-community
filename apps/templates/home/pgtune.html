@@ -12,7 +12,14 @@
 {% set selected_storage = request.form.get('db_storage', 'ssd') if request is defined else 'ssd' %}
 {% set tune_result = pgtune_result|default(result|default(tuning_result|default(tuning|default(output|default(None))))) %}
 
-<div class="container-fluid py-4">
+<div class="container-fluid py-4 pgtune-page">
+  <nav class="nav nav-tabs tune-nav-tabs mb-4" role="tablist" aria-label="pgTune sections">
+    <button class="nav-link active" id="tuning-tab" data-bs-toggle="tab" data-bs-target="#tuning-panel" type="button" role="tab" aria-controls="tuning-panel" aria-selected="true">Tuning</button>
+    <button class="nav-link" id="huge-pages-tab" data-bs-toggle="tab" data-bs-target="#huge-pages-panel" type="button" role="tab" aria-controls="huge-pages-panel" aria-selected="false">Huge Pages</button>
+  </nav>
+  <div class="tab-content">
+  <div class="tab-pane fade show active" id="tuning-panel" role="tabpanel" aria-labelledby="tuning-tab">
+
   <div class="row g-4">
 
     <div class="col-12 col-xl-7">
@@ -82,6 +89,8 @@
                       </select>
                     </div>
                   </div>
+
+                  {% include "home/includes/pgtune_data_size.html" %}
 
                   <div class="col-12 col-md-4">
                     <label for="db_cpu" class="form-label">
@@ -206,10 +215,16 @@
     </div>
 
   </div>
+  </div>
+  <div class="tab-pane fade" id="huge-pages-panel" role="tabpanel" aria-labelledby="huge-pages-tab">
+    {% include "home/includes/pgtune_huge_pages.html" %}
+  </div>
+  </div>
 </div>
 {% endblock content %}
 
 {% block javascripts %}
+{% include "home/includes/pgtune_huge_pages_script.html" %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

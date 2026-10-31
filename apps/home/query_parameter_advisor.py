@@ -260,6 +260,7 @@ def _run_pgtune_baseline(
     connection,
     pg_major_version: int,
     running_values: Dict[str, Any],
+    data_size_class: str = "mid_ram",
 ) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """Detect server resources and run pgTune with documented defaults."""
     resources = pgtune_resource_detector.detect_postgresql_resources(connection)
@@ -270,6 +271,7 @@ def _run_pgtune_baseline(
         "ssd",
         "web",
         running_values.get("max_connections") or 100,
+        data_size_class=data_size_class,
     )
     return resources, tuner.get_pg_tune()
 
@@ -645,8 +647,11 @@ def _build_recommendations(
     return recommendations
 
 
-def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_query_parameter_workload(
+    db_config: Dict[str, Any], data_size_class: str = "mid_ram",
+) -> Dict[str, Any]:
     """Entry point used by the API to analyze workload-level parameter signals."""
+    data_size_class = pgtune.validate_data_size_class(data_size_class)
     pg_major_version = _get_postgres_major_version(db_config)
     running_values, running_major = database.get_pg_tune_parameter(db_config)
 
@@ -703,6 +708,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
                 plan_conn,
                 pg_major_version,
                 running_values,
+                data_size_class=data_size_class,
             )
             pgtune_recommendation = _build_pgtune_recommendation(
                 running_values,
@@ -713,7 +719,7 @@ def analyze_query_parameter_workload(db_config: Dict[str, Any]) -> Dict[str, Any
                 "available": True,
                 "source": "pgTune",
                 "resources": resources,
-                "assumptions": {"database_type": "web", "storage": "ssd"},
+                "assumptions": {"database_type": "web", "storage": "ssd", "data_size_class": data_size_class},
                 "threshold_pct": round(PGTUNE_RELATIVE_THRESHOLD * 100),
                 "tuned_values": tuned_values,
                 "significant_changes": pgtune_recommendation.get("changes", []),

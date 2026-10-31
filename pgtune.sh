@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Modern recommendations ported from le0pard/pgtune revision
+# f740af00a84fe23b7c2a39985ccfd1a892676902 (MIT). Linux target.
 # ==== Units (everything is expressed in kB internally) ====
 KB_IN_KB=1
 MB_IN_KB=1024
@@ -9,7 +11,7 @@ MAX_MEMORY_MB=$((MAX_MEMORY_GB * 1024))
 
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-h] [-v PG_VERSION] [-t DB_TYPE] [-m TOTAL_MEM] [-u CPU_COUNT] [-c MAX_CONN] [-s STGE_TYPE]
+Usage: ${0##*/} [-h] [-v PG_VERSION] [-t DB_TYPE] [-m TOTAL_MEM] [-u CPU_COUNT] [-c MAX_CONN] [-s STGE_TYPE] [-d DATA_SIZE_CLASS]
 
 This script is a bash port of PGTune (https://pgtune.leopard.in.ua).
 It produces a postgresql.conf file based on supplied parameters.
@@ -31,6 +33,9 @@ It produces a postgresql.conf file based on supplied parameters.
   -c MAX_CONN         (optional) Maximum number of PostgreSQL client connections
                       accepted values: integer between 20 and 9999
                       default value: preset corresponding to db_type
+  -d DATA_SIZE_CLASS  (optional) total database size compared to memory available to PostgreSQL
+                      accepted values: less_ram (< RAM), mid_ram (1x-3x RAM), greater_ram (> 3x RAM)
+                      default value: mid_ram
   -s STGE_TYPE        (optional) Type of data storage device used with PostgreSQL
                       accepted values: hdd, ssd, san
                       default value: this script will try to determine the storage type (san not supported) and use hdd
@@ -138,8 +143,8 @@ set_maintenance_work_mem() {
       _error "unknown db_type, cannot calculate maintenance_work_mem"
       ;;
   esac
-  # Cap at 2GB (in kB)
-  local mem_limit_kb=$(( 2 * GB_IN_KB ))
+  # Modern Linux maintenance budget, capped at 8 GiB (in kB).
+  local mem_limit_kb=$(( 8 * GB_IN_KB ))
   if [ "$maintenance_work_mem" -gt "$mem_limit_kb" ]; then
     maintenance_work_mem=$mem_limit_kb
   fi
@@ -224,6 +229,16 @@ set_default_statistics_target() {
 }
 
 set_random_page_cost() {
+  # Upstream pgTune: data fitting in RAM favors random reads; larger DW
+  # workloads retain the default cost even on SSD/SAN.
+  if [[ "$data_size_class" == "less_ram" ]]; then
+    random_page_cost=1.1
+    return
+  fi
+  if [[ "$db_type" == "dw" ]]; then
+    random_page_cost=4
+    return
+  fi
   case "$storage_type" in
     "ssd") random_page_cost=1.1 ;;
     "hdd") random_page_cost=4 ;;
@@ -294,9 +309,60 @@ set_work_mem() {
       ;;
   esac
 
+  # Upstream pgTune data-size adjustment; keep integer kB arithmetic.
+  case "$data_size_class" in
+    less_ram) work_mem=$(( work_mem * 130 / 100 )) ;;
+    greater_ram) work_mem=$(( work_mem * 90 / 100 )) ;;
+  esac
+
   # Floor to 64kB
   if [ "$work_mem" -lt 64 ]; then
     work_mem=64
+  fi
+}
+
+set_modern_settings() {
+  local major=${db_version%%.*}
+  if (( major >= 12 && major < 19 )); then
+    case "$db_type" in
+      web|oltp|mixed) jit=off ;;
+    esac
+  fi
+  if (( major >= 19 )); then
+    wal_compression=on
+  elif (( major >= 15 )); then
+    wal_compression=lz4
+    _warn "wal_compression=lz4 requires build support; check pg_settings.enumvals before applying."
+  elif (( major >= 10 )); then
+    wal_compression=on
+  fi
+  if (( major >= 13 )); then
+    maintenance_io_concurrency=$effective_io_concurrency
+  fi
+  # Bound autovacuum independently of the larger manual-maintenance budget.
+  if (( maintenance_work_mem > GB_IN_KB )); then
+    autovacuum_work_mem=$GB_IN_KB
+  fi
+  if (( cpu_num >= 32 )); then
+    autovacuum_max_workers=5
+  elif (( cpu_num >= 16 )); then
+    autovacuum_max_workers=4
+  fi
+  if [[ -n ${autovacuum_max_workers+x} ]]; then
+    autovacuum_vacuum_cost_limit=$(( (200 * autovacuum_max_workers + 1) / 3 ))
+  fi
+  if (( major < 12 )); then
+    autovacuum_vacuum_cost_delay=2ms
+  fi
+  if (( major < 14 )); then
+    vacuum_cost_page_miss=2
+  fi
+  if (( major == 16 )); then
+    vacuum_buffer_usage_limit=$(( 2 * MB_IN_KB ))
+  fi
+  if (( major >= 18 )); then
+    io_method=io_uring
+    _warn "io_method=io_uring is a Linux recommendation requiring liburing build support, kernel permission and container seccomp permission; verify before applying."
   fi
 }
 
@@ -328,9 +394,10 @@ storage_type=$(get_disk_type)
 conn_nb=0
 db_type="web"
 db_version=15
+data_size_class="mid_ram"
 
 # ==== CLI parsing ====
-while getopts "hv:t:m:u:c:s:" opt; do
+while getopts "hv:t:m:u:c:s:d:" opt; do
   case $opt in
     h)
       show_help
@@ -398,6 +465,12 @@ while getopts "hv:t:m:u:c:s:" opt; do
       fi
       conn_nb=$c
       ;;
+    d)
+      case "$OPTARG" in
+        less_ram|mid_ram|greater_ram) data_size_class="$OPTARG" ;;
+        *) _input_error "$OPTARG is not a valid data size class (use less_ram, mid_ram or greater_ram)" ;;
+      esac
+      ;;
     s)
       s=$OPTARG
       if [ "$s" != "hdd" ] && \
@@ -447,6 +520,7 @@ set_random_page_cost || exit $?
 set_effective_io_concurrency || exit $?
 set_parallel_settings
 set_work_mem || exit $?
+set_modern_settings
 
 # ==== Output ====
 echo "max_connections == $conn_nb"
@@ -461,7 +535,12 @@ echo "effective_io_concurrency == $effective_io_concurrency"
 echo "work_mem == $(format_value "$work_mem")"
 echo "min_wal_size == $(format_value "$min_wal_size")"
 echo "max_wal_size == $(format_value "$max_wal_size")"
-echo "huge_pages == off"
+# Recommendation threshold: 4 GiB of shared_buffers (values are in kB).
+if (( shared_buffers >= 4 * GB_IN_KB )); then
+  echo "huge_pages == try"
+else
+  echo "huge_pages == off"
+fi
 
 [ ! -z ${max_worker_processes+x} ] && echo "max_worker_processes == $max_worker_processes"
 [ ! -z ${max_parallel_workers_per_gather+x} ] && echo "max_parallel_workers_per_gather == $max_parallel_workers_per_gather"
@@ -473,3 +552,17 @@ if [ ! -z ${checkpoint_segments+x} ]; then
 fi
 
 unset set_parallel_settings
+
+# Version-gated settings: absent values leave the PostgreSQL default intact.
+for setting in jit wal_compression maintenance_io_concurrency autovacuum_max_workers \
+               autovacuum_vacuum_cost_limit autovacuum_vacuum_cost_delay \
+               vacuum_cost_page_miss io_method; do
+  value=${!setting}
+  [[ -n "$value" ]] && echo "$setting == $value"
+done
+for setting in autovacuum_work_mem vacuum_buffer_usage_limit; do
+  value=${!setting}
+  [[ -n "$value" ]] && echo "$setting == $(format_value "$value")"
+done
+# Keep a successful exit status when the last optional setting is omitted.
+exit 0

@@ -1,3 +1,9 @@
+## [3.8.7] - 2026-10-31
+
+- pgTune: update tuning rules to follow the newer upstream pgTune algorithm, including data-size input in the UI and APIs, revised maintenance memory, and additional PostgreSQL recommendations. Keep LZ4 compression and I/O method changes commented out in Docker Compose and generated SQL pending compatibility checks.
+- pgTune: Add a Huge Pages recommandation  
+- pgTune: Add a postgresql.conf Tab to dislay a recommended postgresql.conf file
+
 ## [3.8.6] - 2026-10-26
 
 ### Bug fixes

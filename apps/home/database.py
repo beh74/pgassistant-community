@@ -1021,18 +1021,29 @@ def get_pg_tune_parameter(db_config):
     """    
     con, message = connectdb(db_config)
     if con:
-        # get the the current setting of key pgtune run-time parameters.
-        running_values={}
-        params=['max_connections','shared_buffers','effective_cache_size',
-                'maintenance_work_mem','checkpoint_completion_target','wal_buffers',
-                'default_statistics_target','random_page_cost','effective_io_concurrency',
-                'work_mem','huge_pages','min_wal_size','max_wal_size',
-                'max_worker_processes','max_parallel_workers_per_gather',
-                'max_parallel_workers','max_parallel_maintenance_workers']
-        for aparam in params:
-            sql = 'SHOW ' + aparam + ';'
-            value=json.loads(db_fetch_json(con,sql))
-            running_values[aparam]=value[0][aparam]
+        # Read only settings available in this server version; SHOW on a missing
+        # setting would abort the transaction on older PostgreSQL releases.
+        params = [
+            'max_connections', 'shared_buffers', 'effective_cache_size',
+            'maintenance_work_mem', 'checkpoint_completion_target', 'wal_buffers',
+            'default_statistics_target', 'random_page_cost', 'effective_io_concurrency',
+            'work_mem', 'huge_pages', 'min_wal_size', 'max_wal_size',
+            'max_worker_processes', 'max_parallel_workers_per_gather',
+            'max_parallel_workers', 'max_parallel_maintenance_workers',
+            'jit', 'wal_compression', 'maintenance_io_concurrency',
+            'autovacuum_work_mem', 'autovacuum_max_workers',
+            'autovacuum_vacuum_cost_limit', 'autovacuum_vacuum_cost_delay',
+            'vacuum_cost_page_miss', 'vacuum_buffer_usage_limit', 'io_method',
+        ]
+        cursor = con.cursor()
+        try:
+            cursor.execute(
+                "SELECT name, current_setting(name) FROM pg_settings WHERE name = ANY(%s)",
+                (params,),
+            )
+            running_values = dict(cursor.fetchall())
+        finally:
+            cursor.close()
 
         # get the database version
         version_raw, _= db_query(con,'db_version')

@@ -4728,3 +4728,40 @@ details[open] > summary > .pga-disclosure-arrow { transform: rotate(180deg); }
 .connect-page .connect-actions { margin-top: 1rem; padding-top: .85rem; }
 .connect-page .tune-nav-tabs { margin-bottom: 0; }
 @media (max-width: 575.98px) { .connect-page .connect-section-card .card-body { padding: .85rem; } }
+
+/* pgTune: keep the generated recommendations in view. */
+.pgtune-page .tune-inputs summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+.pgtune-page .tune-inputs summary::-webkit-details-marker { display: none; }
+.pgtune-page .tune-inputs summary:focus-visible {
+  outline: 3px solid var(--pga-primary, #2f6f9f);
+  outline-offset: -3px;
+  border-radius: .85rem;
+}
+.pgtune-page .tune-inputs-heading { display: grid; gap: .35rem; }
+.pgtune-page .tune-inputs-summary { color: var(--pga-text, #172033); }
+.pgtune-page .tune-edit-label { flex-shrink: 0; font-weight: 600; }
+.pgtune-page .tune-inputs[open] .tune-edit-label span { display: inline-block; transform: rotate(180deg); }
+.pgtune-page .tune-row-status { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: flex-end; }
+.pgtune-page .tune-setting-value { font-family: var(--bs-font-monospace, monospace); font-variant-numeric: tabular-nums; }
+.pgtune-page .tune-table tbody th { text-transform: none; letter-spacing: normal; font-size: .875rem; }
+.pgtune-page .tune-code-block { min-height: 10rem; max-height: 35rem; overflow: auto; }
+.pgtune-page .tune-table [hidden] { display: none !important; }
+.pgtune-page .nav.nav-tabs.tune-nav-tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 1rem !important;
+}
+@media (max-width: 575.98px) {
+  .pgtune-page .tune-inputs summary { align-items: flex-start; flex-direction: column; }
+  .pgtune-page .tune-table { min-width: 620px; }
+}

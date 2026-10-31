@@ -538,12 +538,16 @@ def handle_pgtune_post():
     db_memory_unity = request.form.get('db_memory_unity')
     db_maxconn = request.form.get('db_maxconn')
     db_storage = request.form.get('db_storage')
+    data_size_class = request.form.get('data_size_class', 'mid_ram')
+    if data_size_class not in {'less_ram', 'mid_ram', 'greater_ram'}:
+        return 'Invalid data size class.', 400
 
     running_values,major_version=database.get_pg_tune_parameter(session)
-    a_pgtune = pgtune.pgTune (major_version,db_cpu,db_memory+db_memory_unity,db_storage,db_type,db_maxconn)
+    a_pgtune = pgtune.pgTune (major_version,db_cpu,db_memory+db_memory_unity,db_storage,db_type,db_maxconn, data_size_class=data_size_class)
     
     tuned_values = a_pgtune.get_pg_tune()
     sqlalter = a_pgtune.get_alter_system(running_values)
+    postgresql_conf = a_pgtune.get_postgresql_conf()
     docker_cmd = a_pgtune.get_docker_cmd(session, major_version)
     kubernetes_cmd = a_pgtune.get_kube_cmd(session, major_version)
 
@@ -552,6 +556,7 @@ def handle_pgtune_post():
                            running_values=running_values, 
                            tuned_values=tuned_values,
                            sqlalter=sqlalter,
+                           postgresql_conf=postgresql_conf,
                            docker_cmd=docker_cmd,
                            kubernetes_cmd=kubernetes_cmd
                            )

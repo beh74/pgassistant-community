@@ -1,0 +1,54 @@
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const button = document.getElementById('refresh-huge-pages');
+  const tab = document.getElementById('huge-pages-tab');
+  const status = document.getElementById('huge-pages-status');
+  const details = document.getElementById('huge-pages-details');
+  let loading = false;
+  let loaded = false;
+  async function loadSettings() {
+    if (loading) return;
+    loading = true;
+    button.disabled = true;
+    details.hidden = true;
+    status.textContent = 'Reading the connected PostgreSQL settings…';
+    try {
+      const response = await fetch('/api/v1/pgtune/huge-pages', {headers: {'Accept': 'application/json'}});
+      if (!response.ok) throw new Error('Unable to read settings. Check your database connection and retry.');
+      const result = await response.json();
+      const body = document.getElementById('huge-pages-settings');
+      body.replaceChildren();
+      const parameters = ['shared_buffers', 'max_connections', 'shared_memory_type', 'shared_memory_size', 'shared_memory_size_in_huge_pages', 'huge_page_size', 'huge_pages', 'huge_pages_status'];
+      parameters.forEach(function (name) {
+        const row = document.createElement('tr');
+        [name, result.settings[name] ?? 'Unavailable on this server'].forEach(function (value) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+      const actions = document.getElementById('huge-pages-actions');
+      actions.replaceChildren();
+      result.actions.forEach(function (text) {
+        const item = document.createElement('li');
+        item.textContent = text;
+        item.className = 'mb-2';
+        actions.appendChild(item);
+      });
+      status.textContent = result.recommended_pages
+        ? `Current instance requirement with 5% margin: ${result.recommended_pages} pages. Host readiness has not been verified.`
+        : 'The server does not expose a usable page count. See suggested actions.';
+      details.hidden = false;
+      loaded = true;
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      loading = false;
+      button.disabled = false;
+    }
+  }
+  button.addEventListener('click', loadSettings);
+  tab.addEventListener('shown.bs.tab', function () { if (!loaded) loadSettings(); });
+});
+</script>

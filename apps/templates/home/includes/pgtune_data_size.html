@@ -1,0 +1,10 @@
+{% set selected_data_size = request.form.get('data_size_class', 'mid_ram') %}
+<div class="col-12 col-md-4">
+  <label for="data_size_class" class="form-label">Total Data Size</label>
+  <select class="form-select" id="data_size_class" name="data_size_class" aria-describedby="data-size-help">
+    <option value="less_ram" {% if selected_data_size == 'less_ram' %}selected{% endif %}>Less than RAM</option>
+    <option value="mid_ram" {% if selected_data_size == 'mid_ram' %}selected{% endif %}>1x–3x RAM (default)</option>
+    <option value="greater_ram" {% if selected_data_size == 'greater_ram' %}selected{% endif %}>More than 3x RAM</option>
+  </select>
+  <div id="data-size-help" class="form-text">Compared to the memory above. Use the container memory limit when applicable.</div>
+</div>

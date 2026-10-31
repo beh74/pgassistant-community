@@ -88,6 +88,25 @@ POST /api/v2/pgtune
 This endpoint supports explicit resource sizing and connected database sizing.
 It generates recommendations but never applies them.
 
+The effective `data_size_class` is returned in `inputs`. Missing or `null` values
+use `mid_ram`; other invalid values return HTTP 400.
+
+The historical `GET`/`POST /api/v1/query_parameter_advisor` accepts the same
+optional field at the top level of its JSON body, alongside `db_config`:
+
+```json
+{
+  "db_config": {"db_uri": "postgresql://user:password@postgres:5432/application"},
+  "data_size_class": "less_ram"
+}
+```
+
+For GET requests, `?data_size_class=less_ram` is also accepted. An explicit JSON
+field takes precedence over the query parameter. The effective category is
+included in `pgtune.assumptions` when the baseline calculation succeeds. Other v1
+pgTune routes (`resources` and `huge-pages`) inspect current server state and do
+not generate a baseline, so they do not need this sizing input.
+
 ### Explicit resource mode
 
 Omit `database_uri` and provide the resources to size:
@@ -109,6 +128,7 @@ Omit `database_uri` and provide the resources to size:
 | `memory_mb` | Yes | Positive amount of memory in MiB. |
 | `postgresql_version` | No | PostgreSQL major version; defaults to `18`. |
 | `database_type` | No | `web`, `oltp`, or `dw`; defaults to `web`. |
+| `data_size_class` | No | `less_ram` (< RAM), `mid_ram` (1x–3x RAM), or `greater_ram` (> 3x RAM); defaults to `mid_ram`. Refers to memory available to PostgreSQL. |
 | `storage` | No | `ssd`, `san`, or `hdd`; defaults to `ssd`. |
 | `max_connections` | No | Positive connection limit; defaults to `100`. |
 

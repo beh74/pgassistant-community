@@ -1,0 +1,17 @@
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-4">
+    <h2 class="h5">Huge Pages</h2>
+    <p>pgTune recommends <code>huge_pages = try</code> when the proposed <code>shared_buffers</code> is at least 4 GiB. This is a tuning policy, not a PostgreSQL requirement.</p>
+    <p>Read the connected database's current settings and calculate its page requirement with 5% margin. Actions below are suggestions to perform manually.</p>
+    <button type="button" class="btn btn-outline-primary mb-3" id="refresh-huge-pages">Read current settings</button>
+    <p id="huge-pages-status" role="status" aria-live="polite">Open this tab to load the current database settings.</p>
+    <div id="huge-pages-details" hidden>
+      <div class="table-responsive">
+        <table class="table"><caption>Current database settings; unavailable parameters depend on PostgreSQL version.</caption><thead><tr><th scope="col">Parameter</th><th scope="col">Current value</th></tr></thead><tbody id="huge-pages-settings"></tbody></table>
+      </div>
+      <h3 class="h6">Suggested actions</h3>
+      <ol id="huge-pages-actions"></ol>
+    </div>
+    <a href="https://www.postgresql.org/docs/current/kernel-resources.html#LINUX-HUGE-PAGES" target="_blank" rel="noopener">PostgreSQL Huge Pages documentation</a>
+  </div>
+</div>

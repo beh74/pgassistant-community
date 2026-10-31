@@ -37,10 +37,33 @@ class PgTuneV2ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
+        self.assertEqual(payload["inputs"]["data_size_class"], "mid_ram")
         self.assertTrue(payload["success"])
         self.assertEqual(payload["source"], "request")
         self.assertEqual(payload["recommendations"], {"shared_buffers": "2GB"})
-        pg_tune.assert_called_once_with("17", 4, "8192MB", "ssd", "web", 100)
+        pg_tune.assert_called_once_with("17", 4, "8192MB", "ssd", "web", 100, data_size_class="mid_ram")
+
+    def test_accepts_data_size_categories_and_returns_effective_input(self):
+        for value in (None, "less_ram", "mid_ram", "greater_ram"):
+            with self.subTest(value=value):
+                with patch.object(route_pgtune.pgtune, "pgTune", return_value=self._tuner()) as tuner:
+                    response = self.client.post("/api/v2/pgtune", json={
+                        "cpu": 2, "memory_mb": 65536, "data_size_class": value,
+                    })
+                self.assertEqual(response.status_code, 200)
+                expected = value or "mid_ram"
+                self.assertEqual(response.get_json()["inputs"]["data_size_class"], expected)
+                self.assertEqual(tuner.call_args.kwargs["data_size_class"], expected)
+
+    def test_rejects_invalid_data_size_before_connecting(self):
+        for value in ("invalid", "", [], {}, 3, False):
+            with self.subTest(value=value), patch.object(route_pgtune, "_database_inputs") as connect:
+                response = self.client.post("/api/v2/pgtune", json={
+                    "cpu": 2, "memory_mb": 65536, "data_size_class": value,
+                })
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("data_size_class", response.get_json()["error"])
+                connect.assert_not_called()
 
     def test_requires_bearer_token_only_when_configured(self):
         os.environ["PGA_API_TOKEN"] = "integration-secret"
@@ -98,7 +121,7 @@ class PgTuneV2ApiTests(unittest.TestCase):
         self.assertIn("ALTER SYSTEM", payload["alter_system_sql"])
         self.assertNotIn("database_uri", payload)
         connection.close.assert_called_once()
-        pg_tune.assert_called_once_with("16", 8, "16384MB", "ssd", "web", 250)
+        pg_tune.assert_called_once_with("16", 8, "16384MB", "ssd", "web", 250, data_size_class="mid_ram")
 
     def test_rejects_missing_sizing_without_database_uri(self):
         response = self.client.post("/api/v2/pgtune", json={})
