@@ -4,64 +4,22 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 from flask import Flask
-from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
-from importlib import import_module
 
 from .version import __version__
 
 
-
-db = SQLAlchemy()
-login_manager = LoginManager()
-
-
-def register_extensions(app):
-    db.init_app(app)
-    login_manager.init_app(app)
-
-
 def register_blueprints(app):
-    for module_name in ('authentication', 'home'):
-        module = import_module('apps.{}.routes'.format(module_name))
-        app.register_blueprint(module.blueprint)
+    from apps.home.routes import blueprint as home_blueprint
+    app.register_blueprint(home_blueprint)
 
     # Keep the versioned integration API independent from historical routes.
     from apps.api_v2 import blueprint as api_v2_blueprint
     app.register_blueprint(api_v2_blueprint)
 
 
-def configure_database(app):
-
-    @app.before_first_request
-    def initialize_database():
-        try:
-            db.create_all()
-        except Exception as e:
-
-            print('> Error: DBMS Exception: ' + str(e) )
-
-            # fallback to SQLite
-            basedir = os.path.abspath(os.path.dirname(__file__))
-            app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'db.sqlite3')
-
-            print('> Fallback to SQLite ')
-            db.create_all()
-
-    @app.teardown_request
-    def shutdown_session(exception=None):
-        db.session.remove()
-
-from apps.authentication.oauth import github_blueprint
-
 def create_app(config):
     app = Flask(__name__)
     app.config.from_object(config)
     app.config["PGASSISTANT_VERSION"] = __version__
-    register_extensions(app)
-
-    app.register_blueprint(github_blueprint, url_prefix="/index")
-    
     register_blueprints(app)
-    #configure_database(app)
     return app

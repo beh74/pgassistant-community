@@ -199,7 +199,6 @@
   .tools-pill-monitoring,
   .tools-pill-docs { background: var(--ga-cyan-soft, #cffafe); color: #075985; }
   .tools-pill-issues { background: var(--ga-red-soft, #fee2e2); color: #991b1b; }
-  .tools-pill-auth { background: #f8fafc; color: var(--ga-muted-strong, #475569); border: 1px solid var(--ga-border, #dbe4ef); }
 
   .tools-card-actions {
     display: flex;
@@ -242,8 +241,7 @@
     color: #fff;
   }
 
-  .tools-btn-issues,
-  .tools-btn-auth {
+  .tools-btn-issues {
     background: linear-gradient(135deg, var(--ga-red, #dc2626), #f43f5e);
     color: #fff;
   }
@@ -315,7 +313,6 @@
     'issues': 'tools-pill tools-pill-issues',
     'dba': 'tools-pill tools-pill-dba',
     'docs': 'tools-pill tools-pill-docs',
-    'auth': 'tools-pill tools-pill-auth'
   } %}
 
   {% set BTN_CLASS = {
@@ -330,7 +327,6 @@
     'issues': 'tools-btn tools-btn-issues',
     'dba': 'tools-btn tools-btn-dba',
     'docs': 'tools-btn tools-btn-docs',
-    'auth': 'tools-btn tools-btn-auth'
   } %}
 
   {# ---------------- Macro: card ---------------- #}
@@ -409,7 +405,6 @@
         <option value="issues" {% if selected_category == 'issues' %}selected{% endif %}>Issues</option>
         <option value="dba" {% if selected_category == 'dba' %}selected{% endif %}>DBA Corner</option>
         <option value="docs" {% if selected_category == 'docs' %}selected{% endif %}>Docs</option>
-        <option value="auth" {% if selected_category == 'auth' %}selected{% endif %}>Auth</option>
       </select>
     </form>
   </div>
@@ -489,13 +484,6 @@
         keywords='rank queries scoring'
       ) }}
 
-      {{ tool_card(
-        'Statistics', '/stats.html', 'monitoring', 'bi bi-bar-chart',
-        'General stats and activity insights.',
-        tags=['sessions','locks','io'],
-        keywords='statistics stats activity'
-      ) }}
-
       {% set db_items = [
         ('Modules', '/generic/database_modules', 'modules extensions', 'bi bi-boxes', 'Database modules/extensions view.', ['extensions','modules','preload']),
         ('All Settings', '/generic/database_settings', 'settings parameters', 'bi bi-gear', 'Browse all settings.', ['parameters','config']),
@@ -543,7 +531,6 @@
         {{ tool_card('DBA Corner · ' ~ label, href, 'dba', icon, subtitle, tags=tags, keywords='dba ' ~ label|lower ~ ' ' ~ kw) }}
       {% endfor %}
 
-      {{ tool_card('Logout', '/logout', 'auth', 'bi bi-box-arrow-right', 'End the current session.', tags=['session','sign out'], keywords='logout sign out') }}
 
     {% endif %}
   </div>

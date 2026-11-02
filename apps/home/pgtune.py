@@ -1,3 +1,5 @@
+"""Validate sizing inputs and run pgTune to recommend PostgreSQL settings."""
+
 import subprocess
 
 

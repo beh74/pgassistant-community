@@ -1,3 +1,5 @@
+"""Parse and format SQL, resolve query parameters, and inspect execution plans."""
+
 import re
 import json
 import uuid
@@ -666,22 +668,6 @@ def map_query_parameters(query, connection):
         param_mapping[param] = (resolved_table_name, column_name, column_type)
 
     return param_mapping
-
-
-def split_query_by_parameters(query, parameters):
-    """
-    Split the query into smaller parts based on the presence of multiple parameters in a single line.
-    """
-    fragments = []
-    if not parameters:
-        return fragments
-
-    for line in query.splitlines():
-        parts = re.split(rf"({'|'.join(re.escape(p) for p in parameters)})", line)
-        for part in parts:
-            if part.strip():
-                fragments.append(part.strip())
-    return fragments
 
 
 def merge_parameter_mappings(sql_query, parser_mapping, postgres_types):

@@ -1,3 +1,5 @@
+"""Query LLM services and build prompts for PostgreSQL query and schema analysis."""
+
 import os
 import requests
 import markdown
@@ -309,31 +311,6 @@ def _strip_explain(sql: str) -> str:
     """
     return re.sub(pattern, "", sql, flags=re.IGNORECASE | re.VERBOSE)
 
-def _plan_block(rows: Union[str, Dict[str, Any], Iterable[Dict[str, Any]]]) -> str:
-    """
-    Normalise la section plan :
-    - si dict/list -> JSON pretty
-    - si list de dicts avec 'QUERY PLAN' (comme psql) -> concatène
-    - si str -> renvoie tel quel
-    """
-    if rows is None:
-        return "_No plan provided_"
-    if isinstance(rows, (dict, list)):
-        return "```json\n" + json.dumps(rows, indent=2) + "\n```"
-    if isinstance(rows, str):
-        rows = rows.strip()
-        fence = "```" if not rows.startswith("```") else ""
-        return f"{fence}\n{rows}\n{fence}"
-    # list de dicts (format psql)
-    try:
-        lines = []
-        for r in rows:  # type: ignore[assignment]
-            if isinstance(r, dict) and "QUERY PLAN" in r:
-                lines.append(str(r["QUERY PLAN"]))
-        return "```\n" + "\n".join(lines) + "\n```"
-    except Exception:
-        return "```\n" + str(rows) + "\n```"
-
 def format_column_statistics(column_statistics):
     if not column_statistics:
         return ""
@@ -518,43 +495,6 @@ def get_llm_query_for_query_analyze(
     return "\n".join(llm)
 
 
-def generate_primary_key_prompt(table_name: str, ddl: str) -> str:
-    """
-    Generates a prompt for an LLM to determine the best primary key for a PostgreSQL table
-    and provide the necessary ALTER TABLE command.
-
-    Args:
-        table_name (str): The name of the table.
-        ddl (str): The DDL (Data Definition Language) statement for the table.
-
-    Returns:
-        str: A formatted prompt for the LLM.
-    """
-    prompt = f"""
-I have a PostgreSQL table that does not have a primary key. In some cases, a natural key (like an ISO country code) is a good choice, 
-but when no stable unique column exists, a technical key (`SERIAL` or `UUID`) is preferable.
-
-A technical key is best when:
-- No single column or combination of columns is reliably unique.
-- Natural keys are too large, unstable, or inefficient for indexing.
-- Composite keys make queries and relationships complex.
-- The table is large, requiring fast lookups and indexing.
-- The system is distributed and needs globally unique identifiers.
-
-Given the following table structure, suggest the most appropriate primary key (either an existing column or a new technical key) and explain why.
-
-Additionally, provide the necessary **ALTER TABLE** SQL command(s) to implement your suggested primary key.
-
-**One more thing** : Can you also check if the column types and their lengths in the following table are appropriate based on their names and potential usage ? Please mention RFC conventions if any exist end provide an ALTER command to change the column data type or length.
-
-**Table Name:** {table_name}  
-**DDL:**  
-```sql
-{ddl}
-```
-"""
-    return prompt
-
 TABLE_PROMPT_DDL_PLACEHOLDER = "{{DDL}}"
 TABLE_PROMPT_GUIDELINES_PLACEHOLDER = "{{GUIDELINES}}"
 
@@ -683,36 +623,3 @@ def analyze_with_sql_quide(ddl: str, guidelines: str) -> str:
         template=template,
         guidelines=guidelines,
     )
-
-
-def get_llm_query_for_query_optimize (sql_query):
-    llm = (
-        "Could you optimize this postgresql query for me : \n "
-        f"{sql_query}\n"
-    )
-    return llm
-
-def list_available_models():
-    """
-    Returns a list of available models from the OpenAI API or a compatible API (like Ollama).
-    - Uses OPENAI_API_KEY if available.
-    - Otherwise, uses LOCAL_LLM_URI with a dummy 'none' API key.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("LOCAL_LLM_URI")
-
-    if not api_key and not base_url:
-        raise ValueError("Neither OPENAI_API_KEY nor LOCAL_LLM_URI is set.")
-
-    # Initialize the OpenAI client
-    client = OpenAI(
-        api_key=api_key or "none",  # "none" works for Ollama or APIs without authentication
-        base_url=base_url or "https://api.openai.com/v1"
-    )
-
-    try:
-        models = client.models.list()
-        return [model.id for model in models.data]
-    except Exception as e:
-        print(f"❌ Error fetching models: {e}")
-        return []

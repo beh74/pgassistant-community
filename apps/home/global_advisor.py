@@ -1,3 +1,5 @@
+"""Run PostgreSQL advisory checks and summarize recommendations for team dashboards."""
+
 import json
 import time
 from collections import Counter, defaultdict

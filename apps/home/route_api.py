@@ -10,7 +10,6 @@ import requests
 from flask import Response, jsonify, request, session
 
 from apps.home import blueprint
-from . import action
 from . import api_helper
 from . import database
 from . import executive_plan
@@ -582,100 +581,6 @@ def api_dashboard_postgresql_version():
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
-
-@blueprint.route("/api/v1/pg_stat_statements_reset", methods=["POST"])
-def api_reset_stats():
-    try:
-        data = request.get_json(force=True)
-
-        if not data or "db_config" not in data:
-            return jsonify({"error": "Missing 'db_config' in request body"}), 400
-        db_config = data["db_config"]
-
-        required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
-        missing = [k for k in required_keys if k not in db_config]
-        if missing:
-            return jsonify({"error": f"Missing keys in db_config: {', '.join(missing)}"}), 400
-
-        database.exec_cmd(db_config, "pg_stat_statements_reset")
-
-        return Response("pg_stat_statements statistics are reset", mimetype="text/markdown; charset=utf-8")
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@blueprint.route("/api/v1/apply_recommandations", methods=["POST"])
-def api_apply_recommendations():
-    try:
-        data = request.get_json(force=True)
-
-        if not data or "db_config" not in data:
-            return jsonify({"error": "Missing 'db_config' in request body"}), 400
-
-        db_config = data["db_config"]
-
-        if "unique_name" not in data or not data["unique_name"]:
-            return jsonify({"error": "Missing or empty 'unique_name'"}), 400
-        unique_name = data["unique_name"]
-
-        required_keys = ["db_host", "db_port", "db_name", "db_user", "db_password"]
-        missing = [k for k in required_keys if k not in db_config]
-        if missing:
-            return jsonify({"error": f"Missing keys in db_config: {', '.join(missing)}"}), 400
-
-        dryrun = data.get("dryrun", True)
-        if not isinstance(dryrun, bool):
-            return jsonify({"error": "'dryrun' must be a boolean"}), 400
-
-        allowed_reco = {
-            "create_missing_fk_indexes",
-            "drop_duplicate_indexes",
-            "alter_table_columns_on_fk",
-            "drop_unused_indexes",
-            "all",
-        }
-        run_recommandations = data.get("run_recommandations", None)
-
-        if run_recommandations is None:
-            return jsonify({"error": "Missing 'run_recommandations'"}), 400
-
-        if not isinstance(run_recommandations, list):
-            return jsonify({"error": "'run_recommandations' must be a list"}), 400
-
-        unknown = [x for x in run_recommandations if x not in allowed_reco]
-        if unknown:
-            return jsonify({"error": f"Unknown recommendation(s): {', '.join(unknown)}"}), 400
-
-        if "all" in run_recommandations:
-            run_recommandations = list(allowed_reco - {"all"})
-
-        executed_sql, errors = action.run_actions(db_config, unique_name=unique_name, dry_mode=dryrun)
-        result = {
-            "dryrun": dryrun,
-            "run_recommandations": run_recommandations,
-            "message": "Recommendations executed." if not errors else "Errors occurred while executing recommendations.",
-            "executed_sql": executed_sql,
-            "errors": errors
-        }
-
-        if errors:
-            return Response(
-                json.dumps(result, indent=2),
-                mimetype="application/json; charset=utf-8",
-                status=400
-            )
-
-        return Response(
-            json.dumps(result, indent=2),
-            mimetype="application/json; charset=utf-8",
-            status=200
-        )
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-  
 
 @blueprint.route("/api/v1/indexe_stats/<schemaname>/<indexname>", methods=["GET"])
 def api_indexe_stats_by_schema(schemaname, indexname):

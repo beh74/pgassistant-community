@@ -1,3 +1,5 @@
+"""Define recommendation models, categories, priorities, and safety metadata."""
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Dict, Any

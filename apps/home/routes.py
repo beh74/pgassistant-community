@@ -41,7 +41,6 @@ from .routes_helpers import (
     handle_table_autovacuum_tune_post,
     handle_table_rfc_get,
     handle_topqueries_get,
-    handle_topstatistics_get,
     is_db_connected,
     multi_db_template_context,
 )
@@ -78,6 +77,7 @@ def _inject_multi_db_context():
     return {**multi_db_template_context(session), **collector_context}
 
 
+@blueprint.route('/')
 @blueprint.route('/index')
 def index():
     return redirect("/database.html")
@@ -145,8 +145,6 @@ def route_template(template: str):
             return handle_query_index_advisor_get(template, segment)
         elif segment == "query_parameter_advisor.html" and request.method == 'GET':
             return handle_query_parameter_advisor_get(template, segment)
-        elif segment == "stats.html" and request.method == 'GET':
-            return handle_topstatistics_get(template, segment)
         elif segment == "reset_pg_statistics.html":
             return handle_reset_pg_statistics()
         elif segment == "reset_pg_stat.html":

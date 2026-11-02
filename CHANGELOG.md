@@ -1,3 +1,8 @@
+## [3.8.8] - 2026-11-02
+
+- Dashboard design refactoring
+- Remove obsolete pages and unused modules, functions, and navigation links.
+
 ## [3.8.7] - 2026-10-31
 
 - pgTune: update tuning rules to follow the newer upstream pgTune algorithm, including data-size input in the UI and APIs, revised maintenance memory, and additional PostgreSQL recommendations. Keep LZ4 compression and I/O method changes commented out in Docker Compose and generated SQL pending compatibility checks.

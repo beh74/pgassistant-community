@@ -1,3 +1,5 @@
+"""Estimate prompt tokens and determine model families and context limits."""
+
 import re
 
 # Heuristic token estimator for SQL/JSON prompts
@@ -104,47 +106,6 @@ MODEL_CTX_LIMITS = {
     "unknown": 8192,
 }
 
-def choose_ctx_and_output_budget(model_llm: str | None, prompt_tokens: int) -> tuple[int, int, str]:
-    """
-    Return (ctx_limit, out_tokens_budget, mode)
-    mode:
-      - "ok": normal
-      - "tight": low remaining margin, reduced output
-      - "overflow": prompt too large -> minimal output (truncate/summarize upstream)
-    """
-    family = detect_model_family(model_llm)
-    ctx_limit = MODEL_CTX_LIMITS.get(family, MODEL_CTX_LIMITS["unknown"])
-
-    # More realistic margins
-    margin = 512 if ctx_limit <= 8192 else 1024
-
-    # If the prompt is already too large (or nearly), switch to degraded mode
-    if prompt_tokens >= ctx_limit - margin:
-        # Minimal output; ideally truncate the prompt upstream
-        return ctx_limit, 64, "overflow"
-
-    remaining = ctx_limit - prompt_tokens - margin  # > 0 here
-
-    # Safer caps to avoid timeouts (especially 20B models)
-    # Adjust according to your infrastructure
-    if family in ("qwen3.6", "qwen3.5"):
-        hard_cap = 2048    
-    elif family in ("gpt-oss-20b", "mixtral", "mistral3"):
-        hard_cap = 1200
-    elif ctx_limit <= 8192:
-        hard_cap = 800
-    else:
-        hard_cap = 1500
-
-    # Proportional output, without an unrealistic floor
-    out_budget = min(hard_cap, int(remaining * 0.35))
-
-    # Apply floor only if there is actually enough space
-    if out_budget < 128:
-        return ctx_limit, max(64, out_budget), "tight"
-
-    return ctx_limit, out_budget, "ok"
-
 def choose_ctx_for_unlimited_output(model_llm: str | None, prompt_tokens: int) -> tuple[int, str]:
     """
     Return (ctx_limit, mode) without applying any pgAssistant output cap.
@@ -161,16 +122,3 @@ def choose_ctx_for_unlimited_output(model_llm: str | None, prompt_tokens: int) -
     if prompt_tokens >= int(ctx_limit * 0.85):
         return ctx_limit, "tight"
     return ctx_limit, "ok"
-
-def clamp_num_ctx(ctx_limit: int, prompt_tokens: int, out_budget: int) -> int:
-    """
-    num_ctx covers prompt + output + margin, but does not enforce an excessively large minimum
-    if ctx_limit is small.
-    """
-    margin = 256 if ctx_limit <= 8192 else 512
-    needed = prompt_tokens + out_budget + margin
-
-    # Reasonable minimum = min(2048, ctx_limit)
-    # (otherwise you would request 2048 on a 1024/1536 model, etc.)
-    min_ctx = min(2048, ctx_limit)
-    return max(min_ctx, min(ctx_limit, needed))

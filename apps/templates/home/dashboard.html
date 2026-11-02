@@ -91,11 +91,16 @@
   </div>
 {% endmacro %}
 
-{% set top_profile_calls = dbinfo['profile'][:4] %}
-{% set more_profile_calls = dbinfo['profile'][4:] %}
-{% set top_profile_time = dbinfo['profile'][:4] %}
-{% set more_profile_time = dbinfo['profile'][4:] %}
-{% set cache_value = dbinfo['cache'] | float %}
+{% set profile_calls = dbinfo.get('profile', []) | sort(attribute='total_calls', reverse=true) %}
+{% set profile_time = dbinfo.get('profile', []) | sort(attribute='total_exec_time', reverse=true) %}
+{% set top_profile_calls = profile_calls[:4] %}
+{% set more_profile_calls = profile_calls[4:] %}
+{% set top_profile_time = profile_time[:4] %}
+{% set more_profile_time = profile_time[4:] %}
+{% set cache_value = dbinfo.get('cache') %}
+{% set connections = dbinfo.get('connexions') %}
+{% set max_connections = dbinfo.get('max_connexions') | int %}
+{% set connection_percent = (100 * connections | int / max_connections) if connections is not none and max_connections > 0 else none %}
 
 <div class="pg-page dashboard-page">
 
@@ -104,23 +109,21 @@
       <div class="pg-eyebrow"><i class="bi bi-speedometer2"></i> Database overview</div>
       <h1 class="pg-title">Dashboard</h1>
       <p class="pg-subtitle">
-        PostgreSQL health overview, workload distribution, DEV advisor recommendations, and client activity.
+        {{ 'Cluster overview' if dbinfo.get('multi_db') else 'Database' }} · <strong>{{ session.get('db_name', 'Unknown') }}</strong>
+        {% if session.get('db_host') %} · {{ session.get('db_host') }}{% endif %}
       </p>
     </div>
 
     <div class="pg-actions">
-      <a href="/global/advisor" class="btn btn-primary btn-sm">
-        <i class="bi bi-stars me-1"></i> Open Global Advisor
-      </a>
-      <a href="/topqueries.html" class="btn btn-outline-primary btn-sm">
-        Review query activity
-      </a>
+      <button type="button" id="dashboardRefresh" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i> Refresh
+      </button>
     </div>
   </div>
 
   <div class="pg-hero dashboard-command-hero">
     <div class="dashboard-health-card">
-      <div id="dashboardDevScoreArc" class="dashboard-health-score" style="--dashboard-health: 0deg;">
+      <div id="dashboardDevScoreArc" role="img" aria-label="DEV advisor score loading" class="dashboard-health-score" style="--dashboard-health: 0deg;">
         <strong id="dashboardDevScoreValue">...</strong>
         <span>/ 100</span>
       </div>
@@ -129,7 +132,8 @@
           DEV advisor score
           <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Score starts at 100 and subtracts penalties by recommendation type, weighted by priority and by the affected share of tables, indexes, foreign keys, or columns."></i>
         </div>
-        <p id="dashboardDevConclusion" class="dashboard-health-text">
+        <p class="small text-muted mb-1">Schema and index recommendations</p>
+        <p id="dashboardDevConclusion" class="dashboard-health-text" aria-live="polite">
           Querying database for DEV recommendations...
         </p>
       </div>
@@ -139,14 +143,6 @@
       <a href="/global/advisor" class="dashboard-action-pill">
         <span class="dashboard-action-main"><i class="bi bi-stars"></i> Review recommendations</span>
         <span id="dashboardDevActionMeta" class="dashboard-action-meta">loading</span>
-      </a>
-      <a href="/rankqueries.html" class="dashboard-action-pill">
-        <span class="dashboard-action-main"><i class="bi bi-trophy"></i> Prioritize queries</span>
-        <span class="dashboard-action-meta">ranking</span>
-      </a>
-      <a href="/pgtune.html" class="dashboard-action-pill">
-        <span class="dashboard-action-main"><i class="bi bi-sliders"></i> Check configuration</span>
-        <span class="dashboard-action-meta">pgTune</span>
       </a>
     </div>
   </div>
@@ -159,115 +155,61 @@
   </div>
   {% endif %}
 
-  <div class="dashboard-kpi-grid">
+  {% macro metric_card(label, value, icon, href, version_advisor=false) %}
     <div class="pg-card pg-card-body dashboard-kpi-card">
-      <div class="dashboard-kpi-icon"><i class="bi bi-database"></i></div>
-      <div>
-        <div class="dashboard-kpi-label">Database version</div>
-        <a href="#" id="dashboardVersionAdvisorLink" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#postgresVersionAdvisorModal">
-          <h2 class="dashboard-kpi-value">{{ dbinfo['version'] }}</h2>
-        </a>
-        <p class="dashboard-kpi-subtext">Uptime: <strong>{{ dbinfo['uptime'] }}</strong></p>
+      <div class="dashboard-kpi-heading">
+        <i class="bi {{ icon }}" aria-hidden="true"></i>
+        <div class="dashboard-kpi-label">{{ label }}</div>
       </div>
-    </div>
-
-    <div class="pg-card pg-card-body dashboard-kpi-card">
-      <div class="dashboard-kpi-icon"><i class="bi bi-hdd-rack"></i></div>
-      <div>
-        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster size{% else %}Database size{% endif %}</div>
-        <h2 class="dashboard-kpi-value">{{ dbinfo['size'] }}</h2>
-        <p class="dashboard-kpi-subtext">
-          {% if dbinfo.get('multi_db') %}
-          {{ dbinfo.get('databases', [])|length }} databases on cluster
-          {% else %}
-          Shared buffers: <a href="/pgtune.html" class="text-decoration-none"><strong>{{ dbinfo['shared_buffers'] }}</strong></a>
-          {% endif %}
-        </p>
-      </div>
-    </div>
-
-    <div class="pg-card pg-card-body dashboard-kpi-card">
-      <div class="dashboard-kpi-icon"><i class="bi bi-speedometer2"></i></div>
-      <div>
-        <div class="dashboard-kpi-label">{% if dbinfo.get('multi_db') %}Cluster hit cache{% else %}Hit cache ratio{% endif %}</div>
-        <a href="/cache_table.html" class="text-decoration-none">
-          <h2 class="dashboard-kpi-value">{{ dbinfo['cache'] }}%</h2>
-        </a>
-        {% if cache_value >= 99 %}
-          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Excellent</span>
-        {% elif cache_value >= 95 %}
-          <span class="dashboard-status good"><i class="bi bi-check-circle-fill"></i> Good</span>
-        {% else %}
-          <span class="dashboard-status bad"><i class="bi bi-x-circle-fill"></i> Needs attention</span>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="pg-card pg-card-body dashboard-kpi-card">
-      <div class="dashboard-kpi-icon"><i class="bi bi-shield-check"></i></div>
-      <div>
-        <div class="dashboard-kpi-label">DEV recommendations</div>
-        <h2 id="dashboardDevTotal" class="dashboard-kpi-value">...</h2>
-        <span id="dashboardDevStatus" class="dashboard-status warn"><i class="bi bi-hourglass-split"></i> Querying database</span>
-      </div>
-    </div>
-  </div>
-
-  {% set architecture = dbinfo.get('architecture', {}) %}
-  <div class="pg-card mb-4">
-    <div class="dashboard-card-header">
-      <span class="dashboard-section-title">
-        <i class="bi bi-diagram-3"></i>
-        <span>Database architecture</span>
-      </span>
-      <a href="/database_analyze_llm.html" class="btn btn-sm btn-outline-primary">Open DB Design</a>
-    </div>
-    <div class="pg-card-body d-flex align-items-center flex-wrap gap-2">
-      <strong class="me-2">{{ architecture.get('type', 'Unknown') }}</strong>
-      <span class="badge dashboard-architecture-badge">
-        Role: {{ architecture.get('server_role', 'Unknown') }}
-      </span>
-      {% if architecture.get('wal_archiving') %}
-        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-enabled">WAL archiving enabled</span>
-        <span class="badge dashboard-architecture-badge">{{ architecture.get('archive_tool', 'Unknown') }}</span>
+      <h2 class="dashboard-kpi-value">{{ value }}</h2>
+      <div class="dashboard-kpi-description">{{ caller() }}</div>
+      {% if version_advisor %}
+      <button type="button" id="dashboardVersionAdvisorLink" class="dashboard-kpi-details" data-bs-toggle="modal" data-bs-target="#postgresVersionAdvisorModal" aria-label="{{ label }}: view details">
+        View details <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </button>
       {% else %}
-        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-disabled">WAL archiving disabled</span>
-      {% endif %}
-      {% if architecture.get('connected_replicas', 0) | int > 0 %}
-        <span class="badge dashboard-architecture-badge">
-          {{ architecture.get('connected_replicas') }} connected replica{% if architecture.get('connected_replicas') | int != 1 %}s{% endif %}
-        </span>
-      {% endif %}
-      {% if architecture.get('type') == 'Unknown' %}
-        <span class="small text-muted">Architecture information is unavailable for the connected role.</span>
+      <a href="{{ href }}" class="dashboard-kpi-details" aria-label="{{ label }}: view details">
+        View details <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </a>
       {% endif %}
     </div>
+  {% endmacro %}
+
+  <div class="dashboard-kpi-grid">
+    {% call metric_card('PostgreSQL version', dbinfo.get('version', '—'), 'bi-database', '', version_advisor=true) %}
+      <span class="small text-muted">Uptime: {{ dbinfo.get('uptime', 'Unavailable') }}</span>
+    {% endcall %}
+
+    {% call metric_card('Cluster size' if dbinfo.get('multi_db') else 'Database size', dbinfo.get('size', '—'), 'bi-hdd-rack', '/pgtune.html') %}
+      <span class="small text-muted">
+        {% if dbinfo.get('multi_db') %}{{ dbinfo.get('databases', [])|length }} databases on cluster
+        {% else %}Shared buffers: {{ dbinfo.get('shared_buffers', '—') }}{% endif %}
+      </span>
+    {% endcall %}
+
+    {% call metric_card('Cluster hit cache' if dbinfo.get('multi_db') else 'Hit cache ratio', ('%.2f'|format(cache_value) ~ '%') if cache_value is not none else '—', 'bi-speedometer2', '/cache_table.html') %}
+      {% if cache_value is none %}
+        <span class="small text-muted">No cache statistics available</span>
+      {% elif cache_value >= 99 %}
+        <span class="dashboard-status good">Excellent</span>
+      {% elif cache_value >= 95 %}
+        <span class="dashboard-status good">Good</span>
+      {% else %}
+        <span class="dashboard-status warn">Review workload</span>
+      {% endif %}
+      <span class="small text-muted">Cumulative buffer hits</span>
+    {% endcall %}
+
+    {% call metric_card('Server connections', (connections if connections is not none else '—') ~ ' / ' ~ (max_connections if max_connections else '—'), 'bi-people', '/generic/database_activity') %}
+      {% if connection_percent is not none %}
+        <span class="dashboard-status {{ 'bad' if connection_percent >= 90 else 'warn' if connection_percent >= 75 else 'good' }}">{{ '%.0f'|format(connection_percent) }}% of configured limit</span>
+      {% else %}
+        <span class="small text-muted">Usage unavailable</span>
+      {% endif %}
+    {% endcall %}
   </div>
 
-  {% if dbinfo.get('multi_db') and dbinfo.get('databases') %}
-  <div class="pg-card mb-4" id="cluster-databases-card">
-    <div class="dashboard-card-header">
-      <span class="dashboard-section-title"><i class="bi bi-collection"></i><span>Cluster databases</span></span>
-      <div class="d-flex align-items-center flex-wrap gap-2">
-        <label for="cluster-db-per-page" class="small text-muted mb-0">Per page</label>
-        <select id="cluster-db-per-page" class="form-select form-select-sm" style="width: auto;">
-          <option value="5">5</option>
-          <option value="10" selected>10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-        </select>
-      </div>
-    </div>
-    <div class="pg-card-body dashboard-row-list" id="cluster-databases-list"></div>
-    <div class="pagination-wrapper px-3 pb-3 pt-0">
-      <div id="cluster-db-pagination-info" class="pagination-info"></div>
-      <div id="cluster-db-pagination-controls" class="pagination-controls"></div>
-    </div>
-  </div>
-  <script type="application/json" id="cluster-databases-json">{{ dbinfo.databases | tojson }}</script>
-  {% endif %}
-
-  <div class="dashboard-section-grid">
+  <div class="dashboard-section-grid mb-4">
     <div class="dashboard-main-grid">
 
       <div class="pg-card">
@@ -279,6 +221,7 @@
           </span>
         </div>
         <div class="pg-card-body dashboard-profile-list">
+          <p class="small text-muted">Cumulative since pg_stat_statements was reset; not live throughput.</p>
           {% if not top_profile_calls %}
             <div class="small text-muted">No pg_stat_statements workload data is available for this database.</div>
           {% endif %}
@@ -292,7 +235,7 @@
                   <span>{{ humanize_number(table['total_calls']) }} calls</span>
                 </div>
                 <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of calls" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
               </div>
             </div>
@@ -314,6 +257,7 @@
           </span>
         </div>
         <div class="pg-card-body dashboard-profile-list">
+          <p class="small text-muted">Cumulative since pg_stat_statements was reset; not live throughput.</p>
           {% if not top_profile_time %}
             <div class="small text-muted">No pg_stat_statements workload data is available for this database.</div>
           {% endif %}
@@ -327,7 +271,7 @@
                   <span>{% if table['total_exec_time'] is defined %}{{ humanize_ms(table['total_exec_time']) }}{% endif %}</span>
                 </div>
                 <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of execution time" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
               </div>
             </div>
@@ -350,13 +294,20 @@
             <div class="dashboard-row-item">
               <div class="dashboard-row-icon"><i class="bi bi-grid-3x3-gap"></i></div>
               <div class="dashboard-row-main">
-                <div class="dashboard-row-label">{{ table['table_name'] }}</div>
+                <div class="dashboard-row-label">
+                  {% if table.get('schemaname') %}
+                    <a href="/topqueries.html?schema={{ table['schemaname']|urlencode }}&amp;tablename={{ table['table_name']|urlencode }}{% if table.get('database') %}&amp;db={{ table['database']|urlencode }}{% endif %}">{{ table['schemaname'] }}.{{ table['table_name'] }}</a>
+                  {% else %}{{ table['table_name'] }}{% endif %}
+                </div>
+                {% if table.get('database') %}<div class="dashboard-row-note">{{ table['database'] }}</div>{% endif %}
               </div>
               <div class="dashboard-row-value">
                 {{ table['size'] }}<br>
                 <small title="{{ format_integer(table['row_count']) }} rows">≈{{ humanize_number(table['row_count']) }} rows</small>
               </div>
             </div>
+          {% else %}
+            <p class="small text-muted mb-0">No table size information available.</p>
           {% endfor %}
         </div>
       </div>
@@ -371,13 +322,15 @@
             <div class="dashboard-row-item">
               <div class="dashboard-row-icon"><i class="bi bi-display"></i></div>
               <div class="dashboard-row-main">
-                <div class="dashboard-row-label">{{ client['client_addr'] }}</div>
+                <div class="dashboard-row-label">{{ client['client_addr'] or 'Local connection' }}</div>
               </div>
               <div class="dashboard-row-value">
                 <span title="{{ format_integer(client['total_connections']) }} connections">{{ humanize_number(client['total_connections']) }} connection(s)</span><br>
                 <small title="{{ format_integer(client['active_connections']) }} active">{{ humanize_number(client['active_connections']) }} active(s)</small>
               </div>
             </div>
+          {% else %}
+            <p class="small text-muted mb-0">No client activity available.</p>
           {% endfor %}
         </div>
       </div>
@@ -387,30 +340,10 @@
     <div class="dashboard-side-column">
       <div class="pg-card mb-3">
         <div class="dashboard-card-header">
-          <span class="dashboard-section-title"><i class="bi bi-activity"></i><span>Operational activity</span></span>
+          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>DEV priorities</span></span>
+          <a href="/global/advisor" class="btn btn-sm btn-outline-primary">See all</a>
         </div>
-        <div class="pg-card-body dashboard-side-list">
-          <div class="dashboard-side-row">
-            <div class="dashboard-side-title"><i class="bi bi-people-fill text-success"></i><span>Connections</span></div>
-            <a href="/generic/database_activity" class="dashboard-side-link">{{ dbinfo['connexions'] }} / {{ dbinfo['max_connexions'] }} <i class="bi bi-arrow-right-circle"></i></a>
-          </div>
-          <div class="dashboard-side-row">
-            <div class="dashboard-side-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i><span>Conflicts</span></div>
-            <a href="/generic/database_conflicts" class="dashboard-side-link">{{ dbinfo['conflicts'] }} <i class="bi bi-arrow-right-circle"></i></a>
-          </div>
-          <div class="dashboard-side-row">
-            <div class="dashboard-side-title"><i class="bi bi-code-slash text-primary"></i><span>Running queries</span></div>
-            <a href="/generic/database_running_queries" class="dashboard-side-link">#2 <i class="bi bi-arrow-right-circle"></i></a>
-          </div>
-        </div>
-      </div>
-
-      <div class="pg-card">
-        <div class="dashboard-card-header">
-          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>DEV advisor</span></span>
-          <a href="/global/advisor" class="btn btn-sm btn-outline-primary">Open advisor</a>
-        </div>
-        <div id="dashboardDevAdvisorBody" class="pg-card-body dashboard-row-list">
+        <div id="dashboardDevAdvisorBody" class="pg-card-body dashboard-row-list" aria-live="polite">
           <div class="dashboard-row-item dashboard-loading-row">
             <div class="dashboard-row-icon"><i class="bi bi-hourglass-split"></i></div>
             <div class="dashboard-row-main">
@@ -420,9 +353,92 @@
             <div class="dashboard-row-value">...</div>
           </div>
         </div>
+        <div class="px-3 pb-3" id="dashboardDevRetryWrap" hidden><button type="button" id="dashboardDevRetry" class="btn btn-sm btn-outline-primary">Retry advisor</button></div>
       </div>
+      <div class="pg-card mb-3">
+        <div class="dashboard-card-header">
+          <span class="dashboard-section-title"><i class="bi bi-activity"></i><span>Activity links</span></span>
+        </div>
+        <div class="pg-card-body dashboard-side-list">
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-trophy text-primary"></i><span>Query ranking</span></div>
+            <a href="/rankqueries.html" class="dashboard-side-link">View <i class="bi bi-arrow-right-circle"></i></a>
+          </div>
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-arrow-repeat text-primary"></i><span>Recovery conflicts (cumulative)</span></div>
+            <a href="/generic/database_conflicts" class="dashboard-side-link">{{ dbinfo.get('conflicts', '—') }} <i class="bi bi-arrow-right-circle"></i></a>
+          </div>
+          <div class="dashboard-side-row">
+            <div class="dashboard-side-title"><i class="bi bi-code-slash text-primary"></i><span>Running queries</span></div>
+            <a href="/generic/database_running_queries" class="dashboard-side-link">View <i class="bi bi-arrow-right-circle"></i></a>
+          </div>
+        </div>
+      </div>
+
+
     </div>
   </div>
+
+  {% set architecture = dbinfo.get('architecture', {}) %}
+  <details class="pg-card mb-4 dashboard-architecture">
+    <summary class="dashboard-card-header">
+      <span class="dashboard-section-title">
+        <i class="bi bi-diagram-3"></i>
+        <span>Database architecture</span>
+      </span>
+      <span class="small text-muted">{{ architecture.get('type', 'Unknown') }} · {{ architecture.get('server_role', 'Unknown') }}</span>
+    </summary>
+    <div class="pg-card-body d-flex align-items-center flex-wrap gap-2">
+      <strong class="me-2">{{ architecture.get('type', 'Unknown') }}</strong>
+      <span class="badge dashboard-architecture-badge">
+        Role: {{ architecture.get('server_role', 'Unknown') }}
+      </span>
+      {% if architecture.get('type', 'Unknown') == 'Unknown' %}
+        <span class="small text-muted">Architecture information is unavailable for the connected role.</span>
+      {% elif architecture.get('wal_archiving') %}
+        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-enabled">WAL archiving enabled</span>
+        <span class="badge dashboard-architecture-badge">{{ architecture.get('archive_tool', 'Unknown') }}</span>
+      {% else %}
+        <span class="badge dashboard-architecture-badge dashboard-architecture-badge-disabled">WAL archiving disabled</span>
+      {% endif %}
+      {% if architecture.get('connected_replicas', 0) | int > 0 %}
+        <span class="badge dashboard-architecture-badge">
+          {{ architecture.get('connected_replicas') }} connected replica{% if architecture.get('connected_replicas') | int != 1 %}s{% endif %}
+        </span>
+      {% endif %}
+      <a href="/database_analyze_llm.html" class="btn btn-sm btn-outline-primary ms-auto">Open DB Design</a>
+    </div>
+  </details>
+
+  {% if dbinfo.get('multi_db') and dbinfo.get('databases') %}
+  <div class="pg-card mb-4" id="cluster-databases-card">
+    <div class="dashboard-card-header">
+      <span class="dashboard-section-title"><i class="bi bi-collection"></i><span>Cluster databases</span></span>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <label for="cluster-db-search" class="visually-hidden">Find a database</label>
+        <input type="search" id="cluster-db-search" class="form-control form-control-sm" style="width: 180px;" placeholder="Find a database">
+        <label for="cluster-db-sort" class="visually-hidden">Sort databases</label>
+        <select id="cluster-db-sort" class="form-select form-select-sm" style="width: auto;">
+          <option value="size">Largest first</option>
+          <option value="name">Name A–Z</option>
+        </select>
+        <label for="cluster-db-per-page" class="small text-muted mb-0">Per page</label>
+        <select id="cluster-db-per-page" class="form-select form-select-sm" style="width: auto;">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+    </div>
+    <div class="pg-card-body dashboard-row-list" id="cluster-databases-list"></div>
+    <div class="pagination-wrapper px-3 pb-3 pt-0">
+      <div id="cluster-db-pagination-info" class="pagination-info"></div>
+      <div id="cluster-db-pagination-controls" class="pagination-controls"></div>
+    </div>
+  </div>
+  <script type="application/json" id="cluster-databases-json">{{ dbinfo.databases | tojson }}</script>
+  {% endif %}
 
   {% if more_profile_calls %}
   <div class="modal fade" id="profileCallsModal" tabindex="-1" aria-labelledby="profileCallsModalLabel" aria-hidden="true">
@@ -433,7 +449,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          {% for table in dbinfo['profile'] %}
+          {% for table in profile_calls %}
             <div class="dashboard-profile-row">
               <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
               <div class="dashboard-profile-content">
@@ -443,7 +459,7 @@
                   <span title="{{ format_integer(table['total_calls']) }} calls">{{ humanize_number(table['total_calls']) }} calls</span>
                 </div>
                 <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of calls" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
               </div>
             </div>
@@ -465,7 +481,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          {% for table in dbinfo['profile'] %}
+          {% for table in profile_time %}
             <div class="dashboard-profile-row">
               <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
               <div class="dashboard-profile-content">
@@ -475,7 +491,7 @@
                   <span>{% if table['total_exec_time'] is defined %}{{ humanize_ms(table['total_exec_time']) }}{% endif %}</span>
                 </div>
                 <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of execution time" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
               </div>
             </div>
@@ -539,6 +555,11 @@
       versionAdvisorModal.addEventListener("shown.bs.modal", loadPostgresVersionAdvisor);
     }
 
+    document.getElementById("dashboardRefresh").addEventListener("click", function () {
+      this.disabled = true;
+      window.location.reload();
+    });
+    document.getElementById("dashboardDevRetry").addEventListener("click", loadDevAdvisorSummary);
     loadDevAdvisorSummary();
     initClusterDatabasesPagination();
   });
@@ -554,6 +575,8 @@
     }
 
     const databases = JSON.parse(dataEl.textContent || "[]");
+    const search = document.getElementById("cluster-db-search");
+    const sort = document.getElementById("cluster-db-sort");
     let currentPage = 1;
 
     function escapeHtml(value) {
@@ -583,18 +606,22 @@
     }
 
     function renderClusterDatabases() {
+      const filtered = databases.filter(db => String(db.name).toLowerCase().includes(search.value.trim().toLowerCase()));
+      filtered.sort((a, b) => sort.value === "name"
+        ? String(a.name).localeCompare(String(b.name))
+        : Number(b.size_bytes || 0) - Number(a.size_bytes || 0));
       const size = pageSize();
-      const totalPages = Math.max(1, Math.ceil(databases.length / size));
+      const totalPages = Math.max(1, Math.ceil(filtered.length / size));
       if (currentPage > totalPages) {
         currentPage = totalPages;
       }
 
       const start = (currentPage - 1) * size;
-      const end = Math.min(start + size, databases.length);
-      const pageItems = databases.slice(start, end);
+      const end = Math.min(start + size, filtered.length);
+      const pageItems = filtered.slice(start, end);
 
       if (!pageItems.length) {
-        listEl.innerHTML = '<div class="small text-muted">No databases found on this cluster.</div>';
+        listEl.innerHTML = '<div class="small text-muted">No databases match your search.</div>';
       } else {
         listEl.innerHTML = pageItems.map(function (db) {
           const connectedBadge = db.is_connected
@@ -612,10 +639,10 @@
       }
 
       if (paginationInfo) {
-        if (!databases.length) {
+        if (!filtered.length) {
           paginationInfo.textContent = "0 databases";
         } else {
-          paginationInfo.textContent = "Showing " + (start + 1) + "-" + end + " of " + databases.length + " databases";
+          paginationInfo.textContent = "Showing " + (start + 1) + "-" + end + " of " + filtered.length + " databases";
         }
       }
 
@@ -639,6 +666,14 @@
       }
     }
 
+    search.addEventListener("input", function () {
+      currentPage = 1;
+      renderClusterDatabases();
+    });
+    sort.addEventListener("change", function () {
+      currentPage = 1;
+      renderClusterDatabases();
+    });
     perPageSelect.addEventListener("change", function () {
       currentPage = 1;
       renderClusterDatabases();
@@ -799,38 +834,11 @@
   function loadPostgresVersionAdvisor() {
     renderPostgresVersionAdvisorLoading();
 
-    fetch("/api/v1/dashboard/postgresql_version", {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      credentials: "same-origin"
-    })
-      .then(function (response) {
-        return response.json().then(function (payload) {
-          if (!response.ok || payload.status === "error") {
-            throw new Error(payload.error || payload.message || "PostgreSQL version advisor request failed.");
-          }
-          return payload;
-        });
-      })
+    fetchDashboardJson("/api/v1/dashboard/postgresql_version")
       .then(renderPostgresVersionAdvisor)
       .catch(function (error) {
         renderPostgresVersionAdvisorError(error.message || "PostgreSQL version advisor request failed.");
       });
-  }
-
-  function setDashboardStatus(element, iconClass, text, stateClass) {
-    if (!element) {
-      return;
-    }
-
-    element.classList.remove("good", "warn", "bad");
-    element.classList.add(stateClass);
-    element.replaceChildren();
-
-    const icon = document.createElement("i");
-    icon.className = "bi " + iconClass;
-    element.appendChild(icon);
-    element.appendChild(document.createTextNode(" " + text));
   }
 
   function buildDevAdvisorTypeRow(recommendationType) {
@@ -840,7 +848,7 @@
     const iconWrap = document.createElement("div");
     iconWrap.className = "dashboard-row-icon";
     const icon = document.createElement("i");
-    icon.className = "bi bi-check-circle-fill text-success";
+    icon.className = "bi bi-info-circle text-muted";
     if (recommendationType.highest_priority === "HIGH") {
       icon.className = "bi bi-exclamation-triangle-fill text-danger";
     } else if (recommendationType.highest_priority === "MEDIUM") {
@@ -928,69 +936,56 @@
       return;
     }
 
-    (summary.by_type || []).forEach(function (recommendationType) {
+    (summary.by_type || []).slice(0, 3).forEach(function (recommendationType) {
       body.appendChild(buildDevAdvisorTypeRow(recommendationType));
     });
   }
 
   function renderDevAdvisorSummary(payload) {
     const summary = payload.summary || {};
+    if (summary.database_score == null || summary.total == null || !Number.isFinite(Number(summary.database_score))) {
+      throw new Error("Advisor statistics are incomplete. Please try again.");
+    }
     const score = Number(summary.database_score || 0);
     const total = Number(summary.total || 0);
     const highPriority = (summary.priority_counts && summary.priority_counts.HIGH) || 0;
     const mediumPriority = (summary.priority_counts && summary.priority_counts.MEDIUM) || 0;
-    const statusClass = score >= 80 ? "good" : (score >= 55 ? "warn" : "bad");
 
     const scoreArc = document.getElementById("dashboardDevScoreArc");
     const scoreValue = document.getElementById("dashboardDevScoreValue");
-    const totalValue = document.getElementById("dashboardDevTotal");
     const conclusion = document.getElementById("dashboardDevConclusion");
     const actionMeta = document.getElementById("dashboardDevActionMeta");
-    const status = document.getElementById("dashboardDevStatus");
 
     if (scoreArc) {
       scoreArc.style.setProperty("--dashboard-health", String(score * 3.6) + "deg");
+      scoreArc.style.setProperty("--dashboard-score-color", score >= 80 ? "var(--pga-green)" : score >= 55 ? "#b45309" : "var(--pga-red)");
+      scoreArc.setAttribute("aria-label", "DEV advisor score " + score + " out of 100");
     }
     if (scoreValue) {
       scoreValue.textContent = String(score);
     }
-    if (totalValue) {
-      totalValue.textContent = String(total);
-    }
     if (actionMeta) {
-      actionMeta.textContent = total === 1 ? "1 item" : String(total) + " items";
+      actionMeta.textContent = highPriority ? highPriority + " high priority" : total + " items";
     }
     if (conclusion) {
       if (total === 0) {
         conclusion.textContent = "No active DEV recommendation was found for this database.";
       } else {
-        conclusion.textContent = "Global Advisor found " + total + " DEV recommendation(s), with " + highPriority + " high priority and " + mediumPriority + " medium priority item(s).";
+        conclusion.textContent = highPriority + " high priority · " + mediumPriority + " medium priority · " + total + " recommendations in total.";
       }
     }
-
-    setDashboardStatus(
-      status,
-      total === 0 ? "bi-check-circle-fill" : "bi-stars",
-      total === 0 ? "No DEV item" : "Advisor ready",
-      total === 0 ? "good" : statusClass
-    );
 
     renderDevAdvisorTypes(summary);
   }
 
   function renderDevAdvisorError(message) {
     const scoreValue = document.getElementById("dashboardDevScoreValue");
-    const totalValue = document.getElementById("dashboardDevTotal");
     const conclusion = document.getElementById("dashboardDevConclusion");
     const actionMeta = document.getElementById("dashboardDevActionMeta");
-    const status = document.getElementById("dashboardDevStatus");
     const body = document.getElementById("dashboardDevAdvisorBody");
 
     if (scoreValue) {
       scoreValue.textContent = "--";
-    }
-    if (totalValue) {
-      totalValue.textContent = "--";
     }
     if (conclusion) {
       conclusion.textContent = message;
@@ -998,7 +993,10 @@
     if (actionMeta) {
       actionMeta.textContent = "unavailable";
     }
-    setDashboardStatus(status, "bi-x-circle-fill", "Advisor unavailable", "bad");
+    document.getElementById("dashboardDevRetryWrap").hidden = false;
+    const scoreArc = document.getElementById("dashboardDevScoreArc");
+    scoreArc.style.setProperty("--dashboard-health", "0deg");
+    scoreArc.setAttribute("aria-label", "DEV advisor score unavailable");
 
     if (body) {
       body.replaceChildren();
@@ -1031,20 +1029,34 @@
     }
   }
 
+  async function fetchDashboardJson(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(url, {
+        headers: { "Accept": "application/json" },
+        credentials: "same-origin",
+        signal: controller.signal
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.status === "error") {
+        throw new Error(payload.error || payload.message || "Advisor request failed.");
+      }
+      return payload;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("The advisor took too long to respond. Please try again.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   function loadDevAdvisorSummary() {
-    fetch("/api/v1/dashboard/dev_advisor", {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      credentials: "same-origin"
-    })
-      .then(function (response) {
-        return response.json().then(function (payload) {
-          if (!response.ok || payload.status === "error") {
-            throw new Error(payload.error || payload.message || "DEV advisor request failed.");
-          }
-          return payload;
-        });
-      })
+    document.getElementById("dashboardDevRetryWrap").hidden = true;
+    document.getElementById("dashboardDevConclusion").textContent = "Loading DEV recommendations…";
+    fetchDashboardJson("/api/v1/dashboard/dev_advisor")
       .then(renderDevAdvisorSummary)
       .catch(function (error) {
         renderDevAdvisorError(error.message || "DEV advisor request failed.");

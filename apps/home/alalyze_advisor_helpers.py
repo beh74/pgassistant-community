@@ -1374,11 +1374,6 @@ def parse_simple_filter_predicates(
     return _filter_predicates_from_ast(statement.whereClause, alias or table)
 
 
-def extract_simple_filter_columns(filter_expr: str, alias: Optional[str], table: str) -> List[str]:
-    """Return columns from supported, mandatory filter predicates."""
-    return [p["column"] for p in extract_simple_filter_predicates(filter_expr, alias, table)]
-
-
 def extract_simple_filter_predicates(
     filter_expr: str, alias: Optional[str], table: str,
 ) -> List[Dict[str, str]]:

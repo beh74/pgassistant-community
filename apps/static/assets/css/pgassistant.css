@@ -1242,7 +1242,7 @@ body {
   border-radius: 50%;
   background:
     radial-gradient(circle at center, #fff 58%, transparent 60%),
-    conic-gradient(var(--pga-green) var(--dashboard-health, 80%), #dfe7f1 0);
+    conic-gradient(var(--dashboard-score-color, var(--pga-green)) var(--dashboard-health, 80%), #dfe7f1 0);
   color: var(--pga-text);
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .04);
 }
@@ -4764,4 +4764,91 @@ details[open] > summary > .pga-disclosure-arrow { transform: rotate(180deg); }
 @media (max-width: 575.98px) {
   .pgtune-page .tune-inputs summary { align-items: flex-start; flex-direction: column; }
   .pgtune-page .tune-table { min-width: 620px; }
+}
+
+/* Keep the dashboard overview compact; details remain available on demand. */
+.dashboard-page .dashboard-command-hero { padding: .75rem; grid-template-columns: minmax(0, 1fr) 250px; }
+.dashboard-page .dashboard-next-actions { align-content: center; }
+.dashboard-page .dashboard-action-pill { flex-direction: column; align-items: flex-start; }
+.dashboard-page .dashboard-health-card { padding: .75rem; }
+.dashboard-page .dashboard-health-score { width: 86px; height: 86px; }
+.dashboard-status.neutral { background: #f1f5f9; color: #475569; }
+.dashboard-architecture summary { cursor: pointer; }
+.dashboard-architecture:not([open]) summary { border-bottom: 0; }
+.dashboard-page .dashboard-card-header { flex-wrap: wrap; }
+.dashboard-page .dashboard-kpi-card { min-width: 0; }
+.dashboard-page .dashboard-row-label { overflow-wrap: anywhere; }
+@media (max-width: 1200px) {
+  .dashboard-page .dashboard-side-column { grid-row: 1; }
+}
+@media (max-width: 900px) {
+  .dashboard-page .dashboard-command-hero { grid-template-columns: 1fr; }
+}
+@media (max-width: 575px) {
+  .dashboard-page .dashboard-health-score { width: 64px; height: 64px; }
+  .dashboard-page .dashboard-health-card { gap: .75rem; }
+  .dashboard-page .dashboard-health-title { font-size: .95rem; }
+  .dashboard-page .dashboard-health-text { font-size: .85rem; }
+}
+
+/* Dashboard typography and metric cards stay local to this page. */
+.dashboard-page .pg-title { font-weight: 600; }
+.dashboard-page .dashboard-health-title,
+.dashboard-page .dashboard-section-title,
+.dashboard-page .dashboard-action-main { font-weight: 700; }
+.dashboard-page .dashboard-row-label,
+.dashboard-page .dashboard-profile-label,
+.dashboard-page .dashboard-side-title { font-weight: 500; }
+.dashboard-page .dashboard-health-score strong,
+.dashboard-page .dashboard-recommendation-rank strong { font-weight: 600; }
+.dashboard-page .btn,
+.dashboard-page .dashboard-status,
+.dashboard-page .dashboard-side-link { font-weight: 500; }
+.dashboard-page .dashboard-kpi-grid { grid-auto-rows: 1fr; align-items: stretch; }
+.dashboard-page .dashboard-kpi-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(2.5rem, auto) auto minmax(2.75rem, 1fr) auto;
+  align-items: start;
+  gap: .65rem;
+  min-height: 200px;
+}
+.dashboard-page .dashboard-kpi-heading { display: flex; align-items: center; gap: .6rem; }
+.dashboard-page .dashboard-kpi-heading > i { color: var(--pga-primary); font-size: 1rem; }
+.dashboard-page .dashboard-kpi-label {
+  font-weight: 700;
+  font-size: .875rem;
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0;
+}
+.dashboard-page .dashboard-kpi-value { font-weight: 600; font-size: 1.75rem; letter-spacing: -.025em; margin: 0; }
+.dashboard-page .dashboard-kpi-description { display: flex; flex-wrap: wrap; align-content: start; align-items: center; gap: .35rem .6rem; }
+.dashboard-page .dashboard-kpi-description .dashboard-status { font-size: .75rem; }
+.dashboard-page .dashboard-kpi-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--pga-border-soft);
+  padding-top: .65rem;
+  font-size: .8rem;
+  font-weight: 400;
+  text-decoration: none;
+}
+@media (min-width: 1101px) {
+  .dashboard-page .dashboard-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.dashboard-page button.dashboard-kpi-details {
+  width: 100%;
+  background: transparent;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  color: var(--bs-link-color, var(--pga-primary));
+  text-align: left;
+  cursor: pointer;
 }

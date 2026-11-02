@@ -1,3 +1,5 @@
+"""Cache PostgreSQL release information and recommend version upgrades."""
+
 from __future__ import annotations
 
 import json

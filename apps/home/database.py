@@ -1,3 +1,5 @@
+"""Manage PostgreSQL connections, query execution, and monitoring data retrieval."""
+
 import datetime
 import decimal
 import json
@@ -12,7 +14,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from flask import g
 from . import sqlhelper
 
-from typing import Dict, Any, Iterable, Tuple, List, Optional
+from typing import Tuple, List, Optional
 
 PGA_QUERIES={}
 PGA_TABLES=[]
@@ -38,33 +40,6 @@ def dict_merge(dct, merge_dct):
             dict_merge(dct[k], merge_dct[k])
         else:
             dct[k] = merge_dct[k]
-
-
-
-
-def _dsn_has_param(dsn: str, param_name: str) -> bool:
-    """
-    Returns True if the PostgreSQL URI already contains the given query parameter.
-    """
-    parsed = urlparse(dsn)
-    query_params = parse_qs(parsed.query, keep_blank_values=True)
-    return param_name in query_params
-
-
-def _add_default_uri_param(dsn: str, param_name: str, param_value: str) -> str:
-    """
-    Adds a query parameter to a PostgreSQL URI only if it is not already present.
-    """
-    if _dsn_has_param(dsn, param_name):
-        return dsn
-
-    parsed = urlparse(dsn)
-    query_params = parse_qs(parsed.query, keep_blank_values=True)
-    query_params[param_name] = [param_value]
-
-    new_query = urlencode(query_params, doseq=True)
-
-    return urlunparse(parsed._replace(query=new_query))
 
 
 
@@ -298,7 +273,8 @@ def get_db_info_cluster(db_config):
                 """,
             )
         )
-        info["cache"] = float(cache_rows[0].get("ratio") or 0) if cache_rows else 0
+        cache_ratio = cache_rows[0].get("ratio") if cache_rows else None
+        info["cache"] = float(cache_ratio) if cache_ratio is not None else None
 
         try:
             uptime, _ = db_query(con, "reporting_pguptime")
@@ -454,18 +430,6 @@ def execute_and_fetch(cursor, query):
     res = cursor.fetchall()
     cursor.close()
     return res
-
-def get_json_response(conn, query):
-    """
-    Executes a SQL query and returns the result as a JSON string.
-    
-    :param conn: The active database connection.
-    :param query: The SQL query to execute.
-    :return: JSON string of the query results.
-    """    
-    cursor = get_json_cursor(conn)
-    response = execute_and_fetch(cursor, query)
-    return json.dumps(response)
 
 def defaultconverter(o):
     """
@@ -858,10 +822,8 @@ def get_db_info(db_config,con=None):
             try:
                 cache, _= db_query(con,'db_cache')
                 info["cache"]=float(cache[0]['ratio'])
-                if not info["cache"]:
-                    info["cache"]=0 
-            except:
-                info["cache"]=0
+            except Exception:
+                info["cache"] = None
 
             try:
                 uptime, _= db_query(con,'reporting_pguptime')
@@ -1056,89 +1018,6 @@ def get_pg_tune_parameter(db_config):
         con.close()
         return running_values, major
 
-
-def get_existing_indexes(db_config):
-    """
-    Retrieves existing indexes from PostgreSQL.
-    
-    :param db_config: Database configuration dictionary.
-    :return: Dictionary {table_name: set(frozenset(columns))} of existing indexes.
-    """
-    existing_indexes = {}
-    try:
-        conn, message = connectdb(db_config)
-        if (conn):
-            cur = conn.cursor()
-
-            query = """
-            SELECT tablename, indexdef FROM pg_indexes where schemaname !='pg_catalog';
-            """
-
-            cur.execute(query)
-            indexes = cur.fetchall()
-
-            for table, index_def in indexes:
-                
-                # Extract column names
-                match = re.search(r"ON\s+(?:ONLY\s+)?\S+\s+USING\s+\w+\s*\((.*?)\)", index_def, re.IGNORECASE)
-                if not match:
-                    print ("**** ERROR WHILE PARSING INDEXE DEFINITION > ", index_def, table)
-                if match:
-                    indexed_columns = tuple(col.strip() for col in match.group(1).split(","))  # Convertir en tuple (ordre important)
-                    
-                    if table not in existing_indexes:
-                        existing_indexes[table] = set()
-                    existing_indexes[table].add(indexed_columns)  # Stocker sous forme de tuple immuable
-
-            cur.close()
-            conn.close()
-    except Exception as e:
-        print(f"⚠️ Error while getting indexes definition : {e}")
-
-    return existing_indexes
-
-
-def fetch_tables_pgstat(db_config, tables: Iterable[str]) -> Dict[str, Dict[str, Any]]:
-    """
-    Returns pg_stats for each table and its columns.
-    """
-
-    if not tables:
-        return {}
-
-    rows = {}
-    conn = None 
-    try:
-        conn, message = connectdb(db_config)
-    except Exception as e:
-        return None
-    
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT schemaname, tablename, attname,
-                   null_frac, avg_width, n_distinct,
-                   most_common_vals, most_common_freqs,
-                   histogram_bounds, correlation
-            FROM pg_stats
-            WHERE (tablename) = ANY(%s)
-            """,
-            (tables,),
-        )
-        for r in cur.fetchall():
-            key = f"{r['schemaname']}.{r['tablename']}"
-            rows.setdefault(key, {})
-            rows[key][r["attname"]] = {
-                "null_frac": float(r["null_frac"]),
-                "avg_width": int(r["avg_width"]),
-                "n_distinct": float(r["n_distinct"]),
-                "most_common_vals": r["most_common_vals"],
-                "most_common_freqs": r["most_common_freqs"],
-                "histogram_bounds": r["histogram_bounds"],
-                "correlation": float(r["correlation"]) if r["correlation"] is not None else None,
-            }
-
-    return rows
 
 def fetch_table_stats(db_config, tables):
     if not tables:

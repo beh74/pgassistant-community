@@ -1,3 +1,5 @@
+"""Generate Mermaid diagrams of table dependencies from PostgreSQL metadata."""
+
 from __future__ import annotations
 
 import re

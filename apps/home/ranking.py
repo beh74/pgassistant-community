@@ -1,3 +1,5 @@
+"""Normalize and rank PostgreSQL statements by workload impact."""
+
 import math
 
 

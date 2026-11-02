@@ -1,3 +1,5 @@
+"""Build Mermaid relationship diagrams for tables referenced in execution plans."""
+
 from __future__ import annotations
 
 from collections import defaultdict

@@ -1,3 +1,5 @@
+"""Parse and adapt table DDL for PostgreSQL table rewrite operations."""
+
 import re
 from typing import List
 

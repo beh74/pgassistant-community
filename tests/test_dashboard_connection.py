@@ -7,6 +7,27 @@ from apps.home import routes_helpers
 
 
 class DashboardConnectionTests(unittest.TestCase):
+    def test_cache_statistics_preserve_unknown_and_zero(self):
+        database = routes_helpers.database
+        for ratio in (None, 0, 99.5):
+            with self.subTest(ratio=ratio):
+                rows = {
+                    "db_version": [{"server_version": "17.6"}],
+                    "db_size": [{"pg_size_pretty": "1 GB"}],
+                    "db_cache": [{"ratio": ratio}],
+                    "reporting_pguptime": [{"uptime_pretty": "1 day"}],
+                    "shared_buffers_setting": [{"current_setting": "128 MB"}],
+                    "database_count_connexions": [{"nb": 1}],
+                    "database_max_connexions": [{"setting": "100"}],
+                    "database_count_conlicts": [{"nb": 0}],
+                }
+                with (
+                    patch.object(database, "ensure_pg_stat_statements", return_value=(False, "unavailable")),
+                    patch.object(database, "db_query", side_effect=lambda _con, query, *_args: (rows.get(query, []), "OK")),
+                ):
+                    info = database.get_db_info({"db_name": "example"}, con=Mock())
+                self.assertEqual(info["cache"], ratio)
+
     def setUp(self):
         self.app = Flask(__name__)
         self.app.secret_key = "test"

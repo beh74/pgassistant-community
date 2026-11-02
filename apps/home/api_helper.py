@@ -1,3 +1,5 @@
+"""Prepare ranked query and advisor dashboard results for API responses."""
+
 from . import database
 from . import ranking
 from . import global_advisor
@@ -47,27 +49,3 @@ def get_dev_advisor_dashboard(session, yaml_path="advisor_enriched.yml"):
 def get_postgresql_version_advisor(session):
     """Return PostgreSQL version guidance from the Global Advisor logic."""
     return global_advisor.get_postgresql_version_advisor(session)
-
-
-"""
-curl -X GET http://localhost:8080/api/v1/rank_top_50_queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "db_config": {
-      "db_host": "host.docker.internal",
-      "db_port": 5420,
-      "db_name": "northwind",
-      "db_user": "postgres",
-      "db_password": "demo"
-    }
-  }'
-
-  
-curl -X GET http://localhost:8080/api/v1/rank_top_50_queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "db_config": {
-      "db_uri": "postgresql://postgres:demo@host.docker.internal:5421/demo?options=-c%20search_path%3Dapp%2Cbookings"
-    }
-  }'  
-"""

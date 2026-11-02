@@ -1,3 +1,5 @@
+"""Export PostgreSQL table definitions and format DDL for display."""
+
 import subprocess
 import re
 from pygments import highlight

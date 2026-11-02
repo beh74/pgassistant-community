@@ -1,13 +1,13 @@
+"""Create and run the Flask application with production settings and HTML minification."""
+
 import os
 import random
 import string
-#from   flask_migrate import Migrate
 from   flask_minify  import Minify
 from   sys import exit
 
 from apps.config import config_dict
-from apps import create_app, db
-from flask import session
+from apps import create_app
 
 # WARNING: Don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False')

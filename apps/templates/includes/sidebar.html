@@ -35,7 +35,6 @@
 {% set is_rankqueries = current_path == '/rankqueries.html' or 'rankqueries' in segment %}
 {% set is_query_index_advisor = current_path == '/query_index_advisor.html' or segment == 'query_index_advisor.html' %}
 {% set is_query_parameter_advisor = current_path == '/query_parameter_advisor.html' or segment == 'query_parameter_advisor.html' %}
-{% set is_stats = current_path == '/stats.html' or segment.startswith('stats') %}
 {% set is_database_connection = current_path == '/database.html' or segment == 'database.html' %}
 {% set is_pgtune = current_path == '/pgtune.html' or 'pgtune' in segment %}
 {% set is_llm = current_path == '/llm.html' or segment == 'llm.html' %}

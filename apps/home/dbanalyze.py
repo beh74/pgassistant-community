@@ -1,3 +1,5 @@
+"""Aggregate PostgreSQL JSON execution plans into table timing and buffer metrics."""
+
 from __future__ import annotations
 
 import json

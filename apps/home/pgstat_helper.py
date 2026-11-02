@@ -1,3 +1,5 @@
+"""Provide descriptions of pg_stat_statements columns for the query interface."""
+
 PGSS_COLUMN_DOCS = {
     # --- Identification ---
     "userid": "OID of the user who executed the statement.",
@@ -85,8 +87,3 @@ PGSS_COLUMN_DOCS = {
     "operation_type": "Type of operation (e.g., SELECT, INSERT) - Semantic analysis of the query",
     "total_blks_read": "Total number of blocks read (shared + temp + local)",
 }
-
-
-def get_column_description(column_name: str) -> str:
-    return PGSS_COLUMN_DOCS.get(column_name, "No description available.")
-

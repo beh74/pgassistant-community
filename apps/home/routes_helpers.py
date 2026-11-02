@@ -16,9 +16,7 @@ from . import pgtune
 from . import query_table_stats
 from . import ranking
 from . import schema_helper
-from . import sqlcolumns
 from . import sqlhelper
-from . import stats
 from . import table_autovacuum_advisor
 
 
@@ -368,43 +366,6 @@ def handle_rank_queries_get(template: str, segment: str):
     else:
         return redirect("/database.html")    
 
-def handle_topstatistics_get(template: str, segment: str):
-    if session.get("db_name"):
-        rows = database.get_top_queries(session)
-        
-        i=0
-        table_stats=[]
-        for query in rows:            
-            tables = sqlhelper.get_tables(query['query'])
-            for table  in tables:
-                columns = []
-                
-                try:
-                    columns = sqlcolumns.extract_where_columns(query['query'], table)
-                except:
-                    columns = []
-                
-                stats.add_or_update_table_info(table_stats,
-                                               table, 
-                                               query['calls'], 
-                                               float(query['mean_exec_time']),
-                                               query['rows'],
-                                               sqlhelper.get_sql_type(query['query']),
-                                               columns
-                                               )
-            rows[i]['tables']=tables
-            i = i + 1
-        table_stats.sort(reverse=True, key=lambda x: (x['avg_execution_time'], x['operation_type']))
-        pga_tables=database.get_pga_tables()
-        table_stats_filtered=[]
-        for table in table_stats:
-            if table['table_name'] not in pga_tables and "$" not in table['table_name']:
-                table_stats_filtered.append(table)
-        
-        return render_template(f"home/{template}", segment=segment, table_stats=table_stats_filtered)
-    else:
-        return redirect("/database.html")
-
 def handle_primarykey_get(template: str, segment: str):
     redirect_response = require_db_connection()
     if redirect_response:
@@ -508,9 +469,6 @@ def handle_reset_pg_stat():
 def handle_myqueries_get():
     queries=database.get_my_queries()
     return render_template(f"home/search.html", segment='search.html', rows=queries, searchkey='My queries')
-
-def handle_tools_get():
-    return render_template(f"home/tools.html", segment='tools.html')
 
 def handle_reset_pg_statistics():
     database.exec_cmd(session, "pg_stat_statements_reset")
