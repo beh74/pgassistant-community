@@ -269,12 +269,7 @@
 
             <div class="card-header d-flex justify-content-between align-items-center">
               <div class="d-flex align-items-center gap-2">
-                <span class="rank-priority-badge badge
-                  {% if row.priority_level == 'Critical' %}bg-danger text-white
-                  {% elif row.priority_level == 'High' %}bg-warning text-dark
-                  {% elif row.priority_level == 'Medium' %}bg-info text-dark
-                  {% else %}bg-secondary text-white
-                  {% endif %}">
+                <span class="rank-priority-badge badge pga-priority-{{ row.priority_level|lower }}">
                   {{ row.priority_level }}
                 </span>
 
@@ -457,7 +452,7 @@
 </div>
 
 {% if collector_history_enabled %}
-<div class="modal fade" id="rankQueryHistoryModal" tabindex="-1" aria-labelledby="rankQueryHistoryModalLabel" aria-hidden="true" data-history-url="{{ url_for('home_blueprint.api_query_activity_history') }}">
+<div class="modal fade pga-table-modal pga-query-modal" id="rankQueryHistoryModal" tabindex="-1" aria-labelledby="rankQueryHistoryModalLabel" aria-hidden="true" data-history-url="{{ url_for('home_blueprint.api_query_activity_history') }}">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
@@ -480,13 +475,13 @@
           <svg id="rankQueryHistoryChart" class="query-history-chart" role="img" aria-labelledby="rankQueryHistoryChartTitle"></svg>
         </div>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-gray-200" data-bs-dismiss="modal">Close</button></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
     </div>
   </div>
 </div>
 {% endif %}
 
-<div class="modal fade" id="rankHelpModal" tabindex="-1" aria-labelledby="rankHelpModalLabel" aria-hidden="true">
+<div class="modal fade pga-table-modal pga-query-modal" id="rankHelpModal" tabindex="-1" aria-labelledby="rankHelpModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">

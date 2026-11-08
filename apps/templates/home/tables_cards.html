@@ -745,7 +745,7 @@
 {% endmacro %}
 
 {% block content %}
-<div class="container-fluid py-4 ps-3 pe-3">
+<div class="container-fluid py-4 ps-3 pe-3 tables-cards-page">
 
   {% set summary = namespace(
     schemas=[],
@@ -989,7 +989,8 @@
 
             <div class="card-body d-flex flex-column">
               <div class="tables-name mb-3">
-                <code class="text-muted">{{ schema }}</code>.<strong>{{ table }}</strong>
+                <span class="table-identity-icon" aria-hidden="true"><i class="bi bi-table"></i></span>
+                <div><small class="table-identity-schema">{{ schema }}</small><strong>{{ table }}</strong></div>
               </div>
 
               <div class="table-metric-chips mb-3">
@@ -1122,7 +1123,7 @@
                   title="Check RFC — Review table design against PostgreSQL best practices"
                   aria-label="Check RFC for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                  <i class="bi bi-check2-circle" aria-hidden="true"></i><span>Design</span>
                 </a>
 
                 <a
@@ -1131,7 +1132,7 @@
                   title="Check conventions — Review naming and design conventions"
                   aria-label="Check conventions for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-list-check" aria-hidden="true"></i>
+                  <i class="bi bi-list-check" aria-hidden="true"></i><span>Conventions</span>
                 </a>
 
 
@@ -1146,7 +1147,7 @@
                   title="Index statistics — Inspect index usage, size, and definitions"
                   aria-label="Show index statistics for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+                  <i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Indexes</span>
                 </button>
 
                 <a
@@ -1155,7 +1156,7 @@
                   title="Related queries — Explore queries that use this table"
                   aria-label="Show relative queries for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-code-square" aria-hidden="true"></i>
+                  <i class="bi bi-code-square" aria-hidden="true"></i><span>Queries</span>
                 </a>
 
                 <button
@@ -1168,7 +1169,7 @@
                   title="Column usage — See how queries use each column"
                   aria-label="Show column usage for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-columns-gap" aria-hidden="true"></i>
+                  <i class="bi bi-columns-gap" aria-hidden="true"></i><span>Usage</span>
                 </button>
 
                 <button
@@ -1181,7 +1182,7 @@
                   title="Column statistics — Inspect nulls, distinct values, and value distribution"
                   aria-label="Show pg_stats column statistics for {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-distribute-vertical" aria-hidden="true"></i>
+                  <i class="bi bi-distribute-vertical" aria-hidden="true"></i><span>Statistics</span>
                 </button>
 
                 <a
@@ -1190,7 +1191,7 @@
                   title="Play Tetris — Explore column ordering and row storage"
                   aria-label="Play Tetris with {{ schema|e }}.{{ table|e }}"
                 >
-                  <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                  <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i><span>Storage</span>
                 </a>
               </div>
             </div>
@@ -1209,7 +1210,7 @@
       <div id="tables-pagination-controls" class="pagination-controls"></div>
     </div>
 
-    <div class="modal fade" id="fillfactorAdvisorModal" tabindex="-1" aria-labelledby="fillfactorAdvisorModalTitle" aria-hidden="true">
+    <div class="modal fade pga-table-modal" id="fillfactorAdvisorModal" tabindex="-1" aria-labelledby="fillfactorAdvisorModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
@@ -1317,7 +1318,7 @@
       </div>
     </div>
 
-    <div class="modal fade table-index-modal" id="tableIndexStatsModal" tabindex="-1" aria-labelledby="tableIndexStatsModalTitle" aria-hidden="true">
+    <div class="modal fade table-index-modal pga-table-modal" id="tableIndexStatsModal" tabindex="-1" aria-labelledby="tableIndexStatsModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
@@ -1409,7 +1410,7 @@
       </div>
     </div>
 
-    <div class="modal fade table-index-modal" id="tableColumnUsageModal" tabindex="-1" aria-labelledby="tableColumnUsageModalTitle" aria-hidden="true">
+    <div class="modal fade table-index-modal pga-table-modal" id="tableColumnUsageModal" tabindex="-1" aria-labelledby="tableColumnUsageModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
@@ -1446,7 +1447,7 @@
       </div>
     </div>
 
-    <div class="modal fade table-index-modal" id="tableColumnStatsModal" tabindex="-1" aria-labelledby="tableColumnStatsModalTitle" aria-hidden="true">
+    <div class="modal fade table-index-modal pga-table-modal" id="tableColumnStatsModal" tabindex="-1" aria-labelledby="tableColumnStatsModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">

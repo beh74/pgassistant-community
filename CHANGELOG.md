@@ -1,3 +1,13 @@
+## [4.0] - 2026-11-08
+
+- Refresh the visual identity with new logos, favicons, and consistent styling across the application.
+- Add light, dark, and system appearance modes with saved preferences.
+- Streamline Dashboard, Global Advisor, Executive Plan, Index Advisor, and cache views with clearer priorities, compact cards, and easier access to details and SQL.
+- Improve Dashboard workload rankings, missing-statistics handling, and table-size shares in database and cluster views.
+- Executive Plan history: expose persistent recommendations alongside new, modified, and corrected findings.
+- Fix workload average-time changes to reflect consecutive intervals while retaining shared-query comparisons separately.
+- Update documentation screenshots to match the new interface.
+
 ## [3.8.8] - 2026-11-02
 
 - Dashboard design refactoring

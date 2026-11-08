@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="media/pgassistant_logo.png" alt="pgAssistant" height="120px"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/pgassistant-logo-dark.svg"/>
+    <img src="media/pgassistant-logo.svg" alt="pgAssistant" width="440"/>
+  </picture>
 </p>
 
 <h1 align="center">pgAssistant</h1>

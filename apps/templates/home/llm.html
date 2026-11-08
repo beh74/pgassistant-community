@@ -163,9 +163,9 @@
 
   .llm-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 220px);
     gap: .9rem;
-    align-items: end;
+    align-items: start;
   }
 
   .llm-grid-full {
@@ -264,10 +264,22 @@
     width: 100%;
   }
 
-  .llm-status {
-    min-height: 1.2rem;
-    color: var(--ga-muted, #64748b);
+  .llm-field { min-width: 0; }
+
+  #test-status {
+    grid-column: 1 / -1;
+    min-width: 0;
+    max-width: 100%;
+    padding: .75rem 1rem;
+    border: 1px solid var(--ga-border);
+    border-radius: .6rem;
+    background: var(--ga-surface);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
+  #test-status:empty { display: none; }
+  #model-status { overflow-wrap: anywhere; min-width: 0; }
 
   .llm-footer-actions {
     display: flex;
@@ -422,14 +434,14 @@
                   </div>
 
                   <div class="llm-field llm-action-field">
-                    <label class="form-label">Connection test</label>
+                    <label class="form-label" for="testConnectionBtn">Connection test</label>
                     <button type="button" class="btn ga-outline-action llm-action-btn" id="testConnectionBtn">
                       <i class="bi bi-wifi"></i>
                       Test connection
                       <span id="test-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
                     </button>
-                    <div id="test-status" class="small mt-2 llm-status"></div>
                   </div>
+                  <div id="test-status" class="small llm-status llm-grid-full" role="status" aria-live="polite" aria-atomic="true"></div>
                 </div>
               </section>
 

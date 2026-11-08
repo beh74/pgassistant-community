@@ -234,25 +234,8 @@
   <div class="container-fluid px-0">
     <div class="pga-topnav-inner" id="navbarSupportedContent">
 
-      <div class="pga-topnav-left">
-        <form class="navbar-search form-inline pga-topnav-search" id="navbar-search-main" action="/search.html" method="POST" role="search">
-          <div class="input-group input-group-merge search-bar">
-            <span class="input-group-text" id="topbar-addon" aria-hidden="true">
-              <i class="bi bi-search"></i>
-            </span>
-            <input
-              class="form-control"
-              id="searchkey"
-              name="searchkey"
-              type="text"
-              placeholder="Search query"
-              aria-label="Search query"
-            >
-          </div>
-        </form>
-      </div>
-
       <div class="pga-topnav-right">
+        <button type="button" class="pga-theme-toggle" data-pga-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false"><i class="bi bi-moon" aria-hidden="true" data-pga-theme-icon></i></button>
         <div class="nav-item dropdown">
           <a
             class="nav-link dropdown-toggle pga-topnav-menu-btn"
@@ -267,6 +250,11 @@
 
           <div class="dropdown-menu dropdown-menu-end mt-2 pga-topnav-dropdown">
             <div class="pga-dropdown-section">Navigation</div>
+            <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#pga-search-modal">
+              <span class="pga-dropdown-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+              Search query
+            </button>
+
 
             <a class="dropdown-item" href="/dashboard.html">
               <span class="pga-dropdown-icon"><i class="bi bi-pie-chart-fill"></i></span>
@@ -328,7 +316,7 @@
       </div>
       <div class="modal-body px-4 px-sm-5 pb-5 text-center">
         <div class="pga-about-icon mb-3" aria-hidden="true">
-          <i class="bi bi-database-check"></i>
+          {% include "includes/brand-symbol.html" %}
         </div>
         <h2 class="h4 mb-2" id="pga-about-title">pgAssistant Community</h2>
         <div class="pga-about-version mb-3">
@@ -366,3 +354,20 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="pga-search-modal" tabindex="-1" aria-labelledby="pga-search-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="h5 modal-title" id="pga-search-title">Search query</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <form action="/search.html" method="POST" role="search" id="navbar-search-main">
+        <div class="modal-body"><label class="form-label" for="searchkey">Query text</label><input class="form-control" id="searchkey" name="searchkey" type="search" placeholder="Enter query text" required></div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Search</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('pga-search-modal').addEventListener('shown.bs.modal', function () {
+  document.getElementById('searchkey').focus();
+});
+</script>

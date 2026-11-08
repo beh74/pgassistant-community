@@ -364,6 +364,12 @@ def build_history(
             modifications.append(finding)
             point_modifications.append(finding)
 
+        point_persistent = []
+        for fingerprint in sorted(persistent_keys - modified_keys):
+            finding = dict(current[fingerprint])
+            finding["live_comparison"] = bool(snapshot.get("is_current"))
+            point_persistent.append(finding)
+
         timeline.append({
             "run_id": snapshot["run_id"],
             "collected_at": snapshot["collected_at"],
@@ -371,7 +377,8 @@ def build_history(
             "new": len(new_keys),
             "corrected": len(corrected_keys),
             "modified": len(modified_keys),
-            "persistent": len(persistent_keys - modified_keys),
+            "persistent": len(point_persistent),
+            "persistent_packages": _group_events(point_persistent, "detected_at"),
             "is_current": bool(snapshot.get("is_current")),
             "has_previous": baseline is not None or snapshot_index > 0,
             "correction_packages": _group_events(
@@ -1181,7 +1188,7 @@ def _query_statement_type(query_sql: Any) -> str:
 
 
 def _workload_interval(current, previous, previous_interval, elapsed, previous_elapsed):
-    """Measure consecutive snapshots and compare only a shared query population."""
+    """Measure interval averages; expose shared-query comparisons separately."""
     from math import isfinite
 
     def counters(rows):
@@ -1224,15 +1231,23 @@ def _workload_interval(current, previous, previous_interval, elapsed, previous_e
     prior_time = sum(previous_interval[k]["time"] for k in shared)
     current_average = current_time / current_calls if current_calls else None
     prior_average = prior_time / prior_calls if prior_calls else None
+    observed_average = total / calls if available and calls else None
+    previous_calls = sum(item["calls"] for item in previous_interval.values())
+    previous_time = sum(item["time"] for item in previous_interval.values())
+    previous_average = (
+        previous_time / previous_calls
+        if previous_calls and previous_elapsed and previous_elapsed > 0 else None
+    )
     current_rate = current_calls * 60 / elapsed if available else None
     prior_rate = prior_calls * 60 / previous_elapsed if previous_elapsed else None
     metrics = {
         "calls": calls if available else None,
         "total_time_ms": round(total, 2) if available else None,
-        "average_time_ms": round(total / calls, 4) if available and calls else None,
+        "average_time_ms": round(observed_average, 4) if observed_average is not None else None,
+        "previous_average_time_ms": round(previous_average, 4) if previous_average is not None else None,
         "calls_per_minute": round(calls * 60 / elapsed, 2) if available else None,
         "calls_change_pct": change(current_calls, prior_calls) if shared else None,
-        "change_pct": change(current_average, prior_average) if shared else None,
+        "change_pct": change(observed_average, previous_average),
         "calls_per_minute_change_pct": change(current_rate, prior_rate) if shared else None,
         "active_queries": sum(item["calls"] > 0 for item in intervals.values()) if available else None,
         "active_queries_change_pct": change(
@@ -1245,7 +1260,8 @@ def _workload_interval(current, previous, previous_interval, elapsed, previous_e
                      "excluded_queries": sum(excluded.values()), "exclusions": excluded},
         "comparison": {"query_count": len(shared), "calls": current_calls if shared else None,
                        "previous_calls": prior_calls if shared else None,
-                       "average_time_ms": current_average, "previous_average_time_ms": prior_average},
+                       "average_time_ms": current_average, "previous_average_time_ms": prior_average,
+                       "change_pct": change(current_average, prior_average) if shared else None},
     }
     return metrics, intervals
 

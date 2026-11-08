@@ -906,7 +906,7 @@
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid py-4 analyze-page">
 
   <div class="analyze-page-header">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
@@ -1425,9 +1425,7 @@
                   </div>
                   {% endif %}
 
-                  <details class="advisor-details">
-                    <summary class="advisor-details-summary">Technical details</summary>
-                    <div class="vstack gap-3 mt-3">
+                  {% set technical_details %}
 
                       {% if rec.filter_expr %}
                       <div class="advisor-section">
@@ -1552,8 +1550,13 @@
                       </div>
                       {% endif %}
 
-                    </div>
+                  {% endset %}
+                  {% if technical_details|trim %}
+                  <details class="advisor-details">
+                    <summary class="advisor-details-summary">Technical details</summary>
+                    <div class="vstack gap-3 mt-3">{{ technical_details }}</div>
                   </details>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -1613,17 +1616,17 @@
                 <div class="small text-muted mb-1">Node details</div>
                 <div class="d-flex flex-wrap gap-2">
                   {% if r.table is defined and r.table %}
-                    <span class="badge text-bg-light border"><span class="text-muted">table:</span> <code>{{ r.table }}</code></span>
+                    <span class="badge analyze-node-badge"><span class="text-muted">table:</span> <code>{{ r.table }}</code></span>
                   {% endif %}
                   {% if r.index is defined and r.index %}
-                    <span class="badge text-bg-light border"><span class="text-muted">index:</span> <code>{{ r.index }}</code></span>
+                    <span class="badge analyze-node-badge"><span class="text-muted">index:</span> <code>{{ r.index }}</code></span>
                   {% endif %}
                   {% if r.count is defined %}
-                    <span class="badge text-bg-light border"><span class="text-muted">count:</span> {{ fmt_int(r.count) }}</span>
+                    <span class="badge analyze-node-badge"><span class="text-muted">count:</span> {{ fmt_int(r.count) }}</span>
                   {% endif %}
-                  <span class="badge text-bg-light border"><span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}</span>
-                  <span class="badge text-bg-light border"><span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}</span>
-                  <span class="badge text-bg-light border"><span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}</span>
+                  <span class="badge analyze-node-badge"><span class="text-muted">self_time:</span> {{ fmt_ms(r.self_time_ms) }}</span>
+                  <span class="badge analyze-node-badge"><span class="text-muted">self_time_pct:</span> {{ fmt_pct(r.self_time_pct) }}</span>
+                  <span class="badge analyze-node-badge"><span class="text-muted">self_rows:</span> {{ fmt_int(r.self_rows) }}</span>
                 </div>
               </div>
             </div>
@@ -1713,7 +1716,7 @@
 
 
 
-  <div class="modal fade" id="columnStatsHelpModal" tabindex="-1" aria-labelledby="columnStatsHelpModalTitle" aria-hidden="true">
+  <div class="modal fade pga-table-modal pga-analyze-modal" id="columnStatsHelpModal" tabindex="-1" aria-labelledby="columnStatsHelpModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
       <div class="modal-content">
         <div class="modal-header">
@@ -1815,7 +1818,7 @@
 
 
 
-  <div class="modal fade index-stats-modal" id="indexStatsModal" tabindex="-1" aria-labelledby="indexStatsModalTitle" aria-hidden="true">
+  <div class="modal fade index-stats-modal pga-table-modal pga-analyze-modal" id="indexStatsModal" tabindex="-1" aria-labelledby="indexStatsModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
@@ -1852,7 +1855,7 @@
     </div>
   </div>
 
-  <div class="modal fade" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
+  <div class="modal fade pga-table-modal pga-analyze-modal" id="modalSubscribe" tabindex="-1" role="dialog" aria-labelledby="modalTitleSubscribe" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
       <div class="modal-content py-xl-4">
         <div class="modal-body text-center py-3">

@@ -204,28 +204,18 @@
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="pg-page executive-plan-page">
+<div class="pg-page executive-plan-page executive-review-page">
   <div class="pg-page-header">
     <div>
-      <div class="pg-eyebrow">Insights &amp; Planning</div>
+
       <h1 class="pg-title">Executive Plan</h1>
       <p class="pg-subtitle">
-        Consolidated and ordered implementation plan built from Global Advisor, Index Advisor,
-        Parameter Advisor, and Autovacuum Tuning.
+        From database findings to an ordered, practical action plan.
         {% if multi_db_filter %}<span class="d-block mt-1">Database: <strong>{{ active_db }}</strong></span>{% endif %}
       </p>
     </div>
+    <a href="/global/advisor" class="btn btn-sm btn-outline-primary">Explore findings <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></a>
   </div>
-
-  <section class="pg-hero executive-plan-hero">
-    <div>
-      <div class="pg-hero-title">Implementation roadmap</div>
-      <p class="pg-hero-text">
-        Turn advisor findings into ordered work packages. Start with platform and reliability prerequisites,
-        then address schema, indexes, maintenance, and configuration in a controlled sequence.
-      </p>
-    </div>
-  </section>
 
   <nav class="mb-4" aria-label="Executive Plan views">
     <div class="nav nav-tabs tune-nav-tabs" id="executive-plan-tabs" role="tablist">
@@ -265,34 +255,22 @@
     </div>
   {% endif %}
 
-  <div class="pg-summary-grid">
-    <div class="pg-summary-card is-info">
-      <span class="pg-summary-label d-inline-flex align-items-center gap-1">
-        Work packages
-        <i
-          class="bi bi-question-circle summary-help-icon"
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          title="A work package is an implementation task that groups related advisor recommendations by objective, affected objects, responsible team, and execution phase."
-          aria-label="A work package is an implementation task that groups related advisor recommendations by objective, affected objects, responsible team, and execution phase."
-        ></i>
-        <span class="pg-summary-value">{{ plan.summary.tasks }}</span>
-      </span>
-    </div>
-    <div class="pg-summary-card is-violet">
-      <span class="pg-summary-label">Recommendations <span class="pg-summary-value">{{ plan.summary.recommendations_after_deduplication }}</span></span>
-    </div>
-    <div class="pg-summary-card executive-summary-dev">
-      <span class="pg-summary-label">DEV tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV }}</span></span>
-    </div>
-    <div class="pg-summary-card executive-summary-ops">
-      <span class="pg-summary-label">OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.OPS }}</span></span>
-    </div>
-    <div class="pg-summary-card executive-summary-dev-ops">
-      <span class="pg-summary-label">DEV/OPS tasks <span class="pg-summary-value">{{ plan.summary.teams.DEV_OPS }}</span></span>
-    </div>
+  {% set priorities = namespace(high=0) %}
+  {% for task in plan.tasks %}{% if task.priority in ['HIGH', 'CRITICAL'] %}{% set priorities.high = priorities.high + 1 %}{% endif %}{% endfor %}
+  <section class="executive-brief" aria-label="Plan overview">
+    <h2>{% if plan.phases %}First step: {{ plan.phases[0].name }}{% else %}No implementation work identified{% endif %}</h2>
+    <p>{% if plan.phases %}{{ plan.phases[0].rationale }}{% else %}Review the advisor results for the current database.{% endif %}</p>
+  </section>
+  <div class="executive-summary-line">
+    <span><strong>{{ plan.database }}</strong></span>
+    <span><strong>{{ plan.summary.recommendations_after_deduplication }}</strong> findings</span>
+    <span><strong>{{ plan.summary.tasks }}</strong> work packages</span>
+    <span><strong>{{ priorities.high }}</strong> high priority package{{ 's' if priorities.high != 1 else '' }}</span>
+    <span><strong>{{ plan.summary.phases }}</strong> phases</span>
   </div>
-
+  <div class="executive-review-grid">
+  <section class="pg-card executive-sequence" aria-labelledby="executive-sequence-title">
+    <div class="executive-panel-heading"><h2 id="executive-sequence-title">Recommended sequence</h2><p>Validate each change before moving on. Expand a phase to inspect its work packages and SQL.</p></div>
   {% if not plan.phases %}
     <div class="alert alert-success">No actionable recommendation was found by the advisors.</div>
   {% endif %}
@@ -316,7 +294,15 @@
               <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Database restart
             </span>
           {% endif %}
-          {% if phase.sql_count %}
+          <span
+            class="executive-phase-toggle"
+            title="Click to show or hide recommendations and SQL commands"
+            aria-label="Click to show or hide recommendations and SQL commands"
+          ><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+        </div>
+      </summary>
+
+      <div class="executive-phase-tools">          {% if phase.sql_count %}
             <button
               type="button"
               class="btn btn-sm btn-outline-primary executive-copy-sql"
@@ -326,14 +312,7 @@
               <span>Copy all SQL commands</span>
             </button>
           {% endif %}
-          <span
-            class="executive-phase-toggle"
-            title="Click to show or hide recommendations and SQL commands"
-            aria-label="Click to show or hide recommendations and SQL commands"
-          ><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-        </div>
-      </summary>
-
+      </div>
       {% if phase.sql_count %}
         <pre id="executive-phase-sql-{{ phase.number }}" class="d-none" aria-hidden="true">{% for task in phase.tasks %}{% for advice in task.recommendations if advice.sql %}{{ advice.sql }}
 
@@ -352,7 +331,7 @@
               </div>
               <div>
                 <span class="executive-badge {% if task.team == 'DEV' %}executive-team-dev{% elif task.team == 'OPS' %}executive-team-ops{% else %}executive-team-dev-ops{% endif %}">{{ task.team|replace('_', '/') }}</span>
-                <span class="executive-badge">{{ task.priority }}</span>
+                <span class="executive-badge pga-priority-{{ task.priority|lower }}">{{ task.priority }}</span>
                 {% if task.requires_restart %}<span class="executive-badge">Restart</span>{% endif %}
               </div>
             </div>
@@ -406,6 +385,38 @@
       {% endfor %}
     </details>
   {% endfor %}
+  </section>
+  <aside class="pg-card executive-context" aria-labelledby="executive-context-title">
+    <div class="executive-panel-heading"><h2 id="executive-context-title">Decision context</h2></div>
+    <div class="executive-context-body">
+      <dl>
+        <div><dt>Target</dt><dd>{{ plan.database }}</dd></div>
+        <div><dt>Sources</dt><dd class="executive-advisor-links">
+          <a href="/global/advisor"><i class="bi bi-shield-check" aria-hidden="true"></i>Global Advisor</a>
+          <a href="/query_index_advisor.html"><i class="bi bi-diagram-3" aria-hidden="true"></i>Index Advisor</a>
+          <a href="/query_parameter_advisor.html"><i class="bi bi-sliders" aria-hidden="true"></i>Parameter Advisor</a>
+          <a href="/table_autovacuum_tune.html"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Autovacuum Tuning</a>
+        </dd></div>
+        <div><dt>Sequence</dt><dd>Policy-defined phases, then task score</dd></div>
+        <div><dt>Scope</dt><dd>Developer &amp; Operations</dd></div>
+      </dl>
+      <h3>Before making changes</h3>
+      <p>Review the evidence, test against a representative workload and plan for locking, restarts or write overhead.</p>
+      <a href="/global/advisor" class="btn btn-sm btn-outline-primary">Review the evidence <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></a>
+    </div>
+  </aside>
+  </div>
+  <section class="pg-card executive-team-overview mt-4" aria-labelledby="executive-team-title">
+    <div class="executive-panel-heading"><h2 id="executive-team-title">Work packages by team</h2><p>Shared review, explicit ownership</p></div>
+    <div class="table-responsive"><table class="table mb-0">
+      <thead><tr><th scope="col">Team</th><th scope="col" class="text-end">High / Critical</th><th scope="col" class="text-end">Medium</th><th scope="col" class="text-end">Low</th><th scope="col">First step</th></tr></thead>
+      <tbody>{% for team, label in [('DEV', 'Developer'), ('OPS', 'Operations'), ('DEV_OPS', 'Developer / Operations')] %}
+      {% set tasks = plan.tasks|selectattr('team', 'equalto', team)|list %}
+      <tr><td>{{ label }}</td><td class="text-end">{{ tasks|selectattr('priority', 'in', ['HIGH', 'CRITICAL'])|list|length }}</td><td class="text-end">{{ tasks|selectattr('priority', 'equalto', 'MEDIUM')|list|length }}</td><td class="text-end">{{ tasks|selectattr('priority', 'equalto', 'LOW')|list|length }}</td><td>{{ tasks[0].title if tasks else 'No work package' }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </section>
+  <p class="small text-muted mt-3">Rule-based planning · No changes are applied.</p>
   {% endif %}
   </div>
   </div>
@@ -498,6 +509,11 @@
             <div id="history-changes"></div>
           </section>
         </div>
+        <section class="history-section history-change-section--persistent">
+          <h3 class="history-section-title history-change-heading"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>Still detected</span><span class="history-change-count" id="history-persistent-count">0</span></h3>
+          <p class="small text-muted">Recommendations already present in the preceding measurement and still detected with the same implementation action. These are not new findings.</p>
+          <div id="history-persistent"></div>
+        </section>
       </div>
     </section>
   </div>
@@ -619,36 +635,45 @@ function historyTeamLabel(team) {
 }
 
 function historyFindingHtml(item, eventType) {
-  const eventDate = item.corrected_at || item.detected_at || item.modified_at;
+  const scope = item.scope_name || item.object_name;
   const reopenedBadge = item.reopened && eventType === "No longer detected"
     ? '<span class="executive-badge">Active again</span>'
     : "";
   return `
     <article class="history-change-item">
-      <div class="history-change-title">${escapeHistoryHtml(item.title)}</div>
-      <div class="small text-muted mt-1">${escapeHistoryHtml(item.scope_name || item.object_name || "Database")}</div>
+      ${scope && scope !== item.advisor_id ? `<div class="history-finding-scope">${escapeHistoryHtml(scope)}</div>` : ""}
       ${item.recommendation_sql ? `<div class="small fw-bold mt-2">Recommended SQL</div><pre class="executive-sql"><code>${escapeHistoryHtml(item.recommendation_sql)}</code></pre>` : ""}
       <div class="history-change-meta">
         <span class="executive-badge ${item.team === "DEV" ? "executive-team-dev" : item.team === "OPS" ? "executive-team-ops" : "executive-team-dev-ops"}">${escapeHistoryHtml(historyTeamLabel(item.team))}</span>
-        ${item.priority ? `<span class="executive-badge">${escapeHistoryHtml(item.priority)}</span>` : ""}
+        ${item.priority ? `<span class="executive-badge pga-priority-${["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(String(item.priority).toUpperCase()) ? String(item.priority).toLowerCase() : "low"}">${escapeHistoryHtml(item.priority)}</span>` : ""}
         ${reopenedBadge}
-        ${item.live_comparison ? '<span class="history-event modified">Current state</span>' : ""}
-        <span>${escapeHistoryHtml(eventType)} ${escapeHistoryHtml(formatHistoryDate(eventDate, true))}</span>
+        ${item.live_comparison ? '<span class="history-event history-current-state">Current state</span>' : ""}
+        ${["Changed", "Reopened"].includes(eventType) ? `<span class="history-event modified">${escapeHistoryHtml(eventType)}</span>` : ""}
       </div>
     </article>`;
 }
 
 function historyPackagesHtml(packages, eventType) {
-  return (packages || []).map(pkg => `
-    <section class="history-package">
-      <div class="history-package-header">
-        <span>${escapeHistoryHtml(pkg.title)}</span>
-        <span class="executive-badge ${pkg.team === "DEV" ? "executive-team-dev" : pkg.team === "OPS" ? "executive-team-ops" : "executive-team-dev-ops"}">${escapeHistoryHtml(historyTeamLabel(pkg.team))}</span>
-      </div>
+  const groups = new Map();
+  (packages || []).forEach(function (pkg) {
+    (pkg.recommendations || []).forEach(function (item) {
+      const type = item.advisor_id || item.title || pkg.title || "Other recommendations";
+      const key = JSON.stringify([item.source || "", type]);
+      if (!groups.has(key)) groups.set(key, {title: type, items: []});
+      groups.get(key).items.push(item);
+    });
+  });
+  return Array.from(groups.values()).map(group => `
+    <details class="history-package history-type-group">
+      <summary class="history-package-header">
+        <span>${escapeHistoryHtml(group.title)}</span>
+        <span class="history-type-count">${group.items.length} ${group.items.length === 1 ? "recommendation" : "recommendations"}</span>
+        <i class="bi bi-chevron-down history-type-toggle" aria-hidden="true"></i>
+      </summary>
       <div class="history-package-body">
-        ${(pkg.recommendations || []).map(item => historyFindingHtml(item, item.modified_at ? "Changed" : (item.reopened && eventType === "Detected" ? "Reopened" : eventType))).join("")}
+        ${group.items.map(item => historyFindingHtml(item, item.modified_at ? "Changed" : (item.reopened && eventType === "Detected" ? "Reopened" : eventType))).join("")}
       </div>
-    </section>`).join("");
+    </details>`).join("");
 }
 
 function renderRecommendationHistoryChart(timeline, onSelect, selectedIndex) {
@@ -848,6 +873,8 @@ function initializeExecutiveHistory() {
   function renderSelectedPoint(index) {
     const timeline = state.payload?.timeline || [];
     if (!timeline.length) {
+      document.getElementById("history-persistent-count").textContent = "0";
+      document.getElementById("history-persistent").innerHTML = '<div class="history-empty">No recommendation is available.</div>';
       renderRecommendationHistoryChart([], renderSelectedPoint, 0);
       document.getElementById("history-selection-summary").textContent = "No measurement is available for comparison.";
       document.getElementById("history-corrections").innerHTML = '<div class="history-empty">No recommendation is available.</div>';
@@ -858,6 +885,7 @@ function initializeExecutiveHistory() {
     const point = timeline[index];
     const corrections = point.correction_packages || [];
     const changes = point.change_packages || [];
+    const persistent = point.persistent_packages || [];
     const changedCount = Number(point.new || 0) + Number(point.modified || 0);
     const pointLabel = point.is_current ? "Current state" : formatHistoryDate(point.collected_at, true);
     document.getElementById("history-selection-summary").textContent = point.has_previous
@@ -869,6 +897,9 @@ function initializeExecutiveHistory() {
       || '<div class="history-empty">No recommendation disappeared at this measurement.</div>';
     document.getElementById("history-changes").innerHTML = historyPackagesHtml(changes, "Detected")
       || '<div class="history-empty">No new or changed recommendation at this measurement.</div>';
+    document.getElementById("history-persistent-count").textContent = Number(point.persistent || 0);
+    document.getElementById("history-persistent").innerHTML = historyPackagesHtml(persistent, "Still detected")
+      || '<div class="history-empty">No unchanged recommendation carried over from the preceding measurement.</div>';
     renderRecommendationHistoryChart(timeline, renderSelectedPoint, index);
   }
 

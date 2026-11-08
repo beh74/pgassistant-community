@@ -44,7 +44,7 @@
             "id": "db_size",
             "description": "Database size",            
             "category": "Database",        
-            "sql": "select pg_size_pretty(pg_database_size('$1'));",
+            "sql": "SELECT pg_size_pretty(size_bytes) AS pg_size_pretty, size_bytes FROM (SELECT pg_database_size('$1') AS size_bytes) AS database_size;",
             "type": "param_query",
             "reference": "https://www.postgresql.org/docs/9.1/functions-admin.html"
         },

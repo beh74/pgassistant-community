@@ -107,8 +107,31 @@ class CollectorHistoryTests(unittest.TestCase):
         self.assertEqual(value["comparison"]["calls"], 10)
         self.assertEqual(value["comparison"]["previous_calls"], 10)
         self.assertEqual(value["calls_change_pct"], 0)
-        self.assertEqual(value["change_pct"], 100)
+        self.assertEqual(value["comparison"]["change_pct"], 100)
+        self.assertAlmostEqual(value["previous_average_time_ms"], 920 / 110, places=4)
+        self.assertEqual(value["change_pct"], round(((10040 / 1010) / (920 / 110) - 1) * 100, 2))
         self.assertEqual(value["coverage"]["exclusions"]["missing"], 1)
+
+    def test_average_variation_matches_observed_averages_when_shared_queries_slow_down(self):
+        points = self.timeline([
+            [("a", 10, 100), ("b", 10, 100)],
+            [("a", 20, 120), ("b", 110, 1100), ("c", 10, 100)],
+            [("a", 30, 160), ("c", 110, 200)],
+        ])
+        value = points[2]["workload"]
+        self.assertEqual(value["average_time_ms"], round(140 / 110, 4))
+        self.assertEqual(value["change_pct"], -86.27)
+        self.assertEqual(value["comparison"]["change_pct"], 100)
+
+    def test_average_variation_matches_observed_averages_when_shared_queries_speed_up(self):
+        points = self.timeline([
+            [("a", 10, 100), ("b", 10, 100)],
+            [("a", 20, 140), ("b", 110, 200), ("c", 10, 100)],
+            [("a", 30, 160), ("c", 110, 1100)],
+        ])
+        value = points[2]["workload"]
+        self.assertEqual(value["change_pct"], 628.57)
+        self.assertEqual(value["comparison"]["change_pct"], -50)
 
     def test_active_query_comparison_uses_shared_population(self):
         points = self.timeline([
@@ -430,6 +453,27 @@ class CollectorHistoryTests(unittest.TestCase):
         self.assertTrue(result["corrections"][0]["live_comparison"])
         self.assertEqual(result["correction_packages"][0]["title"], "Protect order data")
         self.assertTrue(result["timeline"][-1]["is_current"])
+
+    def test_current_indexes_persist_without_being_reported_as_new(self):
+        now = datetime(2026, 11, 3, 12, tzinfo=timezone.utc)
+        rows = []
+        for when, run in [(now - timedelta(days=1), "previous"), (now, "current")]:
+            for fingerprint, action in [("index-existing", "same-sql"), ("index-changed", "old-sql" if run == "previous" else "new-sql")]:
+                rows.append(history_row(when, fingerprint, action, run_id=run,
+                    is_current=run == "current", action_type="CREATE_INDEX",
+                    recommendation_sql="CREATE INDEX example ON orders(id);"))
+        rows.append(history_row(now, "index-new", "create-new", run_id="current", is_current=True))
+        result = build_history(rows, target_id="northwind-demo", days="latest", team="ALL", now=now)
+        point = result["timeline"][-1]
+        persistent = [item for group in point["persistent_packages"] for item in group["recommendations"]]
+        changes = [item for group in point["change_packages"] for item in group["recommendations"]]
+        self.assertEqual(point["persistent"], 1)
+        self.assertEqual([item["finding_fingerprint"] for item in persistent], ["index-existing"])
+        self.assertTrue(persistent[0]["live_comparison"])
+        self.assertIn("CREATE INDEX", persistent[0]["recommendation_sql"])
+        self.assertEqual({item["finding_fingerprint"] for item in changes}, {"index-new", "index-changed"})
+        self.assertEqual(point["new"], 1)
+        self.assertEqual(point["modified"], 1)
 
 
 if __name__ == "__main__":

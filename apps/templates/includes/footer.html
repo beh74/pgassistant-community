@@ -126,10 +126,10 @@
   <div class="pga-footer-shell">
     <div class="pga-footer-brand">
       <span class="pga-footer-logo" aria-hidden="true">
-        <i class="bi bi-database-check"></i>
+        {% include "includes/brand-symbol.html" %}
       </span>
       <div>
-        <p class="pga-footer-title">PostgreSQL Assistant</p>
+        <p class="pga-footer-title">pgAssistant</p>
       </div>
     </div>
 
@@ -139,12 +139,10 @@
         Documentation
       </a>
       
-      <span class="pga-footer-pill">
-        <i class="bi bi-tag"></i>
-        <a class="pga-footer-link" href="https://github.com/beh74/pgassistant-community/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">
-        v {{ config.PGASSISTANT_VERSION }}
-        </a>
-      </span>
+      <a class="pga-footer-link pga-footer-version" href="https://github.com/beh74/pgassistant-community/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" aria-label="Release notes for pgAssistant {{ config.PGASSISTANT_VERSION }}">
+        <i class="bi bi-tag" aria-hidden="true"></i>
+        <span>v{{ config.PGASSISTANT_VERSION }}</span>
+      </a>
     </div>
   </div>
 </footer>

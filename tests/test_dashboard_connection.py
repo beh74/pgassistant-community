@@ -13,7 +13,7 @@ class DashboardConnectionTests(unittest.TestCase):
             with self.subTest(ratio=ratio):
                 rows = {
                     "db_version": [{"server_version": "17.6"}],
-                    "db_size": [{"pg_size_pretty": "1 GB"}],
+                    "db_size": [{"pg_size_pretty": "1 GB", "size_bytes": 1024**3}],
                     "db_cache": [{"ratio": ratio}],
                     "reporting_pguptime": [{"uptime_pretty": "1 day"}],
                     "shared_buffers_setting": [{"current_setting": "128 MB"}],
@@ -27,6 +27,7 @@ class DashboardConnectionTests(unittest.TestCase):
                 ):
                     info = database.get_db_info({"db_name": "example"}, con=Mock())
                 self.assertEqual(info["cache"], ratio)
+                self.assertEqual(info["size_bytes"], 1024**3)
 
     def setUp(self):
         self.app = Flask(__name__)

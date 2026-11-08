@@ -17,16 +17,17 @@ Base page
 <meta name="description" content="Optimze your postgresql database">
 
 <!-- Favicon -->
-<link rel="apple-touch-icon" sizes="180x180" href="{{ config.ASSETS_ROOT }}/img/favicon/apple-touch-icon.png?v=3">
-<link rel="icon" type="image/svg+xml" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon.svg?v=3">
-<link rel="icon" type="image/png" sizes="32x32" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon-32x32.png?v=3">
-<link rel="icon" type="image/png" sizes="16x16" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon-16x16.png?v=3">
-<link rel="manifest" href="{{ config.ASSETS_ROOT }}/img/favicon/site.webmanifest?v=3">
-<link rel="mask-icon" href="{{ config.ASSETS_ROOT }}/img/favicon/safari-pinned-tab.svg?v=3" color="#4b5563">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ config.ASSETS_ROOT }}/img/favicon/apple-touch-icon.png?v=4">
+<link rel="icon" type="image/svg+xml" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon.svg?v=4">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon-32x32.png?v=4">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ config.ASSETS_ROOT }}/img/favicon/favicon-16x16.png?v=4">
+<link rel="manifest" href="{{ config.ASSETS_ROOT }}/img/favicon/site.webmanifest?v=4">
+<link rel="mask-icon" href="{{ config.ASSETS_ROOT }}/img/favicon/safari-pinned-tab.svg?v=4" color="#4b5563">
 <meta name="msapplication-TileColor" content="#f3f4f6">
 <meta name="theme-color" content="#f3f4f6">
 
 <!-- Base CSS -->
+<script src="{{ config.ASSETS_ROOT }}/js/theme.js?v=2"></script>
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/volt.css" rel="stylesheet">
 <link type="text/css" href="{{ config.ASSETS_ROOT }}/css/pga.css" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/bootstrap-icons.css">
@@ -36,6 +37,7 @@ Base page
 
 <!-- Specific Page CSS goes HERE -->
 {% block stylesheets %}{% endblock stylesheets %}
+<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant-brand.css?v=25">
 
 </head>
 <body>

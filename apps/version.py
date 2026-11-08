@@ -1,3 +1,3 @@
 """pgAssistant release version."""
 
-__version__ = "3.8.8"
+__version__ = "4.0"

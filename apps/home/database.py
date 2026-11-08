@@ -328,6 +328,7 @@ def get_db_info_cluster(db_config):
                 for row in rows:
                     item = dict(row)
                     item["database"] = db["name"]
+                    item["database_size_bytes"] = db["size_bytes"]
                     largest_tables.append(item)
             finally:
                 db_con.close()
@@ -818,6 +819,7 @@ def get_db_info(db_config,con=None):
 
             size, _= db_query(con,'db_size',db_config['db_name'])
             info["size"]=size[0]['pg_size_pretty']
+            info["size_bytes"] = size[0].get("size_bytes")
 
             try:
                 cache, _= db_query(con,'db_cache')

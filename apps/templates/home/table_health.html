@@ -20,7 +20,7 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="container-fluid py-4 ps-3 pe-3">
+<div class="container-fluid py-4 ps-3 pe-3 table-health-page">
   {% set rows = table_health|default([], true) %}
   {% set summary = namespace(schemas=[],healthy=0,analyze_due=0,never_analyzed=0,high_dead=0) %}
 
@@ -234,7 +234,7 @@
   {% endif %}
 </div>
 
-<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+<div class="modal fade pga-table-modal pga-health-modal" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form id="maintenance-form">

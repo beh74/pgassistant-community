@@ -700,11 +700,11 @@
 </div><!-- /#query-activity-tab-content -->
 </div><!-- /.pg-query-activity-page -->
 
-<div class="modal fade" id="queryDetailsModal" tabindex="-1" aria-labelledby="queryDetailsModalLabel" aria-hidden="true">
+<div class="modal fade pga-table-modal pga-query-modal" id="queryDetailsModal" tabindex="-1" aria-labelledby="queryDetailsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Query details</h5>
+        <h5 class="modal-title" id="queryDetailsModalLabel">Query details</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -735,7 +735,7 @@
 
       <div class="modal-footer">
         <button id="modalAnalyzeBtn" type="button" class="btn btn-primary d-none">Analyze query</button>
-        <button type="button" class="btn btn-gray-200" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -743,7 +743,7 @@
 
 {% if collector_history_enabled %}
 <div
-  class="modal fade"
+  class="modal fade pga-table-modal pga-query-modal"
   id="queryHistoryModal"
   tabindex="-1"
   aria-labelledby="queryHistoryModalLabel"
@@ -777,7 +777,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-gray-200" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

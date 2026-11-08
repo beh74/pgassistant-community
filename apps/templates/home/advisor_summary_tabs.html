@@ -2,10 +2,6 @@
 
 {% block title %} Global Advisor {% endblock %}
 
-{% block stylesheets %}
-<link rel="stylesheet" href="{{ config.ASSETS_ROOT }}/css/pgassistant.css">
-{% endblock stylesheets %}
-
 {% block content %}
 
 {% macro human_rows(n) %}
@@ -22,79 +18,27 @@
   {%- endif -%}
 {% endmacro %}
 
-{% macro value_or_na(value) %}
-  {{ value if value is not none and value != '' else 'N/A' }}
-{% endmacro %}
-
-{% macro enum_value(value) %}
-  {%- if value.value is defined -%}{{ value.value }}{%- else -%}{{ value }}{%- endif -%}
-{% endmacro %}
-
-{% set ns = namespace(
-  high=0,
-  medium=0,
-  low=0,
-  high_risk=0,
-  medium_risk=0,
-  low_risk=0,
-  manual_review=0,
-  auto_apply=0,
-  quick_wins=0,
-  dev_team=0,
-  ops_team=0,
-  unknown_team=0
-) %}
-
-{% for rec in recommendations %}
-  {% set priority = rec.priority or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
-  {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
-  {% set team = rec.team.value if rec.team.value is defined else rec.team %}
-  {% if team == 'DEV' %}{% set ns.dev_team = ns.dev_team + 1 %}{% elif team == 'OPS' %}{% set ns.ops_team = ns.ops_team + 1 %}{% else %}{% set ns.unknown_team = ns.unknown_team + 1 %}{% endif %}
-  {% if priority == 'HIGH' %}{% set ns.high = ns.high + 1 %}{% endif %}
-  {% if priority == 'MEDIUM' %}{% set ns.medium = ns.medium + 1 %}{% endif %}
-  {% if priority == 'LOW' %}{% set ns.low = ns.low + 1 %}{% endif %}
-  {% if risk == 'HIGH' %}{% set ns.high_risk = ns.high_risk + 1 %}{% endif %}
-  {% if risk == 'MEDIUM' %}{% set ns.medium_risk = ns.medium_risk + 1 %}{% endif %}
-  {% if risk == 'LOW' %}{% set ns.low_risk = ns.low_risk + 1 %}{% endif %}
-  {% if rec.manual_review_required %}{% set ns.manual_review = ns.manual_review + 1 %}{% endif %}
-  {% if rec.can_auto_apply %}{% set ns.auto_apply = ns.auto_apply + 1 %}{% endif %}
-  {% if rec.impact is not none and rec.effort is not none and rec.impact >= 60 and rec.effort <= 30 and risk != 'HIGH' %}
-    {% set ns.quick_wins = ns.quick_wins + 1 %}
-  {% endif %}
-{% endfor %}
-
-<div class="global-advisor-page">
+<div class="global-advisor-page ga-review-page">
 
   <div class="ga-header">
     <div>
-      <div class="ga-eyebrow">DEV/OPS command center</div>
-      <h3 class="ga-title">Global Advisor</h3>
+      <h1 class="ga-title">Global Advisor</h1>
       <p class="ga-subtitle">
-        Prioritized database recommendations, grouped by next best action.
+        Prioritized findings, with the evidence needed to decide.
       </p>
     </div>
 
-    <div class="ga-actions">
+    <div class="d-flex align-items-center gap-2">
       <button
         type="button"
-        class="btn btn-sm ga-primary-action ga-open-recommendations"
-        data-min-rank="80"
-      >
-        Review recommendations
-      </button>
-
-      <button
-        type="button"
-        class="btn btn-sm ga-outline-action"
+        class="btn btn-outline-primary btn-sm"
         data-bs-toggle="modal"
         data-bs-target="#gaAllSqlModal"
       >
         View all suggested SQL
       </button>
 
-      <span class="ga-pill-count">
-        {{ recommendations|length }} recommendations
-      </span>
+      <a href="/executive-plan.html" class="btn btn-primary btn-sm">View action plan</a>
     </div>
   </div>
 
@@ -111,319 +55,25 @@
     </div>
   {% endif %}
 
-  <section class="ga-command-center" aria-label="Global Advisor command center">
-    <div class="ga-command-main">
-      <div class="ga-status-pill">pgAssistant conclusion</div>
-      <h4 class="ga-command-title">
-        {% if recommendations|length == 0 %}
-          No recommendation detected on the enabled checks.
-        {% elif ns.high > 0 %}
-          Start with {{ ns.high }} high-priority recommendation{{ 's' if ns.high > 1 else '' }} before applying lower-risk cleanup.
-        {% elif ns.quick_wins > 0 %}
-          No high-priority item detected. Start with {{ ns.quick_wins }} quick win{{ 's' if ns.quick_wins > 1 else '' }}.
-        {% else %}
-          Review the recommendation queue and focus on manual-review items first.
-        {% endif %}
-      </h4>
-      <p class="ga-command-copy">
-        This view separates urgent findings, safe candidates, high-risk changes, and generated SQL so the DEV/OPS workflow is clearer: review, plan, apply, then validate.
-      </p>
-      <div class="ga-command-actions">
-        <button type="button" class="btn btn-sm ga-primary-action ga-open-recommendations" data-min-rank="80">
-          Review highest priority
-        </button>
-        <button type="button" class="btn btn-sm ga-outline-action ga-open-recommendations" data-quick-wins="true">
-          Show quick wins
-        </button>
-        <button type="button" class="btn btn-sm ga-outline-action ga-open-recommendations" data-risk="HIGH">
-          Inspect high-risk changes
-        </button>
-      </div>
-    </div>
-
-    <aside class="ga-command-next">
-      <div class="ga-command-next-title">Next best actions</div>
-      <div class="ga-next-list">
-        <div class="ga-next-item">
-          <span class="ga-next-rank high">1</span>
-          <div>
-            <div class="ga-next-label">Review reliability and high-rank findings</div>
-            <div class="ga-next-hint">{{ ns.high }} item{{ 's' if ns.high != 1 else '' }} with rank 80+.</div>
-          </div>
-        </div>
-        <div class="ga-next-item">
-          <span class="ga-next-rank quick">2</span>
-          <div>
-            <div class="ga-next-label">Identify safe early improvements</div>
-            <div class="ga-next-hint">{{ ns.quick_wins }} high-impact, low-effort candidate{{ 's' if ns.quick_wins != 1 else '' }}.</div>
-          </div>
-        </div>
-        <div class="ga-next-item">
-          <span class="ga-next-rank risk">3</span>
-          <div>
-            <div class="ga-next-label">Plan risky or manual changes</div>
-            <div class="ga-next-hint">{{ ns.high_risk }} high-risk and {{ ns.manual_review }} manual-review item{{ 's' if ns.manual_review != 1 else '' }}.</div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  </section>
-
-  <div class="ga-tabs" role="tablist" aria-label="Global Advisor views">
-    <button type="button" class="ga-tab-btn active" data-ga-tab="summary" role="tab" aria-selected="true">
-      Summary
-    </button>
-    <button type="button" class="ga-tab-btn" data-ga-tab="recommendations" role="tab" aria-selected="false">
-      Recommendations
-    </button>
+  <div class="ga-review-summary" aria-label="Analysis summary">
+    <span><strong>{{ recommendations|length }}</strong> findings</span>
+    {% for priority in ['HIGH', 'MEDIUM', 'LOW'] %}
+    <span class="ga-badge ga-badge-{{ priority|lower }}">{{ recommendations|selectattr('priority.value', 'equalto', priority)|list|length }} {{ priority|lower }}</span>
+    {% endfor %}
+    <span>Rule-based analysis · {{ session.get('db_name', '') }}</span>
   </div>
-
-  <section id="gaTabSummary" class="ga-tab-panel active" role="tabpanel">
-
-    <div class="ga-summary-grid">
-      <div class="ga-summary-card ga-kpi-total">
-        <div class="ga-summary-value">{{ recommendations|length }}</div>
-        <div class="ga-summary-label">Total recommendations</div>
-        <div class="ga-summary-hint">Detected across enabled checks.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-high">
-        <div class="ga-summary-value">{{ ns.dev_team }}</div>
-        <div class="ga-summary-label">DEV advices</div>
-        <div class="ga-summary-hint">Schema, SQL and application-facing findings.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-risk">
-        <div class="ga-summary-value">{{ ns.ops_team }}</div>
-        <div class="ga-summary-label">OPS advices</div>
-        <div class="ga-summary-hint">Operations, configuration and lifecycle findings.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-high">
-        <div class="ga-summary-value">{{ ns.high }}</div>
-        <div class="ga-summary-label">High priority</div>
-        <div class="ga-summary-hint">Start here first.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-quick">
-        <div class="ga-summary-value">{{ ns.quick_wins }}</div>
-        <div class="ga-summary-label">Quick wins</div>
-        <div class="ga-summary-hint">High impact, low effort.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-risk">
-        <div class="ga-summary-value">{{ ns.high_risk }}</div>
-        <div class="ga-summary-label">High risk</div>
-        <div class="ga-summary-hint">Needs careful planning.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-review">
-        <div class="ga-summary-value">{{ ns.manual_review }}</div>
-        <div class="ga-summary-label">Manual review</div>
-        <div class="ga-summary-hint">Do not blindly apply.</div>
-      </div>
-
-      <div class="ga-summary-card ga-kpi-failed">
-        <div class="ga-summary-value">{{ errors|length if errors else 0 }}</div>
-        <div class="ga-summary-label">Failed checks</div>
-        <div class="ga-summary-hint">Review check execution errors.</div>
-      </div>
+  <section class="pg-card ga-review-panel" aria-label="Advisor findings">
+  <div class="ga-review-filters">
+    <div class="btn-group" role="group" aria-label="Priority filter">
+      {% for priority in ['', 'HIGH', 'MEDIUM', 'LOW'] %}<button type="button" class="btn btn-sm btn-outline-primary{% if not priority %} active{% endif %}" data-priority="{{ priority }}" aria-pressed="{{ 'false' if priority else 'true' }}">{{ priority|title if priority else 'All' }}</button>{% endfor %}
     </div>
-
-    <div class="ga-summary-section-grid">
-      <div class="ga-summary-panel">
-        <div class="ga-summary-panel-header">
-          <div>
-            <div class="ga-summary-panel-title">High priority</div>
-            <div class="ga-summary-panel-subtitle">Highest priority recommendations to review first.</div>
-          </div>
-          <button type="button" class="btn btn-sm ga-outline-action ga-open-recommendations" data-min-rank="80">
-            View high priority
-          </button>
-        </div>
-
-        <div class="ga-mini-list">
-          {% set hp = namespace(count=0) %}
-          {% for rec in recommendations %}
-            {% set priority = rec.priority.value or ('HIGH' if rec.rank >= 80 else ('MEDIUM' if rec.rank >= 60 else 'LOW')) %}
-            {% if hp.count < 5 and priority == 'HIGH' %}
-              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
-              {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
-              {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
-              {% set hp.count = hp.count + 1 %}
-              <div class="ga-mini-item">
-                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
-                <div class="ga-mini-meta">
-                  <span class="ga-badge ga-rank-high">Rank {{ rec.rank }}</span>
-                  {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
-                  {% if risk %}<span class="ga-badge ga-badge-risk-{{ risk|lower }}">Risk {{ risk }}</span>{% endif %}
-                  {% if rec.object_name %}<span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>{% endif %}
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-          {% if hp.count == 0 %}
-            <div class="ga-empty-mini">No high priority recommendation detected.</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="ga-summary-panel">
-        <div class="ga-summary-panel-header">
-          <div>
-            <div class="ga-summary-panel-title">Quick wins</div>
-            <div class="ga-summary-panel-subtitle">Good candidates for early review.</div>
-          </div>
-          <button type="button" class="btn btn-sm ga-outline-action ga-open-recommendations" data-quick-wins="true">
-            View quick wins
-          </button>
-        </div>
-
-        <div class="ga-mini-list">
-          {% set qw = namespace(count=0) %}
-          {% for rec in recommendations %}
-            {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
-            {% if qw.count < 5 and rec.impact is not none and rec.effort is not none and rec.impact >= 60 and rec.effort <= 30 and risk != 'HIGH' %}
-              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
-              {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
-              {% set qw.count = qw.count + 1 %}
-              <div class="ga-mini-item">
-                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
-                <div class="ga-mini-meta">
-                  <span class="ga-badge ga-badge-safe">Impact {{ rec.impact }}</span>
-                  <span class="ga-badge ga-badge-safe">Effort {{ rec.effort }}</span>
-                  {% if outcome %}<span class="ga-badge ga-badge-outcome">{{ outcome }}</span>{% endif %}
-                  {% if rec.object_name %}<span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>{% endif %}
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-          {% if qw.count == 0 %}
-            <div class="ga-empty-mini">No quick win detected with the current scoring.</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="ga-summary-panel">
-        <div class="ga-summary-panel-header">
-          <div>
-            <div class="ga-summary-panel-title">High-risk changes</div>
-            <div class="ga-summary-panel-subtitle">Plan these changes carefully.</div>
-          </div>
-          <button type="button" class="btn btn-sm ga-outline-action ga-open-recommendations" data-risk="HIGH">
-            View high risk
-          </button>
-        </div>
-
-        <div class="ga-mini-list">
-          {% set hr = namespace(count=0) %}
-          {% for rec in recommendations %}
-            {% set risk = rec.risk_level.value if rec.risk_level.value is defined else rec.risk_level %}
-            {% if hr.count < 5 and risk == 'HIGH' %}
-              {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
-              {% set action = rec.action_type.value if rec.action_type.value is defined else rec.action_type %}
-              {% set hr.count = hr.count + 1 %}
-              <div class="ga-mini-item">
-                <div class="ga-mini-title">{{ rec.label or rec.source or category }}</div>
-                <div class="ga-mini-meta">
-                  <span class="ga-badge ga-badge-risk-high">Risk HIGH</span>
-                  {% if action %}<span class="ga-badge ga-badge-action">{{ action }}</span>{% endif %}
-                  {% if rec.schema_name and rec.table_name %}
-                    <span class="ga-badge ga-badge-rows">{{ rec.schema_name }}.{{ rec.table_name }}</span>
-                  {% elif rec.object_name %}
-                    <span class="ga-badge ga-badge-rows">{{ rec.object_name }}</span>
-                  {% endif %}
-                  {% if rec.requires_maintenance_window %}<span class="ga-badge ga-badge-review">Maintenance window</span>{% endif %}
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-          {% if hr.count == 0 %}
-            <div class="ga-empty-mini">No high-risk recommendation detected.</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="ga-summary-panel">
-        <div class="ga-summary-panel-header">
-          <div>
-            <div class="ga-summary-panel-title">Priority distribution</div>
-            <div class="ga-summary-panel-subtitle">How recommendations are distributed.</div>
-          </div>
-        </div>
-
-        <div class="ga-dist-list">
-          {% set total = recommendations|length if recommendations|length > 0 else 1 %}
-          <div class="ga-dist-row">
-            <div class="ga-dist-label">High</div>
-            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.high * 100 / total)|round(0, 'floor') }}%;"></div></div>
-            <div class="ga-dist-count">{{ ns.high }}</div>
-          </div>
-          <div class="ga-dist-row">
-            <div class="ga-dist-label">Medium</div>
-            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.medium * 100 / total)|round(0, 'floor') }}%;"></div></div>
-            <div class="ga-dist-count">{{ ns.medium }}</div>
-          </div>
-          <div class="ga-dist-row">
-            <div class="ga-dist-label">Low</div>
-            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.low * 100 / total)|round(0, 'floor') }}%;"></div></div>
-            <div class="ga-dist-count">{{ ns.low }}</div>
-          </div>
-        </div>
-
-        <div class="ga-summary-panel-subtitle" style="margin-top: 1rem; margin-bottom: .6rem;">Recommendations by team</div>
-        <div class="ga-dist-list">
-          <div class="ga-dist-row">
-            <div class="ga-dist-label">DEV</div>
-            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.dev_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
-            <div class="ga-dist-count">{{ ns.dev_team }}</div>
-          </div>
-          <div class="ga-dist-row">
-            <div class="ga-dist-label">OPS</div>
-            <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.ops_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
-            <div class="ga-dist-count">{{ ns.ops_team }}</div>
-          </div>
-          {% if ns.unknown_team > 0 %}
-            <div class="ga-dist-row">
-              <div class="ga-dist-label">Unassigned</div>
-              <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (ns.unknown_team * 100 / total)|round(0, 'floor') }}%;"></div></div>
-              <div class="ga-dist-count">{{ ns.unknown_team }}</div>
-            </div>
-          {% endif %}
-        </div>
-
-        <div class="ga-summary-panel-subtitle" style="margin-top: 1rem; margin-bottom: .6rem;">Recommendations by outcome</div>
-        <div class="ga-dist-list">
-          {% for outcome_item in recommendations | map(attribute='outcome_id') | select | unique | sort %}
-            {% set outcome_value = outcome_item.value if outcome_item.value is defined else outcome_item %}
-            {% set outcome_counter = namespace(count=0) %}
-            {% for rec in recommendations %}
-              {% set rec_outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
-              {% if rec_outcome == outcome_value %}
-                {% set outcome_counter.count = outcome_counter.count + 1 %}
-              {% endif %}
-            {% endfor %}
-            <div class="ga-dist-row">
-              <div class="ga-dist-label">{{ outcome_value }}</div>
-              <div class="ga-dist-bar"><div class="ga-dist-fill" style="width: {{ (outcome_counter.count * 100 / total)|round(0, 'floor') }}%;"></div></div>
-              <div class="ga-dist-count">{{ outcome_counter.count }}</div>
-            </div>
-          {% else %}
-            <div class="ga-empty-mini">No outcome metadata available.</div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-  </section>
-
-  <section id="gaTabRecommendations" class="ga-tab-panel" role="tabpanel">
-
+    <label for="gaTeamFilter">Team <select id="gaTeamFilter" class="form-select form-select-sm"><option value="">All teams</option>{% for team in recommendations|map(attribute='team.value')|unique|sort %}<option value="{{ team }}">{{ 'Developer' if team == 'DEV' else 'Operations' if team == 'OPS' else team }}</option>{% endfor %}</select></label>
+    <details class="ga-review-more"><summary>More filters</summary>
     <div class="ga-toolbar">
 
       <div>
-        <label class="form-label">Search</label>
-        <input
+        <label class="form-label" for="gaSearch">Search</label>
+<input
           id="gaSearch"
           type="text"
           class="form-control"
@@ -431,18 +81,11 @@
         >
       </div>
 
-      <div>
-        <label class="form-label">Team</label>
-        <select id="gaTeamFilter" class="form-select">
-          <option value="">All teams</option>
-          <option value="DEV">DEV</option>
-          <option value="OPS">OPS</option>
-        </select>
-      </div>
+
 
       <div>
-        <label class="form-label">Label</label>
-        <select id="gaLabelFilter" class="form-select">
+        <label class="form-label" for="gaLabelFilter">Label</label>
+<select id="gaLabelFilter" class="form-select">
           <option value="">All labels</option>
           {% for label in recommendations | map(attribute='label') | select | unique | sort %}
             <option value="{{ label }}">{{ label }}</option>
@@ -451,8 +94,8 @@
       </div>
 
       <div>
-        <label class="form-label">Table</label>
-        <select id="gaTableFilter" class="form-select">
+        <label class="form-label" for="gaTableFilter">Table</label>
+<select id="gaTableFilter" class="form-select">
           <option value="">All tables</option>
           {% for table in recommendations | map(attribute='table_name') | select | unique | sort %}
             <option value="{{ table }}">{{ table }}</option>
@@ -461,8 +104,8 @@
       </div>
 
       <div>
-        <label class="form-label">Category</label>
-        <select id="gaCategoryFilter" class="form-select">
+        <label class="form-label" for="gaCategoryFilter">Category</label>
+<select id="gaCategoryFilter" class="form-select">
           <option value="">All categories</option>
           {% for category in recommendations | map(attribute='category_id.value') | select | unique | sort %}
             <option value="{{ category }}">{{ category }}</option>
@@ -471,8 +114,8 @@
       </div>
 
       <div>
-        <label class="form-label">Outcome</label>
-        <select id="gaOutcomeFilter" class="form-select">
+        <label class="form-label" for="gaOutcomeFilter">Outcome</label>
+<select id="gaOutcomeFilter" class="form-select">
           <option value="">All outcomes</option>
           {% for outcome in recommendations | map(attribute='outcome_id') | select | unique | sort %}
             {% set outcome_value = outcome.value if outcome.value is defined else outcome %}
@@ -482,8 +125,8 @@
       </div>
 
       <div>
-        <label class="form-label">Risk</label>
-        <select id="gaRiskFilter" class="form-select">
+        <label class="form-label" for="gaRiskFilter">Risk</label>
+<select id="gaRiskFilter" class="form-select">
           <option value="">All risks</option>
           <option value="HIGH">HIGH</option>
           <option value="MEDIUM">MEDIUM</option>
@@ -492,8 +135,8 @@
       </div>
 
       <div>
-        <label class="form-label">Action</label>
-        <select id="gaActionFilter" class="form-select">
+        <label class="form-label" for="gaActionFilter">Action</label>
+<select id="gaActionFilter" class="form-select">
           <option value="">All actions</option>
           {% for action in recommendations | map(attribute='action_type') | select | unique | sort %}
             {% set action_value = action.value if action.value is defined else action %}
@@ -503,8 +146,8 @@
       </div>
 
       <div>
-        <label class="form-label">Minimum rank</label>
-        <select id="gaRankFilter" class="form-select">
+        <label class="form-label" for="gaRankFilter">Minimum rank</label>
+<select id="gaRankFilter" class="form-select">
           <option value="0">All</option>
           <option value="80">80+</option>
           <option value="60">60+</option>
@@ -514,18 +157,40 @@
 
     </div>
 
-    <div class="ga-count">
-      Showing <span id="gaVisibleCount">{{ recommendations|length }}</span>
-      of {{ recommendations|length }} recommendations.
-    </div>
+    </details>
+  </div>
+  <div class="ga-count" aria-live="polite">
+    Showing <span id="gaVisibleCount">{{ recommendations|length }}</span>
+    of {{ recommendations|length }} recommendations.
+  </div>
 
-    <div id="gaEmptyState" class="ga-empty-state d-none">
-      No recommendation matches the selected filters.
-    </div>
+  <div id="gaEmptyState" class="ga-empty-state d-none">
+    No recommendation matches the selected filters.
+  </div>
 
-    <div id="gaRecommendations" class="ga-card-grid">
-
-      {% for rec in recommendations %}
+  {% set groups = namespace(items=[]) %}
+  {% for group in recommendations|groupby('recommendation_id') %}
+    {% set sorted_items = group.list|sort(attribute='rank', reverse=true) %}
+    {% set groups.items = groups.items + [(sorted_items[0].rank, sorted_items)] %}
+  {% endfor %}
+  <div class="ga-review-sequence">
+    {% for rank, items in groups.items|sort(attribute=0, reverse=true) %}
+    {% set group_index = loop.index %}
+    {% set first = items[0] %}
+    {% set priority = first.priority.value %}
+    <details class="ga-finding-group">
+      <summary class="ga-group-summary">
+        <span class="ga-sequence-number" aria-hidden="true">{{ loop.index }}</span>
+        <span class="ga-sequence-copy"><span class="ga-review-label">{{ first.label or first.title }}</span><small class="d-block text-muted">{{ first.category_id.value }}</small></span>
+        <span class="ga-sequence-meta">
+          <span class="ga-badge ga-badge-{{ priority|lower }} ga-group-priority">{{ priority|title }}</span>
+          <span class="ga-badge ga-badge-source">{{ 'Developer' if first.team.value == 'DEV' else 'Operations' if first.team.value == 'OPS' else first.team.value }}</span>
+          <span class="ga-sequence-count"><span class="text-end ga-group-count">{{ items|length }}</span> findings</span>
+        </span>
+        <span class="ga-sequence-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="ga-review-evidence" id="gaEvidence{{ loop.index }}">
+      {% for rec in items %}
         {% set category = rec.category_id.value if rec.category_id.value is defined else rec.category_id %}
         {% set object_type = rec.object_type.value if rec.object_type.value is defined else rec.object_type %}
         {% set outcome = rec.outcome_id.value if rec.outcome_id.value is defined else rec.outcome_id %}
@@ -746,13 +411,13 @@
                 class="btn btn-sm ga-outline-action"
                 data-bs-toggle="modal"
                 data-bs-target="#gaAdvisorDetailsModal"
-                data-details-id="gaAdvisorDetailsData{{ loop.index }}"
+                data-details-id="gaAdvisorDetailsData{{ (group_index|string ~ '-' ~ loop.index|string) }}"
               >
                 View details
               </button>
             </div>
 
-            <script type="application/json" id="gaAdvisorDetailsData{{ loop.index }}">
+            <script type="application/json" id="gaAdvisorDetailsData{{ (group_index|string ~ '-' ~ loop.index|string) }}">
               {
                 "label": {{ label|tojson }},
                 "subtitle": {% if rec.schema_name and rec.table_name %}{{ (rec.schema_name ~ '.' ~ rec.table_name)|tojson }}{% elif rec.object_name %}{{ rec.object_name|tojson }}{% elif category %}{{ category|tojson }}{% else %}""{% endif %},
@@ -791,10 +456,13 @@
 
         </div>
       {% endfor %}
-
-    </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  <div class="ga-review-footer">Findings grouped by type · Sorted by highest priority and rank</div>
   </section>
-
+  <p class="small text-muted mt-3">Recommendations require validation against your workload. No changes are applied.</p>
 </div>
 
 <div class="modal fade index-stats-modal" id="indexStatsModal" tabindex="-1" aria-labelledby="indexStatsModalTitle" aria-hidden="true">
@@ -1007,6 +675,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const actionFilter = document.getElementById("gaActionFilter");
   const rankFilter = document.getElementById("gaRankFilter");
 
+  let selectedPriority = "";
   const cards = Array.from(document.querySelectorAll(".ga-card"));
   const visibleCount = document.getElementById("gaVisibleCount");
   const emptyState = document.getElementById("gaEmptyState");
@@ -1527,7 +1196,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (!outcome || cardOutcome === outcome) &&
         (!risk || cardRisk === risk) &&
         (!action || cardAction === action) &&
-        cardRank >= minRank;
+        cardRank >= minRank && (!selectedPriority || card.dataset.priority === selectedPriority);
 
       card.classList.toggle("hidden", !visible);
 
@@ -1536,6 +1205,17 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
+    document.querySelectorAll(".ga-finding-group").forEach(function (group) {
+      const visible = Array.from(group.querySelectorAll(".ga-card:not(.hidden)"));
+      group.hidden = visible.length === 0;
+      group.querySelector(".ga-group-count").textContent = visible.length;
+      if (visible.length) {
+        const priority = visible[0].dataset.priority;
+        const badge = group.querySelector(".ga-group-priority");
+        badge.className = "ga-badge ga-group-priority ga-badge-" + priority.toLowerCase();
+        badge.textContent = priority.charAt(0) + priority.slice(1).toLowerCase();
+      }
+    });
     if (visibleCount) visibleCount.textContent = count;
     if (emptyState) emptyState.classList.toggle("d-none", count > 0);
   }
@@ -1616,7 +1296,18 @@ document.addEventListener("DOMContentLoaded", function () {
           card.classList.toggle("hidden", !visible);
           if (visible) count += 1;
         });
-        if (visibleCount) visibleCount.textContent = count;
+        document.querySelectorAll(".ga-finding-group").forEach(function (group) {
+      const visible = Array.from(group.querySelectorAll(".ga-card:not(.hidden)"));
+      group.hidden = visible.length === 0;
+      group.querySelector(".ga-group-count").textContent = visible.length;
+      if (visible.length) {
+        const priority = visible[0].dataset.priority;
+        const badge = group.querySelector(".ga-group-priority");
+        badge.className = "ga-badge ga-group-priority ga-badge-" + priority.toLowerCase();
+        badge.textContent = priority.charAt(0) + priority.slice(1).toLowerCase();
+      }
+    });
+    if (visibleCount) visibleCount.textContent = count;
         if (emptyState) emptyState.classList.toggle("d-none", count > 0);
         return;
       }
@@ -1653,6 +1344,19 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   });
+
+  document.querySelectorAll("[data-priority]").forEach(function (button) {
+    if (button.tagName !== "BUTTON") return;
+    button.addEventListener("click", function () {
+      selectedPriority = button.dataset.priority;
+      document.querySelectorAll("button[data-priority]").forEach(function (item) {
+        item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", String(item === button));
+      });
+      applyFilters();
+    });
+  });
+  applyFilters();
 
   document.querySelectorAll(".copy-sql-btn").forEach(function (button) {
     button.addEventListener("click", function () {

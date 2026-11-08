@@ -303,7 +303,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function appendText(parent, tag, className, text) {
     const el = document.createElement(tag);
     if (className) el.className = className;
-    el.textContent = text || "";
+    el.textContent = text ?? "";
     parent.appendChild(el);
     return el;
   }
@@ -381,13 +381,49 @@ document.addEventListener("DOMContentLoaded", function () {
     body.appendChild(values);
     appendText(body, "div", "text-muted", item.reason || "");
 
+    const changes = item.source === "pgtune" && Array.isArray(item.changes) ? item.changes : [];
+    const changeEvidence = new Set(changes.map(function (change) {
+      return `${change.parameter}: ${change.current_value} → ${change.proposed_value} (${change.difference_pct}% difference)`;
+    }));
+    if (changes.length) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "table-responsive query-parameter-comparison mt-3";
+      const table = document.createElement("table");
+      table.className = "table table-sm align-middle mb-0";
+      const caption = document.createElement("caption");
+      caption.className = "small text-muted";
+      caption.textContent = "Absolute difference relative to the recommended value. Only settings outside the tolerance are shown.";
+      table.appendChild(caption);
+      const head = document.createElement("thead");
+      const titles = document.createElement("tr");
+      ["Parameter", "Current value", "Recommended value", "Difference"].forEach(function (label) {
+        const th = appendText(titles, "th", "", label);
+        th.scope = "col";
+      });
+      head.appendChild(titles);
+      table.appendChild(head);
+      const rows = document.createElement("tbody");
+      changes.forEach(function (change) {
+        const row = document.createElement("tr");
+        const name = appendText(row, "th", "", change.parameter || "—");
+        name.scope = "row";
+        appendText(row, "td", "", change.current_value ?? "—");
+        appendText(row, "td", "", change.proposed_value ?? "—");
+        appendText(row, "td", "text-end", change.difference_pct == null ? "—" : `${change.difference_pct}%`);
+        rows.appendChild(row);
+      });
+      table.appendChild(rows);
+      wrapper.appendChild(table);
+      body.appendChild(wrapper);
+    }
+
     if (item.evidence && item.evidence.length) {
       const list = document.createElement("ul");
       list.className = "query-parameter-evidence";
       item.evidence.forEach(function (value) {
-        appendText(list, "li", "", value);
+        if (!changeEvidence.has(value)) appendText(list, "li", "", value);
       });
-      body.appendChild(list);
+      if (list.children.length) body.appendChild(list);
     }
 
     if (item.alter_system_sql) {

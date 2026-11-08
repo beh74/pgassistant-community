@@ -91,12 +91,16 @@
   </div>
 {% endmacro %}
 
-{% set profile_calls = dbinfo.get('profile', []) | sort(attribute='total_calls', reverse=true) %}
-{% set profile_time = dbinfo.get('profile', []) | sort(attribute='total_exec_time', reverse=true) %}
+{# Sort by numeric percentage, then by total when rounded percentages tie. #}
+{% set workload = namespace(calls=[], time=[]) %}
+{% for row in dbinfo.get('profile', []) %}
+  {% set workload.calls = workload.calls + [((row.percentage_calls | float, row.total_calls | int), row)] %}
+  {% set workload.time = workload.time + [((row.percentage_exec_time | float, row.total_exec_time | float), row)] %}
+{% endfor %}
+{% set profile_calls = workload.calls | sort(attribute=0, reverse=true) | map(attribute=1) | list %}
+{% set profile_time = workload.time | sort(attribute=0, reverse=true) | map(attribute=1) | list %}
 {% set top_profile_calls = profile_calls[:4] %}
-{% set more_profile_calls = profile_calls[4:] %}
 {% set top_profile_time = profile_time[:4] %}
-{% set more_profile_time = profile_time[4:] %}
 {% set cache_value = dbinfo.get('cache') %}
 {% set connections = dbinfo.get('connexions') %}
 {% set max_connections = dbinfo.get('max_connexions') | int %}
@@ -160,18 +164,18 @@
       <div class="dashboard-kpi-heading">
         <i class="bi {{ icon }}" aria-hidden="true"></i>
         <div class="dashboard-kpi-label">{{ label }}</div>
+      {% if version_advisor %}
+      <button type="button" id="dashboardVersionAdvisorLink" class="dashboard-kpi-details" data-bs-toggle="modal" data-bs-target="#postgresVersionAdvisorModal" aria-label="{{ label }}: view details" title="View details">
+        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </button>
+      {% else %}
+      <a href="{{ href }}" class="dashboard-kpi-details" aria-label="{{ label }}: view details" title="View details">
+        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </a>
+      {% endif %}
       </div>
       <h2 class="dashboard-kpi-value">{{ value }}</h2>
       <div class="dashboard-kpi-description">{{ caller() }}</div>
-      {% if version_advisor %}
-      <button type="button" id="dashboardVersionAdvisorLink" class="dashboard-kpi-details" data-bs-toggle="modal" data-bs-target="#postgresVersionAdvisorModal" aria-label="{{ label }}: view details">
-        View details <i class="bi bi-arrow-right" aria-hidden="true"></i>
-      </button>
-      {% else %}
-      <a href="{{ href }}" class="dashboard-kpi-details" aria-label="{{ label }}: view details">
-        View details <i class="bi bi-arrow-right" aria-hidden="true"></i>
-      </a>
-      {% endif %}
     </div>
   {% endmacro %}
 
@@ -209,109 +213,100 @@
     {% endcall %}
   </div>
 
-  <div class="dashboard-section-grid mb-4">
-    <div class="dashboard-main-grid">
-
-      <div class="pg-card">
-        <div class="dashboard-card-header">
-          <span class="dashboard-section-title">
-            <i class="bi bi-bar-chart-line"></i>
-            <span>Workload profile by calls</span>
-            <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows the 4 most frequent query categories. Click More to see all categories and their meaning."></i>
-          </span>
-        </div>
-        <div class="pg-card-body dashboard-profile-list">
-          <p class="small text-muted">Cumulative since pg_stat_statements was reset; not live throughput.</p>
-          {% if not top_profile_calls %}
-            <div class="small text-muted">No pg_stat_statements workload data is available for this database.</div>
-          {% endif %}
-          {% for table in top_profile_calls %}
-            <div class="dashboard-profile-row">
-              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
-              <div class="dashboard-profile-content">
-                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-                <div class="dashboard-progress-meta">
-                  <span>{{ table['percentage_calls'] }}%</span>
-                  <span>{{ humanize_number(table['total_calls']) }} calls</span>
-                </div>
-                <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of calls" style="width: {{ table['percentage_calls'] }}%;" aria-valuenow="{{ table['percentage_calls'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-          {% if more_profile_calls %}
-            <div class="mt-3">
-              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileCallsModal">More</button>
-            </div>
-          {% endif %}
+  {% macro workload_rows(rows, metric) %}
+    {% for table in rows %}
+      {% set percentage = table['percentage_calls'] if metric == 'calls' else table['percentage_exec_time'] %}
+      <div class="dashboard-profile-row">
+        <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}" aria-hidden="true"></i></div>
+        <div class="dashboard-profile-content">
+          <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
+          <div class="dashboard-progress-meta">
+            <span>{{ percentage }}%</span>
+            <span>{% if metric == 'calls' %}{{ humanize_number(table['total_calls']) }} calls{% else %}{{ humanize_ms(table.get('total_exec_time')) }}{% endif %}</span>
+          </div>
+          <div class="progress dashboard-progress">
+            <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of {{ 'calls' if metric == 'calls' else 'execution time' }}" style="width: {{ percentage }}%;" aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
         </div>
       </div>
+    {% else %}
+      <p class="small text-muted mb-0">No pg_stat_statements workload data is available for this database.</p>
+    {% endfor %}
+  {% endmacro %}
 
-      <div class="pg-card">
-        <div class="dashboard-card-header">
-          <span class="dashboard-section-title">
-            <i class="bi bi-stopwatch"></i>
-            <span>Workload profile by time</span>
-            <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows the 4 query categories consuming the most execution time. Click More to see all categories and their meaning."></i>
-          </span>
-        </div>
-        <div class="pg-card-body dashboard-profile-list">
-          <p class="small text-muted">Cumulative since pg_stat_statements was reset; not live throughput.</p>
-          {% if not top_profile_time %}
-            <div class="small text-muted">No pg_stat_statements workload data is available for this database.</div>
-          {% endif %}
-          {% for table in top_profile_time %}
-            <div class="dashboard-profile-row">
-              <div class="dashboard-profile-icon"><i class="bi {{ query_type_icon_class(table['query_type']) }}"></i></div>
-              <div class="dashboard-profile-content">
-                <div class="dashboard-profile-label">{{ table['query_type'] }}</div>
-                <div class="dashboard-progress-meta">
-                  <span>{{ table['percentage_exec_time'] }}%</span>
-                  <span>{% if table['total_exec_time'] is defined %}{{ humanize_ms(table['total_exec_time']) }}{% endif %}</span>
-                </div>
-                <div class="progress dashboard-progress">
-                  <div class="progress-bar" role="progressbar" aria-label="{{ table['query_type'] }} share of execution time" style="width: {{ table['percentage_exec_time'] }}%;" aria-valuenow="{{ table['percentage_exec_time'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-          {% if more_profile_time %}
-            <div class="mt-3">
-              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileTimeModal">More</button>
-            </div>
-          {% endif %}
+  <div class="dashboard-overview-grid mb-4">
+    <section class="pg-card">
+      <div class="dashboard-card-header">
+        <div><h2 class="dashboard-section-title mb-0">Workload distribution</h2><p class="small text-muted mb-0 mt-1">Cumulative since pg_stat_statements was reset</p></div>
+        <div class="nav dashboard-workload-tabs" role="tablist" aria-label="Workload metric">
+          <button class="nav-link active" id="workload-calls-tab" data-bs-toggle="tab" data-bs-target="#workload-calls" type="button" role="tab" aria-controls="workload-calls" aria-selected="true">Calls</button>
+          <button class="nav-link" id="workload-time-tab" data-bs-toggle="tab" data-bs-target="#workload-time" type="button" role="tab" aria-controls="workload-time" aria-selected="false">Time</button>
         </div>
       </div>
-
-      <div class="pg-card">
-        <div class="dashboard-card-header">
-          <span class="dashboard-section-title"><i class="bi bi-table"></i><span>Largest tables</span></span>
-          <a href="/tables_cards.html" class="btn btn-sm btn-outline-primary">See all</a>
+      <div class="tab-content">
+        <div class="tab-pane show active" id="workload-calls" role="tabpanel" aria-labelledby="workload-calls-tab" tabindex="0">
+          <div class="pg-card-body dashboard-profile-list">{{ workload_rows(top_profile_calls, 'calls') }}</div>
+          <div class="dashboard-workload-footer"><span>Cumulative distribution, not live throughput</span>{% if profile_calls %}<button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileCallsModal" aria-label="More workload details by calls">More</button>{% endif %}</div>
         </div>
-        <div class="pg-card-body dashboard-row-list">
-          {% for table in dbinfo['table_size'] %}
-            <div class="dashboard-row-item">
-              <div class="dashboard-row-icon"><i class="bi bi-grid-3x3-gap"></i></div>
-              <div class="dashboard-row-main">
-                <div class="dashboard-row-label">
-                  {% if table.get('schemaname') %}
-                    <a href="/topqueries.html?schema={{ table['schemaname']|urlencode }}&amp;tablename={{ table['table_name']|urlencode }}{% if table.get('database') %}&amp;db={{ table['database']|urlencode }}{% endif %}">{{ table['schemaname'] }}.{{ table['table_name'] }}</a>
-                  {% else %}{{ table['table_name'] }}{% endif %}
-                </div>
-                {% if table.get('database') %}<div class="dashboard-row-note">{{ table['database'] }}</div>{% endif %}
-              </div>
-              <div class="dashboard-row-value">
-                {{ table['size'] }}<br>
-                <small title="{{ format_integer(table['row_count']) }} rows">≈{{ humanize_number(table['row_count']) }} rows</small>
-              </div>
-            </div>
-          {% else %}
-            <p class="small text-muted mb-0">No table size information available.</p>
-          {% endfor %}
+        <div class="tab-pane" id="workload-time" role="tabpanel" aria-labelledby="workload-time-tab" tabindex="0">
+          <div class="pg-card-body dashboard-profile-list">{{ workload_rows(top_profile_time, 'time') }}</div>
+          <div class="dashboard-workload-footer"><span>Cumulative distribution, not live throughput</span>{% if profile_time %}<button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileTimeModal" aria-label="More workload details by time">More</button>{% endif %}</div>
         </div>
       </div>
+    </section>
+      <div class="pg-card dashboard-focus-card">
+        <div class="dashboard-card-header">
+          <div><h2 class="dashboard-section-title mb-0">Where to focus</h2><p class="small text-muted mb-0 mt-1">Top DEV recommendations</p></div>
+          <span class="dashboard-focus-review">Review</span>
+        </div>
+        <div id="dashboardDevAdvisorBody" class="pg-card-body dashboard-row-list" aria-live="polite">
+          <div class="dashboard-row-item dashboard-loading-row">
+            <div class="dashboard-row-icon"><i class="bi bi-hourglass-split"></i></div>
+            <div class="dashboard-row-main">
+              <div class="dashboard-row-label">Querying database</div>
+              <div class="dashboard-row-note">Collecting and grouping DEV recommendations from Global Advisor.</div>
+            </div>
+            <div class="dashboard-row-value">...</div>
+          </div>
+        </div>
+        <div class="dashboard-workload-footer"><span>DEV findings, grouped by type</span><a href="/global/advisor" class="dashboard-focus-link">Review findings <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
+        <div class="px-3 pb-3" id="dashboardDevRetryWrap" hidden><button type="button" id="dashboardDevRetry" class="btn btn-sm btn-outline-primary">Retry advisor</button></div>
+      </div>
+  </div>
 
+  <section class="pg-card mb-4" aria-labelledby="dashboard-largest-tables-title">
+    <div class="dashboard-card-header">
+      <div><h2 id="dashboard-largest-tables-title" class="dashboard-section-title mb-0">Largest tables</h2><p class="small text-muted mb-0 mt-1">Total size includes indexes{% if dbinfo.get('multi_db') %} · Largest relations from up to 20 cluster databases{% endif %}</p></div>
+      <a href="/tables_cards.html" class="btn btn-sm btn-outline-primary">See all</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table dashboard-largest-tables mb-0">
+        <thead><tr><th scope="col">Relation</th><th scope="col" class="text-end">Total size</th><th scope="col" class="text-end">Estimated rows</th><th scope="col">Share of database</th></tr></thead>
+        <tbody>
+          {% for table in dbinfo.get('table_size', []) %}
+            {% set database_bytes = table.get('database_size_bytes') if dbinfo.get('multi_db') else dbinfo.get('size_bytes') %}
+            {% set relation_bytes = table.get('size_bytes', table.get('total_size_bytes')) %}
+            <tr>
+              <td>
+                {% if table.get('schemaname') %}<a href="/topqueries.html?schema={{ table['schemaname']|urlencode }}&amp;tablename={{ table['table_name']|urlencode }}{% if table.get('database') %}&amp;db={{ table['database']|urlencode }}{% endif %}">{{ table['schemaname'] }}.{{ table['table_name'] }}</a>{% else %}{{ table['table_name'] }}{% endif %}
+                {% if table.get('database') %}<div class="small text-muted">{{ table['database'] }}</div>{% endif %}
+              </td>
+              <td class="text-end text-nowrap">{{ table['size'] }}</td>
+              <td class="text-end text-nowrap">{% if table.get('row_count') is not none %}<span title="{{ format_integer(table['row_count']) }} estimated rows">≈{{ humanize_number(table['row_count']) }}</span>{% else %}<span class="text-muted">Unavailable</span>{% endif %}</td>
+              <td>
+                {% if database_bytes and database_bytes|float > 0 and relation_bytes is not none %}
+                  {% set share = 100 * (relation_bytes|float) / (database_bytes|float) %}
+                  <div class="dashboard-table-share"><div class="progress" role="progressbar" aria-label="{{ table['table_name'] }} share of its database" aria-valuenow="{{ share|round(3) }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ [share, 100]|min }}%;"></div></div><span>{% if 0 < share < 0.1 %}&lt;0.1%{% else %}{{ '%.1f'|format(share) }}%{% endif %}</span></div>
+                {% else %}<span class="small text-muted">Unavailable</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}<tr><td colspan="4" class="text-muted">No table size information available.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="dashboard-details-grid mb-4">
       <div class="pg-card">
         <div class="dashboard-card-header">
           <span class="dashboard-section-title"><i class="bi bi-pc-display"></i><span>Top clients</span></span>
@@ -334,28 +329,7 @@
           {% endfor %}
         </div>
       </div>
-
-    </div>
-
-    <div class="dashboard-side-column">
-      <div class="pg-card mb-3">
-        <div class="dashboard-card-header">
-          <span class="dashboard-section-title"><i class="bi bi-shield-exclamation"></i><span>DEV priorities</span></span>
-          <a href="/global/advisor" class="btn btn-sm btn-outline-primary">See all</a>
-        </div>
-        <div id="dashboardDevAdvisorBody" class="pg-card-body dashboard-row-list" aria-live="polite">
-          <div class="dashboard-row-item dashboard-loading-row">
-            <div class="dashboard-row-icon"><i class="bi bi-hourglass-split"></i></div>
-            <div class="dashboard-row-main">
-              <div class="dashboard-row-label">Querying database</div>
-              <div class="dashboard-row-note">Collecting and grouping DEV recommendations from Global Advisor.</div>
-            </div>
-            <div class="dashboard-row-value">...</div>
-          </div>
-        </div>
-        <div class="px-3 pb-3" id="dashboardDevRetryWrap" hidden><button type="button" id="dashboardDevRetry" class="btn btn-sm btn-outline-primary">Retry advisor</button></div>
-      </div>
-      <div class="pg-card mb-3">
+      <div class="pg-card">
         <div class="dashboard-card-header">
           <span class="dashboard-section-title"><i class="bi bi-activity"></i><span>Activity links</span></span>
         </div>
@@ -375,8 +349,6 @@
         </div>
       </div>
 
-
-    </div>
   </div>
 
   {% set architecture = dbinfo.get('architecture', {}) %}
@@ -440,7 +412,7 @@
   <script type="application/json" id="cluster-databases-json">{{ dbinfo.databases | tojson }}</script>
   {% endif %}
 
-  {% if more_profile_calls %}
+  {% if profile_calls %}
   <div class="modal fade" id="profileCallsModal" tabindex="-1" aria-labelledby="profileCallsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -472,7 +444,7 @@
   </div>
   {% endif %}
 
-  {% if more_profile_time %}
+  {% if profile_time %}
   <div class="modal fade" id="profileTimeModal" tabindex="-1" aria-labelledby="profileTimeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -845,16 +817,11 @@
     const row = document.createElement("div");
     row.className = "dashboard-row-item dashboard-advisor-type-item";
 
-    const iconWrap = document.createElement("div");
-    iconWrap.className = "dashboard-row-icon";
-    const icon = document.createElement("i");
-    icon.className = "bi bi-info-circle text-muted";
-    if (recommendationType.highest_priority === "HIGH") {
-      icon.className = "bi bi-exclamation-triangle-fill text-danger";
-    } else if (recommendationType.highest_priority === "MEDIUM") {
-      icon.className = "bi bi-exclamation-circle-fill text-warning";
-    }
-    iconWrap.appendChild(icon);
+    const priority = ["HIGH", "MEDIUM", "LOW"].includes(recommendationType.highest_priority)
+      ? recommendationType.highest_priority : "LOW";
+    const badge = document.createElement("span");
+    badge.className = "dashboard-focus-priority dashboard-focus-priority-" + priority.toLowerCase();
+    badge.textContent = priority.charAt(0) + priority.slice(1).toLowerCase();
 
     const main = document.createElement("div");
     main.className = "dashboard-row-main";
@@ -866,35 +833,12 @@
 
     const note = document.createElement("div");
     note.className = "dashboard-row-note";
-    const priorityCounts = recommendationType.priority_counts || {};
-    const parts = [];
-    if (priorityCounts.HIGH) {
-      parts.push(priorityCounts.HIGH + " HIGH");
-    }
-    if (priorityCounts.MEDIUM) {
-      parts.push(priorityCounts.MEDIUM + " MEDIUM");
-    }
-    if (priorityCounts.LOW) {
-      parts.push(priorityCounts.LOW + " LOW");
-    }
-    note.textContent = parts.join(", ") || "No priority details";
+    const total = recommendationType.total || 0;
+    note.textContent = total + (total === 1 ? " finding" : " findings") + " · Developer";
     main.appendChild(note);
 
-    const rank = document.createElement("div");
-    rank.className = "dashboard-row-value dashboard-recommendation-rank";
-
-    const rankValue = document.createElement("strong");
-    rankValue.textContent = recommendationType.total || 0;
-    rank.appendChild(rankValue);
-    rank.appendChild(document.createElement("br"));
-
-    const totalLabel = document.createElement("small");
-    totalLabel.textContent = recommendationType.total === 1 ? "recommendation" : "recommendations";
-    rank.appendChild(totalLabel);
-
-    row.appendChild(iconWrap);
+    row.appendChild(badge);
     row.appendChild(main);
-    row.appendChild(rank);
 
     return row;
   }
@@ -958,7 +902,6 @@
 
     if (scoreArc) {
       scoreArc.style.setProperty("--dashboard-health", String(score * 3.6) + "deg");
-      scoreArc.style.setProperty("--dashboard-score-color", score >= 80 ? "var(--pga-green)" : score >= 55 ? "#b45309" : "var(--pga-red)");
       scoreArc.setAttribute("aria-label", "DEV advisor score " + score + " out of 100");
     }
     if (scoreValue) {

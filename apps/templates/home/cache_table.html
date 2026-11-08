@@ -1,190 +1,65 @@
 {% extends "layouts/base.html" %}
-
-{% block title %} Tables {% endblock %} 
-
-<!-- Specific Page CSS goes HERE  -->
-{% block stylesheets %}
-<link rel="stylesheet" type="text/css" href="{{ config.ASSETS_ROOT }}/css/dataTables.bootstrap5.css">
-{% endblock stylesheets %}
-
-{% block content %}
- 
-<div class="py-4">
-    <div class="mb-3 mb-lg-0">
-        <h1 class="h4">{{ description['description'] }}</h1>
-    </div>
-
-    <div class="d-flex justify-content-end">
-        
-    {%if description['reference'] %}
-        <a href="{{ description['reference'] }}" target="_blank" class="btn btn-primary me-2 align-items-center d-inline-flex">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
-            <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
-            <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
-            </svg> Reference
-        </a>
-    {% endif %}
-        <button type="button" class="btn btn-primary me-2 align-items-center d-inline-flex" data-bs-toggle="modal" data-bs-target="#modal-default">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1 icon-20" viewBox="0 0 16 16">
-                <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8z"/></svg>
-            Show query</button>
-        <!-- Refresh -->
-        <button id="refresh" type="submit" class="btn btn-primary align-items-center d-inline-flex me-2" name="submit_refresh" value="refresh"
-            onclick="refreshPage()">
-            <svg class="icon icon-20 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3">
-                </path>
-            </svg>
-            Refresh
-        </button>
-        <button onclick="location.href='/reset_pg_stat.html'" type="button" class="btn btn-danger d-inline-flex align-items-center">
-            <svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0">
-            </path></svg>
-            Reset
-        </button>
-    </div>
+{% block title %}Cache efficiency{% endblock %}
+{% macro cache_metric(label, value) %}
+<div class="cache-metric">
+  <span class="cache-metric-label">{{ label }}</span>
+  {% if value is number %}
+  <strong class="cache-metric-value">{{ '%.2f'|format(value) }}<small>%</small></strong>
+  <progress class="cache-meter" value="{{ value }}" max="100" aria-label="{{ label }}">{{ value }}%</progress>
+  <span class="cache-metric-note">{{ 'High cache hit ratio' if value >= 99 else 'Good cache hit ratio' if value >= 95 else 'Review workload and disk reads' }}</span>
+  {% else %}
+  <strong class="cache-metric-value">—</strong><span class="cache-metric-note">No statistics available</span>
+  {% endif %}
 </div>
-   <div class="modal fade" id="modal-default" tabindex="-1" role="dialog" aria-labelledby="modal-default" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-              <div class="modal-header">
-                  <h2 class="h6 modal-title">Executed query</h2>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                  <code>{{ description['sql'] }}</code>
-              
-              </div>
-              <div class="modal-footer">
-                  <button type="button" class="btn btn-link text-gray ms-auto" data-bs-dismiss="modal">Close</button>
-              </div>
-          </div>
-      </div></div>
-
-  <div class="card border-0 shadow mb-4">
-      <div class="card-body">
-        <div class="table-responsive">
-            <table id="generic" class="table table-striped" style="width:100%" >
-                <thead class="thead-light">
-                    <tr>
-                        <th>Schema</th>
-                        <th>Table</th>
-                        <th>Table Hit Cache Ratio</th>
-                        <th>Index Hit Cache Ratio</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows %}
-                    <tr>
-                        <td>{{ row['schemaname'] }}</td>
-                        <td>
-                            <a href="/topqueries.html?tablename={{ row['table_name'] | urlencode }}">
-                                {{ row['table_name'] }}
-                                    <svg class="icon icon-xs text-gray-500 me-2" viewBox="0 0 20 20" data-slot="icon" fill="none" stroke-width="1.5" stroke="blue" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"></path>
-                                    </svg>
-                            </a>
-                        </td>
-                
-                        <!-- Vérification et affichage du table_cache_hit_ratio -->
-                        <td>
-                            {% if row['table_cache_hit_ratio'] is number %}
-                                {{ row['table_cache_hit_ratio'] }} %
-                                {% if row['table_cache_hit_ratio'] == 0 %}
-                                    ❓
-                                {% elif row['table_cache_hit_ratio'] >= 99 %}
-                                    ✅
-                                {% elif row['table_cache_hit_ratio'] >= 95 %}
-                                    👍
-                                {% elif row['table_cache_hit_ratio'] >= 90 %}
-                                    ⚠️
-                                {% else %}
-                                    ❌
-                                {% endif %}
-                            {% else %}
-                                <span class="text-danger">no values</span>
-                            {% endif %}
-                        </td>
-                
-                        <!-- Vérification et affichage du index_cache_hit_ratio -->
-                        <td>
-                            {% if row['index_cache_hit_ratio'] is number %}
-                                {{ row['index_cache_hit_ratio'] }} %
-                                {% if row['index_cache_hit_ratio'] == 0 %}
-                                    ❓
-                                {% elif row['index_cache_hit_ratio'] >= 99 %}
-                                    ✅
-                                {% elif row['index_cache_hit_ratio'] >= 95 %}
-                                    👍
-                                {% elif row['index_cache_hit_ratio'] >= 90 %}
-                                    ⚠️
-                                {% else %}
-                                    ❌
-                                {% endif %}
-                            {% else %}
-                                <span class="text-danger">no values</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+{% endmacro %}
+{% block content %}
+<div class="pg-page cache-cards-page tables-cards-page">
+  <div class="pg-page-header"><div><div class="pg-eyebrow">Database performance</div><h1 class="pg-title">{{ description['description'] }}</h1><p class="pg-subtitle">Table and index cache efficiency, one relation at a time.</p></div>
+  <div class="pg-actions">
+    {% if description.get('reference') %}<a href="{{ description['reference'] }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">Reference ↗</a>{% endif %}
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cacheQueryModal">Show query</button>
+    <button type="button" class="btn btn-outline-primary btn-sm" onclick="location.reload()">Refresh</button>
+    <a href="/reset_pg_stat.html" class="btn btn-outline-danger btn-sm">Reset statistics</a>
+  </div></div>
+  <div class="cache-toolbar">
+    <label>Search tables<input type="search" id="cache-search" class="form-control" placeholder="Schema or table name"></label>
+    <label>Sort by<select id="cache-sort" class="form-select"><option value="name">Table name</option><option value="table">Lowest table hit ratio</option><option value="index">Lowest index hit ratio</option></select></label>
+    <span id="cache-count" class="small text-muted" role="status" aria-live="polite">{{ rows|length }} tables</span>
+  </div>
+  <div class="tables-grid" id="cache-grid">
+  {% for row in rows %}
+    <article class="card table-card cache-card" data-name="{{ (row['schemaname'] ~ '.' ~ row['table_name'])|lower|e }}" data-table="{{ row['table_cache_hit_ratio'] if row['table_cache_hit_ratio'] is number else '' }}" data-index="{{ row['index_cache_hit_ratio'] if row['index_cache_hit_ratio'] is number else '' }}">
+      <div class="card-header"><span class="table-schema-badge"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>{{ row['schemaname'] }}</span></div>
+      <div class="card-body d-flex flex-column">
+        <div class="tables-name mb-3"><span class="table-identity-icon" aria-hidden="true"><i class="bi bi-table"></i></span><div><small class="table-identity-schema">{{ row['schemaname'] }}</small><strong>{{ row['table_name'] }}</strong></div></div>
+        <div class="cache-metrics">{{ cache_metric('Table hit ratio', row['table_cache_hit_ratio']) }}{{ cache_metric('Index hit ratio', row['index_cache_hit_ratio']) }}</div>
+        <div class="table-card-footer"><a class="btn table-action-btn" href="/topqueries.html?schema={{ row['schemaname']|urlencode }}&amp;tablename={{ row['table_name']|urlencode }}"><i class="bi bi-code-square" aria-hidden="true"></i>Related queries <span aria-hidden="true">→</span></a></div>
       </div>
+    </article>
+  {% endfor %}
   </div>
-
-  <div class="card border-0 shadow mb-4">
-    <div class="card-body">
-        <h5 class="mb-3">Understanding the Query Results: Analyzing Cache Hit Ratios in PostgreSQL</h5>
-        <ul class="list-group">
-            <li class="list-group-item"><strong>Low Cache Hit Ratios = More Disk Reads<p>
-                A low table or index cache hit ratio means that PostgreSQL frequently reads from disk instead of memory, which slows down queries and increases I/O load.</p></li>
-            <li class="list-group-item"><strong>Indexes May Be Inefficient:</strong> If a table has a high table cache hit ratio but a low index cache hit ratio, it could mean:
-                <ul>
-                    <li>Indexes are not properly used.</li>
-                    <li>Queries rely on sequential scans instead of index scans.</li>
-                    <li>Index bloat may be affecting efficiency.</li>
-                </ul>
-            </li>
-            <li class="list-group-item"><strong>Optimizing Performance</strong> : Identifying poorly cached tables allows database administrators to take actions such as:
-                <ul>
-                    <li>Increasing shared_buffers to improve caching.</li>
-                    <li>Adding or optimizing indexes for better query performance.</li>
-                    <li>Rewriting queries to make better use of indexes.</li>
-                    <li>Using <a href="https://www.postgresql.org/docs/current/pgprewarm.html"> pg_prewarm</a> to preload frequently accessed tables into memory.</li>
-                </ul>
-            </li>
-            <li class="list-group-item"><strong>Conclusion :</strong> This query helps prioritize database optimization efforts by highlighting tables and indexes that rely too much on disk I/O. By improving cache efficiency, PostgreSQL can serve queries faster and reduce hardware strain.
-            </li>
-        </ul>
-    </div>
-  </div>
-
-  <p id="current-sql">No SQL executing</p>
-  <div id="results"></div>
-
-<script id="dt1" src="{{ config.ASSETS_ROOT }}/js/jquery-3.7.1.js"></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.js"></script>
-<script id="dt3" src="{{ config.ASSETS_ROOT }}/js/dataTables.bootstrap5.js"></script>
-
+  <p id="cache-empty" class="cache-empty text-muted" {% if rows %}hidden{% endif %}>No table matches this view.</p>
+  <details class="cache-help"><summary>Understanding cache hit ratios</summary><p>These ratios describe cumulative PostgreSQL buffer activity. A lower ratio indicates more buffer misses; it does not measure query latency or the operating system cache.</p><p>Compare table and index ratios with workload, table size and recent statistics resets before changing configuration. Missing values mean statistics are unavailable.</p></details>
+</div>
+<div class="modal fade" id="cacheQueryModal" tabindex="-1" aria-labelledby="cacheQueryTitle" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="h6 modal-title" id="cacheQueryTitle">Executed query</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><pre class="cache-query"><code>{{ description['sql'] }}</code></pre></div></div></div></div>
+{% endblock %}
+{% block javascripts %}
 <script>
-    function refreshPage() {
-            location.reload(); // Reloads the page
-        }
+(() => {
+ const grid = document.getElementById('cache-grid');
+ const cards = Array.from(grid.querySelectorAll('.cache-card'));
+ const search = document.getElementById('cache-search');
+ const sort = document.getElementById('cache-sort');
+ function update() {
+   const query = search.value.trim().toLowerCase();
+   const metric = card => card.dataset[sort.value] === '' ? Infinity : Number(card.dataset[sort.value]);
+   cards.sort((a, b) => (sort.value === 'name' ? 0 : metric(a) - metric(b)) || a.dataset.name.localeCompare(b.dataset.name));
+   let count = 0;
+   cards.forEach(card => { card.hidden = !card.dataset.name.includes(query); if (!card.hidden) count++; grid.appendChild(card); });
+   document.getElementById('cache-count').textContent = count + ' of ' + cards.length + ' tables';
+   document.getElementById('cache-empty').hidden = count > 0;
+ }
+ search.addEventListener('input', update); sort.addEventListener('change', update); update();
+})();
 </script>
-
-<script>
-    // Garde les colonnes triables mais désactive le tri par défaut
-    new DataTable('#generic', {
-      order: [], // Pas de tri initial
-      scrollX: true
-    });
-</script>
-
-{% endblock content %}
-
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}{% endblock javascripts %}
+{% endblock %}

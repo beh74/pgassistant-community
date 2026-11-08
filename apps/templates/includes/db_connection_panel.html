@@ -15,8 +15,7 @@
 
   <div class="pga-mobile-db-bar-top">
     <div class="pga-mobile-db-status">
-      <span class="pga-conn-dot" aria-hidden="true"></span>
-      <span class="pga-mobile-db-status-text">Connected</span>
+
       {% if session.get('version') %}
       <span class="pga-mobile-db-pg">PG {{ session['version'] }}</span>
       {% endif %}
@@ -72,10 +71,7 @@
   <div class="pga-db-details">
 
     <div class="pga-sidebar-db-head">
-      <div class="pga-sidebar-db-status" title="Active PostgreSQL connection">
-        <span class="pga-conn-dot" aria-hidden="true"></span>
-        <span class="pga-sidebar-db-status-text">Connected</span>
-      </div>
+
       {% if session.get('version') %}
       <span class="pga-sidebar-db-pg-badge">PG {{ session['version'] }}</span>
       {% endif %}
@@ -113,7 +109,7 @@
           <i class="bi bi-database" aria-hidden="true"></i>
           Database
         </span>
-        <span class="pga-sidebar-db-static" title="{{ session['db_name'] }}">{{ session['db_name'] }}</span>
+        <span class="pga-sidebar-db-value" title="{{ session['db_name'] }}">{{ session['db_name'] }}</span>
       </div>
       {% endif %}
     </div>
